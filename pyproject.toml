@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arena-ai"
+version = "0.1.0"
+description = "A 2D arena fighting game with a reinforcement learning opponent."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pygame-ce",
+    "PyYAML",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+arena_ai = ["**/*.yaml"]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E501"]

@@ -8,3 +8,6 @@ runs/*
 !runs/.gitkeep
 .venv/
 __pycache__/
+*.egg-info/
+dist/
+build/

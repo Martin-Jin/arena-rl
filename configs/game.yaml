@@ -1,0 +1,25 @@
+# game.yaml
+# This YAML file contains the parameter values used by the game. All configurable parameters are also defined in sim/config.py.
+world:
+  gravity_mps2: 19.6 # derived from jump height and time to peak
+  sim_hz: 60 # fixed timestep (1/60)
+  arena_width_m: 12.0
+  floor_y_m: 0.0
+
+fighter:
+  max_health: 100
+  move_speed_mps: 4.0
+  jump_velocity_mps: 6.9
+  height_m: 0.9
+
+combat:
+  attack_windup_frames: 12
+  attack_active_frames: 4
+  attack_recovery_frames: 14
+  attack_damage: 10
+  parry_window_frames: 8
+  parry_recovery_frames: 20
+
+observation:
+  spec_version: 1
+  reaction_delay_frames: 0
