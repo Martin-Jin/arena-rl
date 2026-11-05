@@ -1,0 +1,10 @@
+AGENTS.md
+
+data/*
+!data/.gitkeep
+checkpoints/*
+!checkpoints/.gitkeep
+runs/*
+!runs/.gitkeep
+.venv/
+__pycache__/
