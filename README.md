@@ -35,33 +35,11 @@ This repository contains the **Python side only**: the game simulation, training
 |Logging / plots|TensorBoard or Weights & Biases, matplotlib|
 |Export (future)|ONNX|
 
-## Suggested repo layout
-
-```
-arena-ai/
-├── arena/              # game simulation (pure Python, no rendering)
-│   ├── env.py          # Gymnasium/PettingZoo environment
-│   ├── fighter.py      # movement, attacks, cooldowns, damage
-│   └── spec.md         # observation/action/reward spec (porting checklist)
-├── agents/
-│   ├── scripted.py     # hand-coded bots (baselines)
-│   ├── ppo.py          # own PPO implementation (later phase)
-│   └── clone.py        # behaviour-cloning model of the player
-├── training/
-│   ├── selfplay.py     # self-play + opponent pool
-│   └── finetune.py     # between-round training
-├── viewer/             # pygame viewer and human-play mode
-├── data/               # logged fights (gitignored)
-├── checkpoints/        # saved models (gitignored)
-├── notebooks/          # experiments and analysis
-└── README.md
-```
-
 ## Design principles
 
 - **Deterministic, fixed timestep.** No dependence on engine-specific physics quirks, which keeps a later port feasible.
 - **Simple custom collision** (boxes and velocities) instead of a full physics engine.
-- **Write the spec as you go.** Keep observation order, scaling, frame rate, action set, and reward in `arena/spec.md`.
+- **Write the spec as you go.** Keep observation order, scaling, frame rate, action set, and reward documented in `docs/`.
 - **Log everything.** Record fights so behaviour can be replayed and compared across versions.
 - **One change at a time** when experimenting, and log the result.
 
@@ -135,6 +113,10 @@ On Windows PowerShell, activate the environment with
 The editable install reads the dependencies from `pyproject.toml` and installs
 the libraries currently required by the code: PyTorch, pygame-ce, and PyYAML.
 The `pygame-ce` package provides the `pygame` module used by the viewer.
+
+The headless timestep helper lives in `src/arena_ai/sim/simulate.py`. The
+interactive pygame loop lives in `src/arena_ai/viewer/game.py`, keeping pygame
+outside the pure simulation package.
 
 The following packages are planned for later environment and training work and
 are not required by the current implementation:

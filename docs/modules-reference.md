@@ -12,7 +12,7 @@ This document describes the intended purpose of each module and project director
 
 - `configs/` — Stores the YAML files read by the global configuration loader.
 - `configs/game.yaml` — Defines gameplay and observation constants, including damage, cooldowns, parry timing, and arena dimensions.
-- `configs/agent.yaml` — Defines neural-network settings for the agent.
+- `configs/agent.yaml` — Defines neural-network settings for the agent, including input/output sizes and the size of each hidden layer.
 - `src/arena_ai/config.py` — Loads all YAML files from `configs/` and exposes the typed game settings plus the agent settings.
 
 ## Core package
@@ -25,10 +25,8 @@ The simulation layer is deterministic and independent of rendering. It must not 
 
 - `src/arena_ai/sim/` — Provides pure game simulation logic.
 - `src/arena_ai/sim/state.py` — Defines data structures such as `FighterState` and `GameState`.
-- `src/arena_ai/sim/actions.py` — Defines action enums and the `MultiDiscrete` action-space layout.
+- `src/arena_ai/sim/simulate.py` — Advances the headless simulation by one timestep for training and evaluation.
 - `src/arena_ai/sim/rules.py` — Implements state transitions, damage calculation, and collision handling.
-- `src/arena_ai/sim/observation.py` — Builds observations from the current game state.
-- `src/arena_ai/sim/rewards.py` — Defines reward functions used by training environments.
 
 ### Environments
 
@@ -38,27 +36,20 @@ The simulation layer is deterministic and independent of rendering. It must not 
 ### Agents
 
 - `src/arena_ai/agents/` — Contains agent implementations and shared agent interfaces.
-- `src/arena_ai/agents/base.py` — Defines common agent abstractions and interfaces.
-- `src/arena_ai/agents/scripted.py` — Implements deterministic or rule-based scripted opponents.
-- `src/arena_ai/agents/ppo.py` — Implements or integrates a Proximal Policy Optimization agent.
-- `src/arena_ai/agents/clone.py` — Implements behavior cloning or policy cloning functionality.
+- `src/arena_ai/agents/network.py` — Defines the current PyTorch network and its configurable layer structure.
+- `src/arena_ai/agents/training.py` — Reserved for the agent training workflow; implementation is not yet complete.
 
 ### Training
 
-- `src/arena_ai/training/` — Contains training workflows and supporting utilities.
-- `src/arena_ai/training/selfplay.py` — Runs self-play training between agents.
-- `src/arena_ai/training/finetune.py` — Fine-tunes an existing model.
-- `src/arena_ai/training/curriculum.py` — Defines staged training difficulty or curriculum progression.
-- `src/arena_ai/training/opponent_pool.py` — Manages the collection and selection of training opponents.
+- `src/arena_ai/training/` — Reserved for self-play, fine-tuning, curriculum, and opponent-pool workflows.
 
 ### Viewer
 
 The viewer layer is the only layer intended to depend on `pygame`.
 
 - `src/arena_ai/viewer/` — Provides rendering and interactive display functionality.
-- `src/arena_ai/viewer/renderer.py` — Renders the arena, fighters, effects, and other visual elements.
-- `src/arena_ai/viewer/human_input.py` — Translates keyboard or controller input into game actions.
-- `src/arena_ai/viewer/ui.py` — Implements menus, overlays, status displays, and other interface elements.
+- `src/arena_ai/viewer/game.py` — Runs the interactive pygame game loop.
+- The renderer, input, and UI modules are planned as the viewer grows.
 
 ### Utilities
 
@@ -71,25 +62,21 @@ The viewer layer is the only layer intended to depend on `pygame`.
 - `assets/audio/` — Stores music and sound effects.
 - `assets/fonts/` — Stores fonts used by the user interface.
 
-## Scripts
+## Entry points
 
-- `scripts/` — Contains executable project entry points.
-- `scripts/train.py` — Starts a training run.
-- `scripts/play.py` — Starts an interactive play session.
-- `scripts/evaluate.py` — Evaluates agents or saved models.
+- `src/arena_ai/viewer/game.py` — Current interactive pygame game loop.
+- Command-line scripts for training and evaluation are planned under `scripts/`.
 
 ## Tests
 
-- `tests/` — Contains automated tests organized to mirror the source package.
-- `tests/test_rules.py` — Tests simulation rules, including damage and collision behavior.
-- `tests/test_determinism.py` — Verifies reproducible simulation behavior when using the same seed and inputs.
+- `tests/` — Reserved for automated tests organized to mirror the source package.
+- Determinism and simulation-rule tests are planned as the simulation grows.
 
 ## Documentation and experiments
 
 - `notebooks/` — Contains exploratory analysis, experiments, and visualizations.
 - `docs/` — Contains project specifications and reference documentation.
-- `docs/spec.md` — Documents the observation, action, and reward specifications.
-- `docs/modules-reference.md` — Describes the intended responsibility of each project module and directory.
+- `docs/modules-reference.md` — Describes the current and planned responsibility of each project module and directory.
 
 ## Generated and runtime data
 

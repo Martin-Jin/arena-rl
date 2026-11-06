@@ -1,3 +1,7 @@
+# game.py
+# This module defines the main game loop that runs the
+# simulation and renders the game using Pygame.
+
 import pygame
 
 from arena_ai.config import load_config

@@ -39,6 +39,12 @@ class CombatConfig:
 
 
 @dataclass(frozen=True)
+class ObservationConfig:
+    spec_version: int
+    reaction_delay_frames: int
+
+
+@dataclass(frozen=True)
 class GameConfig:
     world: WorldConfig
     fighter: FighterConfig
@@ -46,22 +52,22 @@ class GameConfig:
     observation: ObservationConfig
 
 
-# CONFIGURATION FOR THE AI AGENT
-@dataclass(frozen=True)
-class ObservationConfig:
-    spec_version: int
-    reaction_delay_frames: int
-
-
 @dataclass(frozen=True)
 class NetworkConfig:
     """Configuration for the AI agent."""
 
-    model_path: str
     input_size: int
-    hidden_size: int
+    hidden_layers: list[int]
     output_size: int
-    num_layers: int
+    activation: str
+    output_activation: str
+
+
+@dataclass(frozen=True)
+class AgentConfig:
+    """All configurations for the AI agent."""
+
+    network: NetworkConfig
 
 
 # CONFIGURATION FOR THE APPLICATION
@@ -70,7 +76,7 @@ class Config:
     """All configuration loaded from the files in the configured directory."""
 
     game: GameConfig
-    agent: NetworkConfig
+    agent: AgentConfig
 
 
 # Helper functions to load the configuration from YAML files in the configs/ directory.
@@ -91,8 +97,8 @@ def _build_game_config(raw: dict[str, Any]) -> GameConfig:
     )
 
 
-def _build_network_config(raw: dict[str, Any]) -> NetworkConfig:
-    return NetworkConfig(**raw)
+def _build_agent_config(raw: dict[str, Any]) -> AgentConfig:
+    return AgentConfig(network=NetworkConfig(**raw["network"]))
 
 
 def load_config(config_dir: str | Path | None = None) -> Config:
@@ -114,5 +120,5 @@ def load_config(config_dir: str | Path | None = None) -> Config:
 
     return Config(
         game=_build_game_config(raw_configs["game"]),
-        agent=_build_network_config(raw_configs.get("agent", {})),
+        agent=_build_agent_config(raw_configs["agent"]),
     )

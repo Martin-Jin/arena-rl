@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from arena_ai.config import load_config
 
 config = load_config()
-network_config = config.agent
+network_config = config.agent.network
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -25,18 +25,20 @@ class Layer:
 
 # The neural network class that consists of multiple layers.
 class Network:
-    def __init__(self, input_size, hidden_size, output_size, num_layers=4):
+    def __init__(self, input_size, hidden_layers, output_size):
         self.layers = []
-        # num layers includes the input and output layers
-        for i in range(num_layers):
-            if i == 0:
-                self.layers.append(Layer(input_size, hidden_size))
-            elif i == num_layers - 1:
-                self.layers.append(Layer(hidden_size, output_size))
-            else:
-                self.layers.append(Layer(hidden_size, hidden_size))
+        layer_sizes = [input_size, *hidden_layers, output_size]
+        for input_size, output_size in zip(layer_sizes, layer_sizes[1:]):
+            self.layers.append(Layer(input_size, output_size))
 
     def forward(self, x):
         for layer in self.layers:
             x = F.relu(layer.forward(x))
         return x
+
+
+network = Network(
+    input_size=network_config.input_size,
+    hidden_layers=network_config.hidden_layers,
+    output_size=network_config.output_size,
+)

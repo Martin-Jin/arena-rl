@@ -2,6 +2,8 @@
 # This file contains training parameters for the AI agent.
 
 network:
+  input_size: 10
   hidden_layers: [128, 128] # number of neurons in each hidden layer
+  output_size: 5
   activation: "relu" # activation function for hidden layers
   output_activation: "linear" # activation function for output layer
