@@ -3,8 +3,9 @@
 # used for headless simulation and training the AI agent.
 
 # Steps forward one timestep in the game simulation, updating the fighter's state.
-def step_game(fighter, move_dir, jump, config):
+def step_game(fighters, move_dir, jump, config):
     """Update the game state by one timestep."""
     from arena_ai.sim.rules import step_fighter
 
-    step_fighter(fighter, move_dir, jump, config.game)
+    for fighter in fighters:
+        step_fighter(fighter, move_dir, jump, config.game)

@@ -26,6 +26,7 @@ The simulation layer is deterministic and independent of rendering. It must not 
 - `src/arena_ai/sim/` — Provides pure game simulation logic.
 - `src/arena_ai/sim/state.py` — Defines data structures such as `FighterState` and `GameState`.
 - `src/arena_ai/sim/simulate.py` — Advances the headless simulation by one timestep for training and evaluation.
+- `src/arena_ai/sim/observation.py` — Builds nested observations with one agent and a keyed collection of opponents.
 - `src/arena_ai/sim/rules.py` — Implements state transitions, damage calculation, and collision handling.
 
 ### Environments
