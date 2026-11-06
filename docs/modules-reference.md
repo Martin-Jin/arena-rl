@@ -25,24 +25,48 @@ The simulation layer is deterministic and independent of rendering. It must not 
 
 - `src/arena_ai/sim/` — Provides pure game simulation logic.
 - `src/arena_ai/sim/state.py` — Defines data structures such as `FighterState` and `GameState`.
-- `src/arena_ai/sim/simulate.py` — Advances the headless simulation by one timestep for training and evaluation.
+- `src/arena_ai/sim/simulate.py` — Advances independently controlled fighters by one timestep using ID-keyed actions.
 - `src/arena_ai/sim/observation.py` — Builds nested observations with one agent and a keyed collection of opponents.
+- `src/arena_ai/sim/observation_vector.py` — Flattens observations into a
+  fixed ordered and normalized vector whose layout matches the network input.
 - `src/arena_ai/sim/rules.py` — Implements state transitions, damage calculation, and collision handling.
 
 ### Environments
 
 - `src/arena_ai/envs/` — Contains reinforcement-learning environment adapters.
-- `src/arena_ai/envs/arena_env.py` — Wraps the simulation for Gymnasium and/or PettingZoo interfaces.
+- `src/arena_ai/envs/arena_env.py` — Wraps a two-fighter episode with reset and step operations.
+  It owns episode setup, the fixed episode limit, terminal conditions, and the
+  observation/action interface. It must remain headless and must not import
+  `pygame`.
 
 ### Agents
 
 - `src/arena_ai/agents/` — Contains agent implementations and shared agent interfaces.
+- `src/arena_ai/agents/action.py` — Defines the fixed discrete action encoding and
+  converts an action selected by a policy into a `FighterAction`.
+- `src/arena_ai/agents/scripted.py` — Controls the non-learning opponent with a
+  deterministic baseline policy.
 - `src/arena_ai/agents/network.py` — Defines the current PyTorch network and its configurable layer structure.
+- `src/arena_ai/agents/policy.py` — Converts fixed observation vectors into
+  action probabilities, samples actions during training, and selects greedy
+  actions during evaluation.
 - `src/arena_ai/agents/training.py` — Reserved for the agent training workflow; implementation is not yet complete.
 
 ### Training
 
-- `src/arena_ai/training/` — Reserved for self-play, fine-tuning, curriculum, and opponent-pool workflows.
+- `src/arena_ai/training/` — Contains the first learner-versus-scripted-opponent
+  workflow and later self-play, fine-tuning, curriculum, and opponent-pool
+  workflows.
+- `src/arena_ai/training/rewards.py` — Defines terminal and shaping rewards
+  from the learner's perspective.
+- `src/arena_ai/training/rollout.py` — Stores observations, actions, rewards,
+  termination flags, and policy values/log probabilities collected from episodes.
+- `src/arena_ai/training/ppo.py` — Calculates PPO policy, value, and entropy
+  losses and applies optimizer updates.
+- `src/arena_ai/training/checkpoints.py` — Saves and restores the policy,
+  optimizer, configuration, and training progress.
+- `src/arena_ai/training/train.py` — Owns episode creation, scripted-opponent
+  selection, rollout collection, updates, checkpointing, and evaluation.
 
 ### Viewer
 

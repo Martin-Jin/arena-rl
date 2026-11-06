@@ -126,9 +126,31 @@ are not required by the current implementation:
 Suggested first steps:
 
 1. Work through the first units of the Hugging Face Deep RL Course.
-2. Build a minimal one-fighter environment with the Gymnasium API and test it with random actions.
-3. Train a PPO agent against a simple scripted bot using Stable-Baselines3.
-4. Add the second agent and move to self-play.
+2. Implement the skeletons in `src/arena_ai/agents/action.py`,
+   `src/arena_ai/envs/arena_env.py`, and `src/arena_ai/training/rewards.py`
+   for a two-fighter episode with a fixed discrete action set.
+3. Implement rollout collection and PPO updates in
+   `src/arena_ai/training/rollout.py` and
+   `src/arena_ai/training/ppo.py`.
+4. Train one learner against a scripted opponent through
+   `src/arena_ai/training/train.py`.
+5. Add the second learning agent and self-play after the basic setup can learn
+   against the scripted opponent.
+
+The minimum trainable prototype needs all of the following before training can
+produce useful results:
+
+- a deterministic `reset(seed)` and `step(action)` environment contract;
+- a fixed, ordered, normalized observation vector;
+- a discrete action encoding matching the policy output size;
+- minimal combat state, damage, and win/loss termination;
+- a scripted opponent;
+- transition rewards, rollout storage, and a policy-update algorithm;
+- checkpointing and evaluation against a fixed opponent.
+
+The files under `src/arena_ai/envs/`, `src/arena_ai/agents/`, and
+`src/arena_ai/training/` currently provide module skeletons for these
+responsibilities. They are intentionally not implementations yet.
 
 ## Roadmap
 
