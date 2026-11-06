@@ -127,7 +127,8 @@ Suggested first steps:
 
 1. Work through the first units of the Hugging Face Deep RL Course.
 2. Implement the skeletons in `src/arena_ai/agents/action.py`,
-   `src/arena_ai/envs/arena_env.py`, and `src/arena_ai/training/rewards.py`
+   `src/arena_ai/envs/training_envs/one_v_one_env.py`, and
+   `src/arena_ai/training/rewards.py`
    for a two-fighter episode with a fixed discrete action set.
 3. Implement rollout collection and PPO updates in
    `src/arena_ai/training/rollout.py` and

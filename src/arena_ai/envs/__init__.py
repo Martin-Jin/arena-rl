@@ -1,1 +1,1 @@
-"""Provide reinforcement-learning environment adapters for the headless simulation."""
+"""Provide shared and scenario-specific reinforcement-learning environments."""

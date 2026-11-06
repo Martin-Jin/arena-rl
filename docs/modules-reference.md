@@ -37,10 +37,14 @@ The simulation layer is deterministic and independent of rendering. It must not 
 ### Environments
 
 - `src/arena_ai/envs/` — Contains reinforcement-learning environment adapters.
-- `src/arena_ai/envs/arena_env.py` — Wraps a two-fighter episode with reset and step operations.
-  It owns episode setup, the fixed episode limit, terminal conditions, and the
-  observation/action interface. It must remain headless and must not import
-  `pygame`.
+- `src/arena_ai/envs/arena_env.py` — Defines the shared abstract environment
+  lifecycle: reset, step, observations, episode limits, and terminal status.
+  It must remain headless and must not import `pygame`.
+- `src/arena_ai/envs/training_envs/` — Contains concrete environments for
+  training and scenario testing.
+- `src/arena_ai/envs/training_envs/one_v_one_env.py` — Implements the current
+  one-learning-agent versus one-opponent scenario, including its initial
+  fighters and opponent policy.
 
 ### Agents
 
