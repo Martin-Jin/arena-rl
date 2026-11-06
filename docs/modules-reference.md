@@ -30,8 +30,9 @@ The simulation layer is deterministic and independent of rendering. It must not 
 - `src/arena_ai/sim/observation_vector.py` — Flattens observations into a
   fixed ordered and normalized vector whose layout matches the network input.
   It exposes the derived observation size so the network does not duplicate it
-  in configuration. Position and velocity features are scaled using the game
-  configuration's fixed observation limits.
+  in configuration. Position, velocity, and health features are scaled using
+  the game configuration's fixed observation limits. Each fighter also
+  contributes grounded and facing-direction features.
 - `src/arena_ai/sim/rules.py` — Implements state transitions, damage calculation, and collision handling.
 
 ### Environments
@@ -50,7 +51,8 @@ The simulation layer is deterministic and independent of rendering. It must not 
 
 - `src/arena_ai/agents/` — Contains agent implementations and shared agent interfaces.
 - `src/arena_ai/agents/action.py` — Defines the fixed discrete action encoding,
-  derives its action count, and converts a policy index into a `FighterAction`.
+  including `ATTACK`, derives its action count, and converts a policy index
+  into a `FighterAction`.
 - `src/arena_ai/agents/scripted.py` — Controls the non-learning opponent with a
   deterministic baseline policy.
 - `src/arena_ai/agents/network.py` — Defines the current PyTorch network and its

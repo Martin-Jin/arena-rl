@@ -52,6 +52,10 @@ class ArenaEnv(ABC):
 
         current_observation = self.get_observation()
         actions = self.get_actions(action, current_observation)
+        previous_health = {
+            fighter_id: fighter.health
+            for fighter_id, fighter in self.fighters.items()
+        }
         step_game(self.fighters, actions, self.config)
         self.step_count += 1
 
@@ -59,7 +63,7 @@ class ArenaEnv(ABC):
         truncated = self.step_count >= self.max_episode_steps and not terminated
         self._episode_done = terminated or truncated
 
-        reward = self.calculate_reward()
+        reward = self.calculate_reward(previous_health)
         info = {"step_count": self.step_count}
         return self.get_observation(), reward, terminated, truncated, info
 
@@ -88,10 +92,29 @@ class ArenaEnv(ABC):
     ) -> Mapping[str, FighterAction]:
         """Convert scenario controller decisions into ID-keyed simulation actions."""
 
-    def calculate_reward(self) -> float:
-        """Return the current reward until scenario-specific rewards are implemented."""
-        return 0.0
+    def calculate_reward(self, previous_health: Mapping[str, int]) -> float:
+        """Reward damage dealt, damage received, and terminal outcomes."""
+        if self.fighters is None:
+            return 0.0
+        agent_damage = previous_health["agent"] - self.fighters["agent"].health
+        opponent_damage = sum(
+            previous_health[fighter_id] - fighter.health
+            for fighter_id, fighter in self.fighters.items()
+            if fighter_id != "agent"
+        )
+        reward = 0.1 * (opponent_damage - agent_damage)
+        if self.fighters["agent"].health <= 0:
+            reward -= 1.0
+        elif any(
+            fighter.health <= 0
+            for fighter_id, fighter in self.fighters.items()
+            if fighter_id != "agent"
+        ):
+            reward += 1.0
+        return reward
 
     def is_terminated(self) -> bool:
         """Return whether the scenario has reached a natural terminal state."""
-        return False
+        if self.fighters is None:
+            return False
+        return any(fighter.health <= 0 for fighter in self.fighters.values())

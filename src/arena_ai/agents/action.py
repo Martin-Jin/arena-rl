@@ -18,6 +18,7 @@ class Action(IntEnum):
     JUMP = 3
     MOVE_LEFT_JUMP = 4
     MOVE_RIGHT_JUMP = 5
+    ATTACK = 6
 
 
 ACTION_COUNT = len(Action)
@@ -30,7 +31,7 @@ def to_fighter_action(action: Action | int) -> FighterAction:
     except ValueError as error:
         raise ValueError(f"Unknown action index: {action}") from error
 
-    # Create a mapping to each action first and then returns selected action index.
+    # Create a mapping to each action first and then return the selected action.
     return {
         Action.IDLE: FighterAction(),
         Action.MOVE_LEFT: FighterAction(move_dir=-1),
@@ -38,4 +39,5 @@ def to_fighter_action(action: Action | int) -> FighterAction:
         Action.JUMP: FighterAction(jump=True),
         Action.MOVE_LEFT_JUMP: FighterAction(move_dir=-1, jump=True),
         Action.MOVE_RIGHT_JUMP: FighterAction(move_dir=1, jump=True),
+        Action.ATTACK: FighterAction(attack=True),
     }[selected_action]

@@ -155,7 +155,10 @@ responsibilities. They are intentionally not implementations yet.
 
 The policy input and output dimensions are derived from the observation encoder
 and action codec rather than duplicated in `configs/agent.yaml`. This keeps
-network dimensions synchronized when fighter or game-state features change.
+network dimensions synchronized when fighter, game-state, or action features
+change. The current action order is `IDLE`, `MOVE_LEFT`, `MOVE_RIGHT`, `JUMP`,
+`MOVE_LEFT_JUMP`, `MOVE_RIGHT_JUMP`, and `ATTACK`; existing action indices must
+not be reordered.
 
 ## Roadmap
 

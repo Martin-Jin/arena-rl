@@ -16,6 +16,8 @@ class FighterObservation(TypedDict):
     position: VectorObservation
     velocity: VectorObservation
     on_ground: bool
+    facing_dir: int
+    health: int
     """Stores the observation of a single fighter."""
 
 
@@ -31,6 +33,8 @@ def _fighter_observation(fighter: FighterState) -> FighterObservation:
         "position": {"x": fighter.x, "y": fighter.y},
         "velocity": {"x": fighter.vx, "y": fighter.vy},
         "on_ground": fighter.on_ground,
+        "facing_dir": fighter.facing_dir,
+        "health": fighter.health,
     }
 
 

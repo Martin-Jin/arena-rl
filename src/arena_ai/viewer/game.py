@@ -45,10 +45,11 @@ while running:
     # -1 for right, 0 for no movement, 1 for left
     move_dir = int(keys[pygame.K_d]) - int(keys[pygame.K_a])
     jump = keys[pygame.K_w]
+    attack = keys[pygame.K_SPACE]
 
     # Simulate enough fixed timesteps to catch up after a lag spike.
     while accumulator >= DT:
-        step_fighter(fighter, move_dir, jump, config.game)
+        step_fighter(fighter, move_dir, jump, config.game, attack=attack)
         accumulator -= DT
 
     # render the player

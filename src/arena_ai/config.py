@@ -34,6 +34,7 @@ class CombatConfig:
     attack_active_frames: int
     attack_recovery_frames: int
     attack_damage: int
+    attack_range_m: float
     parry_window_frames: int
     parry_recovery_frames: int
 

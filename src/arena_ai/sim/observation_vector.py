@@ -6,7 +6,7 @@ from arena_ai.config import Config, load_config
 from arena_ai.sim.observation import Observation
 
 
-FEATURES_PER_FIGHTER = 5
+FEATURES_PER_FIGHTER = 7
 def observation_size(opponent_count: int = 1) -> int:
     """Return the encoded vector size for the configured opponent count."""
     if opponent_count < 1:
@@ -33,7 +33,7 @@ def _fighter_vector(
     world = config.game.world
     fighter_config = config.game.fighter
     observation_config = config.game.observation
-    # Order: normalized x, y, vx, vy, on_ground.
+    # Order: normalized x, y, vx, vy, on_ground, facing_dir, health.
     return [
         _normalize(float(position["x"]), world.arena_width_m),
         _normalize(
@@ -43,6 +43,8 @@ def _fighter_vector(
         _normalize(float(velocity["x"]), fighter_config.move_speed_mps),
         _normalize(float(velocity["y"]), fighter_config.jump_velocity_mps),
         float(bool(fighter["on_ground"])),
+        float(fighter["facing_dir"]),
+        _normalize(float(fighter["health"]), fighter_config.max_health),
     ]
 
 

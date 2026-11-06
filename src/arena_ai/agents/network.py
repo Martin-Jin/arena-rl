@@ -38,11 +38,11 @@ class Network(nn.Module):
 
 
 network = Network(
-    # Input order: agent [x, y, vx, vy, on_ground], then each opponent in
-    # sorted ID order with the same five features.
+    # Input order: agent [x, y, vx, vy, on_ground, facing_dir, health], then
+    # each opponent in sorted ID order with the same seven features.
     input_size=observation_size(),
     hidden_layers=network_config.hidden_layers,
     # Output order: IDLE, MOVE_LEFT, MOVE_RIGHT, JUMP, MOVE_LEFT_JUMP,
-    # MOVE_RIGHT_JUMP. See agents/action.py.
+    # MOVE_RIGHT_JUMP, ATTACK. See agents/action.py.
     output_size=ACTION_COUNT,
 )

@@ -6,10 +6,33 @@ from arena_ai.sim.state import FighterState
 
 
 def step_fighter(
-    f: FighterState, move_dir: int, jump: bool, config: GameConfig
+    f: FighterState,
+    move_dir: int,
+    jump: bool,
+    config: GameConfig,
+    attack: bool = False,
 ) -> None:
     w, fc = config.world, config.fighter
     dt = w.dt_seconds
+
+    if move_dir:
+        f.facing_dir = move_dir
+
+    combat = config.combat
+    # Update the fighter's attack state.
+    if f.attack_frame:
+        f.attack_frame += 1
+        # Reset the attack state after the full attack animation has completed.
+        if f.attack_frame > (
+            combat.attack_windup_frames
+            + combat.attack_active_frames
+            + combat.attack_recovery_frames
+        ):
+            f.attack_frame = 0
+            f.attack_hit = False
+    elif attack:
+        f.attack_frame = 1
+        f.attack_hit = False
 
     # Update the fighter's horizontal velocity.
     f.vx = move_dir * fc.move_speed_mps  # -1, 0, or 1

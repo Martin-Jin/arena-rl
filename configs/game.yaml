@@ -17,6 +17,7 @@ combat:
   attack_active_frames: 4
   attack_recovery_frames: 14
   attack_damage: 10
+  attack_range_m: 0.8
   parry_window_frames: 8
   parry_recovery_frames: 20
 
