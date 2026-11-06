@@ -42,6 +42,7 @@ class CombatConfig:
 class ObservationConfig:
     spec_version: int
     reaction_delay_frames: int
+    max_observed_height_m: float
 
 
 @dataclass(frozen=True)

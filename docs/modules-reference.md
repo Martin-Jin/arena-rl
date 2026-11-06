@@ -30,7 +30,8 @@ The simulation layer is deterministic and independent of rendering. It must not 
 - `src/arena_ai/sim/observation_vector.py` — Flattens observations into a
   fixed ordered and normalized vector whose layout matches the network input.
   It exposes the derived observation size so the network does not duplicate it
-  in configuration.
+  in configuration. Position and velocity features are scaled using the game
+  configuration's fixed observation limits.
 - `src/arena_ai/sim/rules.py` — Implements state transitions, damage calculation, and collision handling.
 
 ### Environments

@@ -2,13 +2,11 @@
 
 from collections.abc import Mapping
 
+from arena_ai.config import Config, load_config
 from arena_ai.sim.observation import Observation
 
 
 FEATURES_PER_FIGHTER = 5
-
-
-# TODO: Normalize positions, velocities, and future health/combat features.
 def observation_size(opponent_count: int = 1) -> int:
     """Return the encoded vector size for the configured opponent count."""
     if opponent_count < 1:
@@ -16,26 +14,47 @@ def observation_size(opponent_count: int = 1) -> int:
     return FEATURES_PER_FIGHTER * (opponent_count + 1)
 
 
-def _fighter_vector(fighter: Mapping[str, object]) -> list[float]:
+def _normalize(value: float, maximum: float) -> float:
+    """Scale a value by a fixed positive maximum and clamp it to [-1, 1]."""
+    if maximum <= 0:
+        raise ValueError(f"Normalization maximum must be positive, got {maximum}")
+    return max(-1.0, min(1.0, value / maximum))
+
+
+def _fighter_vector(
+    fighter: Mapping[str, object],
+    config: Config,
+) -> list[float]:
     """Encode one fighter's position, velocity, and grounded state."""
     position = fighter["position"]
     velocity = fighter["velocity"]
     if not isinstance(position, Mapping) or not isinstance(velocity, Mapping):
         raise TypeError("Fighter position and velocity must be mappings")
-    # Order: x, y, vx, vy, on_ground.
+    world = config.game.world
+    fighter_config = config.game.fighter
+    observation_config = config.game.observation
+    # Order: normalized x, y, vx, vy, on_ground.
     return [
-        float(position["x"]),
-        float(position["y"]),
-        float(velocity["x"]),
-        float(velocity["y"]),
+        _normalize(float(position["x"]), world.arena_width_m),
+        _normalize(
+            float(position["y"]) - world.floor_y_m,
+            observation_config.max_observed_height_m,
+        ),
+        _normalize(float(velocity["x"]), fighter_config.move_speed_mps),
+        _normalize(float(velocity["y"]), fighter_config.jump_velocity_mps),
         float(bool(fighter["on_ground"])),
     ]
 
 
-def encode_observation(observation: Observation) -> list[float]:
+def encode_observation(
+    observation: Observation,
+    config: Config | None = None,
+) -> list[float]:
     """Return a fixed-order vector containing the agent and its opponents."""
-    vector = _fighter_vector(observation["agent"])
+    if config is None:
+        config = load_config()
+    vector = _fighter_vector(observation["agent"], config)
     opponents = observation["opponents"]
     for opponent_id in sorted(opponents):
-        vector.extend(_fighter_vector(opponents[opponent_id]))
+        vector.extend(_fighter_vector(opponents[opponent_id], config))
     return vector
