@@ -5,6 +5,11 @@ from pathlib import Path
 
 from arena_ai.config import load_config
 
+config = load_config()
+PIXELS_PER_METER = config.viewer.rendering.pixels_per_meter
+TARGET_FIGHTER_HEIGHT_PX = (
+    config.game.fighter.height_m * PIXELS_PER_METER
+)
 
 class Animation:
     """A simple animation class that cycles through a list of frames."""
@@ -23,18 +28,6 @@ class Animation:
         else:
             i = min(i, len(self.frames) - 1)
         return self.frames[i]
-
-
-PIXELS_PER_METER = 100
-TARGET_FIGHTER_HEIGHT_PX = (
-    load_config().game.fighter.height_m * PIXELS_PER_METER
-)
-SOURCE_BODY_HEIGHT_PX = {
-    "idle": 21,
-    "run": 21,
-    "attack": 20,
-    "turn": 21,
-}
 
 
 def load_frames(
@@ -58,16 +51,11 @@ ASSET_ROOT = Path(__file__).resolve().parents[3] / "assets" / "sprites" / "fight
 
 anims = {
     name: Animation(
-        load_frames(ASSET_ROOT / name, source_body_height),
-        frame_duration,
-        loop=loop,
+        load_frames(ASSET_ROOT / name, config.viewer.animation.source_body_height_px[name]),
+        config.viewer.animation.frame_duration[name],
+        loop=config.viewer.animation.loop[name],
     )
-    for name, (source_body_height, frame_duration, loop) in {
-        "idle": (SOURCE_BODY_HEIGHT_PX["idle"], 6, True),
-        "run": (SOURCE_BODY_HEIGHT_PX["run"], 4, True),
-        "attack": (SOURCE_BODY_HEIGHT_PX["attack"], 3, False),
-        "turn": (SOURCE_BODY_HEIGHT_PX["turn"], 1, False),
-    }.items()
+    for name in config.viewer.animation.source_body_height_px
 }
 
 
@@ -79,6 +67,14 @@ def draw_fighter(screen, fighter, tick, to_screen, turning=False):
     elif fighter.attack_frame:
         animation_name = "attack"
         animation_tick = fighter.attack_frame
+    # TODO: Use the simulation's support-contact state here once platforms
+    # exist; airborne animation should depend on contact, not floor height.
+    elif not fighter.on_ground:
+        falling_animation = anims.get("falling")
+        animation_name = (
+            "falling" if falling_animation is not None and falling_animation.frames else "idle"
+        )
+        animation_tick = tick
     elif fighter.vx:
         animation_name = "run"
         animation_tick = tick

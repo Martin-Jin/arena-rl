@@ -1,0 +1,40 @@
+# Viewer-only display, animation, and audio settings.
+rendering:
+  screen_width: 1280
+  screen_height: 720
+  pixels_per_meter: 100
+  floor_y_px: 650
+
+animation:
+  source_body_height_px:
+    idle: 21
+    run: 21
+    attack: 20
+    turn: 21
+  frame_duration:
+    idle: 6
+    run: 4
+    attack: 3
+    turn: 1
+  loop:
+    idle: true
+    run: true
+    attack: false
+    turn: false
+
+audio:
+  # Applied after per-file RMS/peak normalization.
+  effects_volume: 0.5
+  # Music master volume.
+  music_volume: 0.10
+  # Runtime normalization targets. Source files are not modified.
+  normalization_rms: 0.18
+  normalization_peak: 0.95
+  running_fade_ms: 250
+  effects:
+    attack: sword_swing.mp3
+    hit: hit.mp3
+    jump: jump.mp3
+    landing: jump_landing.mp3
+    running: running.mp3
+  music: battle_music.mp3

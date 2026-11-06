@@ -8,12 +8,14 @@ from arena_ai.config import load_config
 from arena_ai.sim.rules import step_fighter
 from arena_ai.sim.state import FighterState
 from arena_ai.viewer.annimation import PIXELS_PER_METER, draw_fighter
+from arena_ai.viewer.audio import AudioManager
 
 # Load all application configuration from the YAML files in configs/.
 config = load_config()
 DT = config.game.world.dt_seconds
 
-FLOOR_PX = 650  # screen y-coordinate of the floor
+PIXELS_PER_METER = config.viewer.rendering.pixels_per_meter
+FLOOR_PX = config.viewer.rendering.floor_y_px
 
 
 # Convert meters to pixels for rendering.
@@ -39,8 +41,12 @@ def render(
 
 # Initialize Pygame and run the main game loop.
 pygame.init()
-screen = pygame.display.set_mode((1280, 720))
+screen = pygame.display.set_mode(
+    (config.viewer.rendering.screen_width, config.viewer.rendering.screen_height)
+)
 clock = pygame.time.Clock()
+audio = AudioManager(config.viewer.audio)
+audio.start_music()
 running = True
 accumulator = 0.0
 render_tick = 0
@@ -77,11 +83,22 @@ while running:
 
     # Simulate enough fixed timesteps to catch up after a lag spike.
     while accumulator >= DT:
+        # TODO: Track the generalized support-contact transition when platforms
+        # are added so jump and landing effects work on every walkable surface.
+        was_on_ground = fighter.on_ground
+        previous_attack_frame = fighter.attack_frame
         step_fighter(fighter, move_dir, jump, config.game, attack=attack)
+        audio.update_fighter(
+            fighter,
+            move_dir,
+            was_on_ground,
+            previous_attack_frame,
+        )
         accumulator -= DT
 
     render(screen, fighter, render_tick, turning=turn_timer > 0)
     turn_timer = max(0, turn_timer - 1)
     render_tick += 1
 
+audio.close()
 pygame.quit()

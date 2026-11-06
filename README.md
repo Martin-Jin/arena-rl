@@ -14,8 +14,8 @@ are still being built.
 - Configurable game, agent, and scoring values in [`configs/`](configs/).
 - Observation encoding and discrete action definitions for future agents.
 - Initial agent, rollout, PPO, checkpoint, and environment modules.
-- Pygame viewer with animated idle, running, turning, and single-slash attack
-  states.
+- Pygame viewer with configurable idle, running, turning, single-slash attack,
+  and airborne animation fallback, plus battle music and fighter sound effects.
 - Premade Knight Hero Platformer sprite assets, scaled to the configured
   fighter hitbox.
 
@@ -45,6 +45,8 @@ Controls:
   fighter state, rules, observations, and stepping.
 - [`src/arena_ai/viewer/`](src/arena_ai/viewer/) — pygame rendering, input,
   and animation loading.
+- [`configs/viewer.yaml`](configs/viewer.yaml) — viewer display, animation,
+  audio volume, normalization, and fade settings.
 - [`src/arena_ai/agents/`](src/arena_ai/agents/) — agent and policy modules.
 - [`src/arena_ai/envs/`](src/arena_ai/envs/) — environment wrappers.
 - [`src/arena_ai/training/`](src/arena_ai/training/) — rollout, PPO,
@@ -63,6 +65,20 @@ played because the game does not have combo actions yet.
 
 Animation credit: [Knight Hero Platformer by
 Pixivan](https://pixivan.itch.io/knight-hero-platfor).
+
+## Audio assets
+
+Sound effects in [`assets/audio/effects/`](assets/audio/effects/) are royalty
+free and do not require attribution. The battle music in
+[`assets/audio/music/`](assets/audio/music/) is **“Senkae” by Hideyuki
+Fukasawa**, from the *TSUKIHIME -A piece of blue glass moon- Original
+Soundtrack*. Attribution is required. Source:
+[official YouTube Music track](https://www.youtube.com/watch?v=qpElSu-nRRk).
+
+Sound effects are normalized in memory using configurable RMS and peak targets
+before the master effects volume is applied. Running audio fades on start,
+stop, and direction changes, and is only active while the fighter is supported.
+The source audio files are not modified by normalization or fades.
 
 ## Development
 

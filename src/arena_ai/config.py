@@ -79,6 +79,47 @@ class ScoringConfig:
     defeat_penalty: float
 
 
+@dataclass(frozen=True)
+class RenderingConfig:
+    """Display and world-to-screen settings used by the pygame viewer."""
+
+    screen_width: int
+    screen_height: int
+    pixels_per_meter: int
+    floor_y_px: int
+
+
+@dataclass(frozen=True)
+class AnimationConfig:
+    """Sprite animation timing and source dimensions."""
+
+    source_body_height_px: dict[str, int]
+    frame_duration: dict[str, int]
+    loop: dict[str, bool]
+
+
+@dataclass(frozen=True)
+class AudioConfig:
+    """Viewer audio levels and asset filenames."""
+
+    music_volume: float
+    effects_volume: float
+    normalization_rms: float
+    normalization_peak: float
+    running_fade_ms: int
+    effects: dict[str, str]
+    music: str
+
+
+@dataclass(frozen=True)
+class ViewerConfig:
+    """Configuration for pygame rendering and audio."""
+
+    rendering: RenderingConfig
+    animation: AnimationConfig
+    audio: AudioConfig
+
+
 # CONFIGURATION FOR THE APPLICATION
 @dataclass(frozen=True)
 class Config:
@@ -87,6 +128,7 @@ class Config:
     game: GameConfig
     agent: AgentConfig
     scoring: ScoringConfig
+    viewer: ViewerConfig
 
 
 # Helper functions to load the configuration from YAML files in the configs/ directory.
@@ -115,6 +157,14 @@ def _build_scoring_config(raw: dict[str, Any]) -> ScoringConfig:
     return ScoringConfig(**raw["scoring"])
 
 
+def _build_viewer_config(raw: dict[str, Any]) -> ViewerConfig:
+    return ViewerConfig(
+        rendering=RenderingConfig(**raw["rendering"]),
+        animation=AnimationConfig(**raw["animation"]),
+        audio=AudioConfig(**raw["audio"]),
+    )
+
+
 def load_config(config_dir: str | Path | None = None) -> Config:
     """Load the game and agent configuration files from one directory.
 
@@ -134,9 +184,12 @@ def load_config(config_dir: str | Path | None = None) -> Config:
         raise FileNotFoundError(f"Missing game.yaml in {config_path}")
     if "scoring" not in raw_configs:
         raise FileNotFoundError(f"Missing scoring.yaml in {config_path}")
+    if "viewer" not in raw_configs:
+        raise FileNotFoundError(f"Missing viewer.yaml in {config_path}")
 
     return Config(
         game=_build_game_config(raw_configs["game"]),
         agent=_build_agent_config(raw_configs["agent"]),
         scoring=_build_scoring_config(raw_configs["scoring"]),
+        viewer=_build_viewer_config(raw_configs["viewer"]),
     )
