@@ -56,9 +56,7 @@ class GameConfig:
 class NetworkConfig:
     """Configuration for the AI agent."""
 
-    input_size: int
     hidden_layers: list[int]
-    output_size: int
     activation: str
     output_activation: str
 

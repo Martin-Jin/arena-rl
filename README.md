@@ -152,6 +152,10 @@ The files under `src/arena_ai/envs/`, `src/arena_ai/agents/`, and
 `src/arena_ai/training/` currently provide module skeletons for these
 responsibilities. They are intentionally not implementations yet.
 
+The policy input and output dimensions are derived from the observation encoder
+and action codec rather than duplicated in `configs/agent.yaml`. This keeps
+network dimensions synchronized when fighter or game-state features change.
+
 ## Roadmap
 
 - [ ] Phase 1: environment and manual play
