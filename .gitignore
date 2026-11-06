@@ -1,11 +1,8 @@
 AGENTS.md
 
-data/*
-!data/.gitkeep
-checkpoints/*
-!checkpoints/.gitkeep
-runs/*
-!runs/.gitkeep
+data/
+checkpoints/
+runs/
 .venv/
 __pycache__/
 *.egg-info/

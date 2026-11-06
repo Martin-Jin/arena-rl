@@ -1,12 +1,12 @@
 import pygame
 
-from arena_ai.sim.config import load_config
+from arena_ai.config import load_config
 from arena_ai.sim.rules import step_fighter
 from arena_ai.sim.state import FighterState
 
-# Load the configuration from YAML.
-config = load_config("configs/game.yaml")
-DT = config.world.dt_seconds
+# Load all application configuration from the YAML files in configs/.
+config = load_config()
+DT = config.game.world.dt_seconds
 
 PIXELS_PER_METER = 100  # viewer-only setting
 FLOOR_PX = 650  # screen y-coordinate of the floor
@@ -44,12 +44,12 @@ while running:
 
     # Simulate enough fixed timesteps to catch up after a lag spike.
     while accumulator >= DT:
-        step_fighter(fighter, move_dir, jump, config)
+        step_fighter(fighter, move_dir, jump, config.game)
         accumulator -= DT
 
     # render the player
     screen.fill("purple")
-    h_px = config.fighter.height_m * PIXELS_PER_METER
+    h_px = config.game.fighter.height_m * PIXELS_PER_METER
     w_px = h_px * 0.3
     x_px, y_px = to_screen(fighter.x, fighter.y)
     pygame.draw.rect(screen, "red", (x_px - w_px / 2, y_px - h_px, w_px, h_px))

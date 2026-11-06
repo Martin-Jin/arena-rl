@@ -10,9 +10,10 @@ This document describes the intended purpose of each module and project director
 
 ## Configuration
 
-- `configs/` — Stores YAML or TOML configuration files for hyperparameters and game constants.
-- `configs/game.yaml` — Defines gameplay constants, including damage, cooldowns, parry timing, and arena dimensions.
-- `configs/train_selfplay.yaml` — Defines configuration for self-play training runs.
+- `configs/` — Stores the YAML files read by the global configuration loader.
+- `configs/game.yaml` — Defines gameplay and observation constants, including damage, cooldowns, parry timing, and arena dimensions.
+- `configs/agent.yaml` — Defines neural-network settings for the agent.
+- `src/arena_ai/config.py` — Loads all YAML files from `configs/` and exposes the typed game settings plus the agent settings.
 
 ## Core package
 

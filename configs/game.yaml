@@ -1,5 +1,5 @@
 # game.yaml
-# This YAML file contains the parameter values used by the game. All configurable parameters are also defined in sim/config.py.
+# This YAML file contains the parameter values used by the game.
 world:
   gravity_mps2: 19.6 # derived from jump height and time to peak
   sim_hz: 60 # fixed timestep (1/60)

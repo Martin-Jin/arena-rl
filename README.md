@@ -124,9 +124,22 @@ Stretch goals: implement PPO from scratch and compare with Stable-Baselines3; ad
 git clone <your-repo-url>
 cd arena-ai
 python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install gymnasium pettingzoo stable-baselines3 torch pygame numpy matplotlib tensorboard
+source .venv/bin/activate        # macOS/Linux
+python -m pip install --upgrade pip
+python -m pip install -e .
 ```
+
+On Windows PowerShell, activate the environment with
+`.venv\Scripts\Activate.ps1` instead of the `source` command.
+
+The editable install reads the dependencies from `pyproject.toml` and installs
+the libraries currently required by the code: PyTorch, pygame-ce, and PyYAML.
+The `pygame-ce` package provides the `pygame` module used by the viewer.
+
+The following packages are planned for later environment and training work and
+are not required by the current implementation:
+`gymnasium`, `pettingzoo`, `stable-baselines3`, `numpy`, `matplotlib`, and
+`tensorboard`.
 
 Suggested first steps:
 

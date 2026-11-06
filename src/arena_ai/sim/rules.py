@@ -1,7 +1,7 @@
 # rules.py
 # This module defines the game rules and physics, including player behavior and game-state updates.
 
-from arena_ai.sim.config import GameConfig
+from arena_ai.config import GameConfig
 from arena_ai.sim.state import FighterState
 
 
