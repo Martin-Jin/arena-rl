@@ -102,15 +102,16 @@ class ArenaEnv(ABC):
             for fighter_id, fighter in self.fighters.items()
             if fighter_id != "agent"
         )
-        reward = 0.1 * (opponent_damage - agent_damage)
+        scoring = self.config.scoring
+        reward = scoring.damage_reward_scale * (opponent_damage - agent_damage)
         if self.fighters["agent"].health <= 0:
-            reward -= 1.0
+            reward -= scoring.defeat_penalty
         elif any(
             fighter.health <= 0
             for fighter_id, fighter in self.fighters.items()
             if fighter_id != "agent"
         ):
-            reward += 1.0
+            reward += scoring.victory_reward
         return reward
 
     def is_terminated(self) -> bool:

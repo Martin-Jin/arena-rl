@@ -13,6 +13,8 @@ This document describes the intended purpose of each module and project director
 - `configs/` — Stores the YAML files read by the global configuration loader.
 - `configs/game.yaml` — Defines gameplay and observation constants, including damage, cooldowns, parry timing, and arena dimensions.
 - `configs/agent.yaml` — Defines neural-network settings for the agent, including input/output sizes and the size of each hidden layer.
+- `configs/scoring.yaml` — Defines reward scales and terminal win/loss rewards
+  used by training environments.
 - `src/arena_ai/config.py` — Loads all YAML files from `configs/` and exposes the typed game settings plus the agent settings.
 
 ## Core package

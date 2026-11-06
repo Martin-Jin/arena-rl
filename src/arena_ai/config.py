@@ -70,6 +70,15 @@ class AgentConfig:
     network: NetworkConfig
 
 
+@dataclass(frozen=True)
+class ScoringConfig:
+    """Reward values used by training environments."""
+
+    damage_reward_scale: float
+    victory_reward: float
+    defeat_penalty: float
+
+
 # CONFIGURATION FOR THE APPLICATION
 @dataclass(frozen=True)
 class Config:
@@ -77,6 +86,7 @@ class Config:
 
     game: GameConfig
     agent: AgentConfig
+    scoring: ScoringConfig
 
 
 # Helper functions to load the configuration from YAML files in the configs/ directory.
@@ -101,11 +111,16 @@ def _build_agent_config(raw: dict[str, Any]) -> AgentConfig:
     return AgentConfig(network=NetworkConfig(**raw["network"]))
 
 
+def _build_scoring_config(raw: dict[str, Any]) -> ScoringConfig:
+    return ScoringConfig(**raw["scoring"])
+
+
 def load_config(config_dir: str | Path | None = None) -> Config:
     """Load the game and agent configuration files from one directory.
 
     The YAML files are loaded together so callers use one configuration
-    object rather than loading individual files in each subsystem.
+    object rather than loading individual files in each subsystem. This
+    includes the game, agent, and training-scoring settings.
     """
     if config_dir is None:
         config_dir = Path(__file__).resolve().parents[2] / "configs"
@@ -117,8 +132,11 @@ def load_config(config_dir: str | Path | None = None) -> Config:
     raw_configs = {path.stem: _load_yaml(path) for path in files}
     if "game" not in raw_configs:
         raise FileNotFoundError(f"Missing game.yaml in {config_path}")
+    if "scoring" not in raw_configs:
+        raise FileNotFoundError(f"Missing scoring.yaml in {config_path}")
 
     return Config(
         game=_build_game_config(raw_configs["game"]),
         agent=_build_agent_config(raw_configs["agent"]),
+        scoring=_build_scoring_config(raw_configs["scoring"]),
     )
