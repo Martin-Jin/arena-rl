@@ -7,13 +7,12 @@ import pygame
 from arena_ai.config import load_config
 from arena_ai.sim.rules import step_fighter
 from arena_ai.sim.state import FighterState
-from arena_ai.viewer.annimation import draw_fighter
+from arena_ai.viewer.annimation import PIXELS_PER_METER, draw_fighter
 
 # Load all application configuration from the YAML files in configs/.
 config = load_config()
 DT = config.game.world.dt_seconds
 
-PIXELS_PER_METER = 100  # viewer-only setting
 FLOOR_PX = 650  # screen y-coordinate of the floor
 
 
@@ -22,10 +21,15 @@ def to_screen(x_m: float, y_m: float) -> tuple[float, float]:
     return x_m * PIXELS_PER_METER, FLOOR_PX - y_m * PIXELS_PER_METER
 
 
-def render(screen: pygame.Surface, fighter: FighterState, tick: int) -> None:
+def render(
+    screen: pygame.Surface,
+    fighter: FighterState,
+    tick: int,
+    turning: bool = False,
+) -> None:
     """Render the current game frame."""
     screen.fill("white")
-    if not draw_fighter(screen, fighter, tick, to_screen):
+    if not draw_fighter(screen, fighter, tick, to_screen, turning=turning):
         h_px = config.game.fighter.height_m * PIXELS_PER_METER
         w_px = h_px * 0.3
         x_px, y_px = to_screen(fighter.x, fighter.y)
@@ -40,6 +44,8 @@ clock = pygame.time.Clock()
 running = True
 accumulator = 0.0
 render_tick = 0
+turn_timer = 0
+last_move_dir = 0
 fighter = FighterState()
 
 while running:
@@ -62,6 +68,10 @@ while running:
     keys = pygame.key.get_pressed()
     # -1 for right, 0 for no movement, 1 for left
     move_dir = int(keys[pygame.K_d]) - int(keys[pygame.K_a])
+    if move_dir and move_dir != last_move_dir:
+        turn_timer = 6
+    if move_dir:
+        last_move_dir = move_dir
     jump = keys[pygame.K_w]
     attack = keys[pygame.K_SPACE]
 
@@ -70,7 +80,8 @@ while running:
         step_fighter(fighter, move_dir, jump, config.game, attack=attack)
         accumulator -= DT
 
-    render(screen, fighter, render_tick)
+    render(screen, fighter, render_tick, turning=turn_timer > 0)
+    turn_timer = max(0, turn_timer - 1)
     render_tick += 1
 
 pygame.quit()

@@ -3,6 +3,8 @@
 import pygame
 from pathlib import Path
 
+from arena_ai.config import load_config
+
 
 class Animation:
     """A simple animation class that cycles through a list of frames."""
@@ -23,15 +25,31 @@ class Animation:
         return self.frames[i]
 
 
-def load_frames(folder: str | Path, scale: float = 1) -> list[pygame.Surface]:
+PIXELS_PER_METER = 100
+TARGET_FIGHTER_HEIGHT_PX = (
+    load_config().game.fighter.height_m * PIXELS_PER_METER
+)
+SOURCE_BODY_HEIGHT_PX = {
+    "idle": 21,
+    "run": 21,
+    "attack": 20,
+    "turn": 21,
+}
+
+
+def load_frames(
+    folder: str | Path,
+    source_body_height_px: int,
+    target_body_height_px: float = TARGET_FIGHTER_HEIGHT_PX,
+) -> list[pygame.Surface]:
     """Load all PNG frames from a folder and return them as a list of Pygame surfaces."""
     frames = []
     for p in sorted(Path(folder).glob("*.png")):
         img = pygame.image.load(p)
         if pygame.display.get_surface() is not None:
             img = img.convert_alpha()
-        if scale != 1:
-            img = pygame.transform.scale_by(img, scale)
+        scale = target_body_height_px / source_body_height_px
+        img = pygame.transform.scale_by(img, scale)
         frames.append(img)
     return frames
 
@@ -39,15 +57,26 @@ def load_frames(folder: str | Path, scale: float = 1) -> list[pygame.Surface]:
 ASSET_ROOT = Path(__file__).resolve().parents[3] / "assets" / "sprites" / "fighter"
 
 anims = {
-    "idle": Animation(load_frames(ASSET_ROOT / "idle"), 6, loop=True),
-    "run": Animation(load_frames(ASSET_ROOT / "run"), 4, loop=True),
-    "attack": Animation(load_frames(ASSET_ROOT / "attack"), 3, loop=False),
+    name: Animation(
+        load_frames(ASSET_ROOT / name, source_body_height),
+        frame_duration,
+        loop=loop,
+    )
+    for name, (source_body_height, frame_duration, loop) in {
+        "idle": (SOURCE_BODY_HEIGHT_PX["idle"], 6, True),
+        "run": (SOURCE_BODY_HEIGHT_PX["run"], 4, True),
+        "attack": (SOURCE_BODY_HEIGHT_PX["attack"], 3, False),
+        "turn": (SOURCE_BODY_HEIGHT_PX["turn"], 1, False),
+    }.items()
 }
 
 
-def draw_fighter(screen, fighter, tick, to_screen):
+def draw_fighter(screen, fighter, tick, to_screen, turning=False):
     """Draw a fighter animation and return whether sprite frames were available."""
-    if fighter.attack_frame:
+    if turning:
+        animation_name = "turn"
+        animation_tick = 0
+    elif fighter.attack_frame:
         animation_name = "attack"
         animation_tick = fighter.attack_frame
     elif fighter.vx:
@@ -61,8 +90,13 @@ def draw_fighter(screen, fighter, tick, to_screen):
     if not animation.frames:
         return False
 
-    img = animation.get_frame(animation_tick)
-    if fighter.facing_dir < 0:
+    if animation_name == "run" and fighter.vx < 0:
+        frame_index = (animation_tick // animation.frame_duration) % len(animation.frames)
+        frame_index = len(animation.frames) - 1 - frame_index
+        img = animation.frames[frame_index]
+    else:
+        img = animation.get_frame(animation_tick)
+    if fighter.facing_dir < 0 and animation_name != "turn":
         img = pygame.transform.flip(img, True, False)
     x_px, y_px = to_screen(fighter.x, fighter.y)
     screen.blit(img, img.get_rect(midbottom=(x_px, y_px)))

@@ -97,6 +97,12 @@ The viewer layer is the only layer intended to depend on `pygame`.
 
 - `assets/` — Stores non-code resources used by the viewer.
 - `assets/sprites/` — Stores fighter sprite sheets and visual effects.
+- `assets/sprites/fighter/` — Stores ordered idle, run, attack, and turn frames
+  extracted from the credited Knight Hero Platformer sprite pack. The viewer
+  scales the source cells to the 0.9 m fighter hitbox. The attack action uses
+  only the pack's single-slash `Attack 1` sequence until combo mechanics exist.
+- `assets/sprites/fighter/deferred/` — Preserves source sheets and extracted
+  combo/recovery frames that are not loaded until their actions exist.
 - `assets/audio/` — Stores music and sound effects.
 - `assets/fonts/` — Stores fonts used by the user interface.
 
