@@ -64,10 +64,25 @@ class NetworkConfig:
 
 
 @dataclass(frozen=True)
+class PolicyConfig:
+    """Hyperparameters used by the PPO learner."""
+
+    clip_range: float
+    learning_rate: float
+    discount_factor: float
+    gae_lambda: float
+    num_epochs: int
+    batch_size: int
+    value_loss_coef: float
+    entropy_coef: float
+
+
+@dataclass(frozen=True)
 class AgentConfig:
     """All configurations for the AI agent."""
 
     network: NetworkConfig
+    policy: PolicyConfig
 
 
 @dataclass(frozen=True)
@@ -150,7 +165,10 @@ def _build_game_config(raw: dict[str, Any]) -> GameConfig:
 
 
 def _build_agent_config(raw: dict[str, Any]) -> AgentConfig:
-    return AgentConfig(network=NetworkConfig(**raw["network"]))
+    return AgentConfig(
+        network=NetworkConfig(**raw["network"]),
+        policy=PolicyConfig(**raw["policy"]),
+    )
 
 
 def _build_scoring_config(raw: dict[str, Any]) -> ScoringConfig:

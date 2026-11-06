@@ -5,3 +5,13 @@ network:
   hidden_layers: [128, 128] # number of neurons in each hidden layer
   activation: "relu" # activation function for hidden layers
   output_activation: "linear" # activation function for output layer
+
+policy:
+  clip_range: 0.2 # clipping range for policy updates
+  learning_rate: 0.0003 # learning rate for the optimizer
+  discount_factor: 0.99 # discount factor for future rewards
+  gae_lambda: 0.95 # lambda parameter for Generalized Advantage Estimation
+  num_epochs: 10 # number of epochs for training
+  batch_size: 64 # size of each training batch
+  value_loss_coef: 0.5 # coefficient for value loss in the total loss function
+  entropy_coef: 0.01 # coefficient for entropy in the total loss function
