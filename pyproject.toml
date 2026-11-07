@@ -11,6 +11,10 @@ requires-python = ">=3.10"
 dependencies = [
     "pygame-ce",
     "PyYAML",
+]
+
+[project.optional-dependencies]
+cpu = [
     "torch",
 ]
 

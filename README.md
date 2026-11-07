@@ -24,6 +24,10 @@ compatibility and more advanced training workflows remain future work.
 Follow the [setup guide](docs/setup.md) to install the project and its
 dependencies.
 
+The setup guide includes separate CPU and NVIDIA CUDA installation commands.
+Use the CUDA command before running training if you want PyTorch to use your
+GPU; the training script automatically selects CUDA when it is available.
+
 Start the manual viewer from the repository root:
 
 ```powershell

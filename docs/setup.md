@@ -15,15 +15,38 @@ py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-Install the project in editable mode:
+For a CPU-only installation, install the project with its CPU extra:
 
 ```powershell
 py -m pip install --upgrade pip
-py -m pip install -e .
+py -m pip install -e ".[cpu]"
 ```
 
 The project dependencies are declared in [`pyproject.toml`](../pyproject.toml).
-The editable install currently provides pygame-ce, PyYAML, and PyTorch.
+The CPU extra installs the standard PyPI PyTorch wheel.
+
+### NVIDIA CUDA installation
+
+For an NVIDIA GPU, install the PyTorch wheel built for CUDA before installing
+the project. This prevents pip from selecting the CPU wheel:
+
+```powershell
+py -m pip install --upgrade pip
+py -m pip install torch --index-url https://download.pytorch.org/whl/cu126
+py -m pip install -e .
+```
+
+The `cu126` index is an example. Choose the CUDA wheel index matching the
+PyTorch and NVIDIA driver versions supported by your machine using the
+[official PyTorch installation selector](https://pytorch.org/get-started/locally/).
+Do not install the `cpu` extra in this environment, because it requests the
+CPU PyTorch wheel.
+
+Verify that PyTorch can see the GPU:
+
+```powershell
+py -c "import torch; print(torch.__version__); print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
+```
 
 If PowerShell prevents activation scripts from running, allow scripts for the
 current PowerShell process only:
