@@ -93,6 +93,7 @@ class TrainingConfig:
     checkpoint_interval: int
     seed: int | None
     num_envs: int = 1
+    randomize_spawns: bool = False
 
 
 @dataclass(frozen=True)

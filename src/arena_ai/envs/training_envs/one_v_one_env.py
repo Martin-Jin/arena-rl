@@ -2,6 +2,7 @@
 
 from collections.abc import Callable, Mapping
 from functools import partial
+import random
 
 from arena_ai.agents.action import to_fighter_action
 from arena_ai.agents.scripted import approach_and_attack
@@ -22,13 +23,31 @@ class OneVOneEnv(ArenaEnv):
     ) -> None:
         """Initialize the one-versus-one scenario and its optional opponent."""
         super().__init__(config, max_episode_steps)
+        self.rng = random.Random()
         self.opponent_policy: Callable[[list[float]], int] = opponent_policy or partial(
             approach_and_attack, config=config
         )
 
+    def reset(self, seed: int | None = None):
+        """Reseed the spawn RNG only when a seed is given, so later
+        auto-resets keep drawing new positions."""
+        if seed is not None:
+            self.rng = random.Random(seed)
+        return super().reset(seed)
+
     def create_initial_fighters(self) -> dict[str, FighterState]:
-        """Create the deterministic one-versus-one starting state."""
-        return create_initial_fighters(self.config.game)
+        """Create the one-versus-one starting state, optionally randomized."""
+        fighters = create_initial_fighters(self.config.game)
+        if not self.config.training.randomize_spawns:
+            return fighters
+        world = self.config.game.world
+        margin = self.config.game.fighter.width_m / 2
+        for fighter in fighters.values():
+            fighter.x = self.rng.uniform(margin, world.arena_width_m - margin)
+        agent, opponent = fighters["agent"], fighters["opponent"]
+        agent.facing_dir = 1 if opponent.x >= agent.x else -1
+        opponent.facing_dir = -agent.facing_dir
+        return fighters
 
     def get_actions(
         self,
