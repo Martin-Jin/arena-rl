@@ -12,7 +12,9 @@ This document describes the intended purpose of each module and project director
 
 - `configs/` — Stores the YAML files read by the global configuration loader.
 - `configs/game.yaml` — Defines gameplay and observation constants, including damage, cooldowns, parry timing, and arena dimensions.
-- `configs/agent.yaml` — Defines neural-network settings for the agent, including input/output sizes and the size of each hidden layer.
+- `configs/agent.yaml` — Defines neural-network settings for the agent and
+  training-loop defaults, including hidden-layer sizes, rollout length, and
+  checkpoint interval.
 - `configs/scoring.yaml` — Defines reward scales and terminal win/loss rewards
   used by training environments.
 - `src/arena_ai/config.py` — Loads all YAML files from `configs/` and exposes the typed game settings plus the agent settings.
@@ -75,14 +77,14 @@ The simulation layer is deterministic and independent of rendering. It must not 
 - `src/arena_ai/training/rewards.py` — Defines terminal and shaping rewards
   from the learner's perspective.
 - `src/arena_ai/training/rollout.py` — Stores observations, actions, rewards,
-  termination flags, and policy values/log probabilities collected from episodes.
+  termination flags, and policy values/log probabilities collected from rollouts.
 - `src/arena_ai/training/ppo.py` — Calculates GAE and bootstrapped critic
   targets, then calculates PPO policy, value, and entropy losses and applies
   optimizer updates.
 - `src/arena_ai/training/checkpoints.py` — Saves and restores the policy,
   optimizer, configuration, and training progress.
-- `src/arena_ai/training/train.py` — Owns episode creation, scripted-opponent
-  selection, rollout collection, updates, checkpointing, and evaluation.
+- `src/arena_ai/training/train.py` — Owns rollout collection across episodes,
+  scripted-opponent selection, updates, checkpointing, and evaluation.
 
 #### PPO iteration order
 
@@ -96,6 +98,11 @@ updates are separate phases. Each iteration must:
 3. run several minibatch epochs that update the actor and critic from the
    rollout, using the PPO surrogate objective, entropy bonus, and value loss;
 4. discard the rollout before collecting the next one with the updated policy.
+
+An iteration is not an episode. The `N` steps are a fixed budget, so one
+rollout spans as many episodes as it takes and can end mid-episode; that is why
+the final state is bootstrapped. Terminated and truncated steps only reset the
+environment and collection continues until the step budget is reached.
 
 This discard-and-recollect step is required by PPO's on-policy design. The
 stored batch belongs to the old policy and should not be reused after the

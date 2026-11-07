@@ -74,7 +74,7 @@ def advantage_estimation(
             delta + discount_factor * gae_lambda * not_episode_end * last_advantage
         )
         advantages[t] = last_advantage
-    # tensor of advantages for each time step per episode in the rollout
+    # tensor of advantages for each time step of the rollout, shape [time, environments]
     return advantages
 
 

@@ -78,6 +78,16 @@ class PolicyConfig:
 
 
 @dataclass(frozen=True)
+class TrainingConfig:
+    """Settings controlling the outer on-policy training loop."""
+
+    iterations: int
+    rollout_steps: int
+    checkpoint_interval: int
+    seed: int | None
+
+
+@dataclass(frozen=True)
 class AgentConfig:
     """All configurations for the AI agent."""
 
@@ -142,6 +152,7 @@ class Config:
 
     game: GameConfig
     agent: AgentConfig
+    training: TrainingConfig
     scoring: ScoringConfig
     viewer: ViewerConfig
 
@@ -169,6 +180,10 @@ def _build_agent_config(raw: dict[str, Any]) -> AgentConfig:
         network=NetworkConfig(**raw["network"]),
         policy=PolicyConfig(**raw["policy"]),
     )
+
+
+def _build_training_config(raw: dict[str, Any]) -> TrainingConfig:
+    return TrainingConfig(**raw["training"])
 
 
 def _build_scoring_config(raw: dict[str, Any]) -> ScoringConfig:
@@ -208,6 +223,7 @@ def load_config(config_dir: str | Path | None = None) -> Config:
     return Config(
         game=_build_game_config(raw_configs["game"]),
         agent=_build_agent_config(raw_configs["agent"]),
+        training=_build_training_config(raw_configs["agent"]),
         scoring=_build_scoring_config(raw_configs["scoring"]),
         viewer=_build_viewer_config(raw_configs["viewer"]),
     )

@@ -16,6 +16,7 @@ class RolloutBatch:
     truncated: torch.Tensor
     values: torch.Tensor
     log_probs: torch.Tensor
+    next_values: torch.Tensor
 
     @property
     def dones(self) -> torch.Tensor:
@@ -43,6 +44,7 @@ class RolloutBatch:
             truncated=flatten(self.truncated),
             values=flatten(self.values),
             log_probs=flatten(self.log_probs),
+            next_values=flatten(self.next_values),
         )
 
 
@@ -140,6 +142,12 @@ class Rollout:
             truncated=torch.tensor(self._truncated, dtype=torch.bool, device=device),
             values=torch.tensor(self._values, dtype=dtype, device=device),
             log_probs=torch.tensor(self._log_probs, dtype=dtype, device=device),
+            next_values=torch.zeros(
+                len(self._actions),
+                self.environment_count,
+                dtype=dtype,
+                device=device,
+            ),
         )
         # If only one environment, return a batch with shape [time]
         # instead of the [time, 1] shape produced before squeezing.
@@ -156,6 +164,7 @@ class Rollout:
                 truncated=batch.truncated[:, 0],
                 values=batch.values[:, 0],
                 log_probs=batch.log_probs[:, 0],
+                next_values=batch.next_values[:, 0],
             )
         return batch
 

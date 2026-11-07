@@ -64,7 +64,12 @@ class ArenaEnv(ABC):
         self._episode_done = terminated or truncated
 
         reward = self.calculate_reward(previous_health)
-        info = {"step_count": self.step_count}
+        winner = None
+        if terminated and self.fighters["agent"].health > 0:
+            winner = "agent"
+        elif terminated:
+            winner = "opponent"
+        info = {"step_count": self.step_count, "winner": winner}
         return self.get_observation(), reward, terminated, truncated, info
 
     def get_observation(self) -> list[float]:
