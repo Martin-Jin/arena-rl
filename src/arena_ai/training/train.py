@@ -81,6 +81,7 @@ class TrainingLoop:
         *,
         save_checkpoint: SaveCheckpoint | None = None,
         step_callback: StepCallback | None = None,
+        device: torch.device | str | None = None,
     ) -> None:
         # One training loop consists of the:
         # - the environment in which the agent is learning
@@ -93,6 +94,7 @@ class TrainingLoop:
         self.update_policy = update_policy
         self.save_checkpoint = save_checkpoint
         self.step_callback = step_callback
+        self.device = device
         self.state = TrainingState()
         self._current_episode_return = 0.0
         self._vector_episode_returns: list[float] = []
@@ -160,7 +162,7 @@ class TrainingLoop:
                         self.state.wins += 1
                     self._current_episode_return = 0.0
                     observation, _ = self.environment.reset()
-        batch = rollout.as_batch()
+        batch = rollout.as_batch(device=self.device)
         batch = replace(
             batch,
             next_values=torch.tensor(
@@ -242,7 +244,7 @@ class TrainingLoop:
                 observations = next_observations
                 self.state.environment_steps += environment_count
 
-        batch = rollout.as_batch()
+        batch = rollout.as_batch(device=self.device)
         batch = replace(
             batch,
             next_values=torch.tensor(

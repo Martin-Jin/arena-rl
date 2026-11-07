@@ -20,6 +20,17 @@ from arena_ai.training.train import TrainingLoop, TrainingState
 
 # Switch this to True to render every simulation step during training.
 VISUALIZE_TRAINING = True
+TRAINING_DEVICE = "auto"
+
+
+def select_training_device() -> torch.device:
+    """Select CUDA by default when available, otherwise use the CPU."""
+    if TRAINING_DEVICE == "auto":
+        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(TRAINING_DEVICE)
+    if device.type == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("TRAINING_DEVICE is set to CUDA, but CUDA is unavailable")
+    return device
 
 
 def build_update_callback(
@@ -87,7 +98,10 @@ def run_training(config: Config | None = None) -> TrainingState:
     config = config or load_config()
     if config.training.seed is not None:
         torch.manual_seed(config.training.seed)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = select_training_device()
+    if device.type == "cuda":
+        torch.set_float32_matmul_precision("high")
+    print(f"Training device: {device}")
     model = ActorCritic(config).to(device)
     optimizer = torch.optim.Adam(
         model.parameters(), lr=config.agent.policy.learning_rate
@@ -119,6 +133,7 @@ def run_training(config: Config | None = None) -> TrainingState:
         update_policy,
         save_checkpoint=checkpoint,
         step_callback=visualizer,
+        device=device,
     )
     try:
         state = loop.run(

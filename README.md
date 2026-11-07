@@ -86,6 +86,13 @@ Press `Ctrl+C` to stop training. The latest in-memory model, optimizer, and
 completed training state are saved to `checkpoints/latest.pt` before the script
 exits.
 
+Training automatically uses CUDA when PyTorch detects a CUDA-capable GPU and
+falls back to the CPU otherwise. Set `TRAINING_DEVICE = "cpu"` or
+`TRAINING_DEVICE = "cuda"` in [`scripts/run_training.py`](scripts/run_training.py)
+to override the default. The neural-network inference, PPO tensors, and
+optimizer updates run on the selected device; the deterministic game simulation
+and pygame visualization remain CPU-bound.
+
 To visualize training, set `VISUALIZE_TRAINING = True` near the top of
 [`scripts/run_training.py`](scripts/run_training.py). The viewer renders every
 fixed simulation step during every rollout without adding a real-time delay, so
