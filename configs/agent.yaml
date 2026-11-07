@@ -30,4 +30,4 @@ training:
   max_episode_steps: 1500 # episode time limit in sim steps (25 s at 60 Hz); null = 10 s
   stats_window: 100 # recent episodes used for the rolling episode stats (overall and per opponent)
   print_stats: true # print the training statistics (set false for silent training)
-  print_interval: 10 # iterations between printed statistics
+  print_interval: 100 # iterations between printed statistics (same as checkpoint_interval)
