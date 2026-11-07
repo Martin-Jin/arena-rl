@@ -30,8 +30,8 @@ TRAINING_DEVICE = "auto"
 # run. The model, optimizer and progress counters are restored and
 # training.iterations more iterations are run on top of the saved ones. Leave as
 # None to start a new run.
-RESUME_FROM: str | None = None
-# e.g. RESUME_FROM = "checkpoints/latest.pt" to continue that run
+# RESUME_FROM: str | None = None
+RESUME_FROM = "checkpoints/best.pt"
 
 
 def select_training_device() -> torch.device:
@@ -139,9 +139,7 @@ def run_training(config: Config | None = None) -> TrainingState:
     print(f"Training device: {device}")
     # Build the model, optimizer, policy, environment, and training loop.
     model = ActorCritic(config).to(device)
-    optimizer = torch.optim.Adam(
-        model.parameters(), lr=config.agent.policy.learning_rate
-    )
+    optimizer = torch.optim.Adam(model.parameters(), lr=config.agent.policy.learning_rate)
     policy = PolicyAdapter(model, device, "cpu")
     resumed_state: TrainingState | None = None
     if RESUME_FROM is not None:
@@ -165,9 +163,7 @@ def run_training(config: Config | None = None) -> TrainingState:
     def checkpoint(state: TrainingState) -> None:
         """Save the latest model and training progress."""
         save_checkpoint(checkpoint_path, model, optimizer, config, state)
-        save_checkpoint(
-            run_dir / f"iter_{state.iteration:06d}.pt", model, optimizer, config, state
-        )
+        save_checkpoint(run_dir / f"iter_{state.iteration:06d}.pt", model, optimizer, config, state)
         if config.training.print_stats:
             print(f"[iter {state.iteration}] checkpoint saved to {checkpoint_path}")
 
@@ -179,9 +175,7 @@ def run_training(config: Config | None = None) -> TrainingState:
 
     # Build the environment(s) and run the training loop.
     factories = make_factories(config)
-    environment = (
-        VectorEnv(factories) if config.training.num_envs > 1 else factories[0]()
-    )
+    environment = VectorEnv(factories) if config.training.num_envs > 1 else factories[0]()
     loop = TrainingLoop(
         environment,
         policy,
@@ -189,9 +183,7 @@ def run_training(config: Config | None = None) -> TrainingState:
         save_checkpoint=checkpoint,
         step_callback=visualizer,
         log_callback=(
-            (lambda state: print(format_stats(state)))
-            if config.training.print_stats
-            else None
+            (lambda state: print(format_stats(state))) if config.training.print_stats else None
         ),
         device=device,
         stats_window=config.training.stats_window,
@@ -228,9 +220,7 @@ def make_factories(config: Config):
             opponent_name=name,
             max_episode_steps=config.training.max_episode_steps,
         )
-        for name, policy in (
-            opponents[i % len(opponents)] for i in range(config.training.num_envs)
-        )
+        for name, policy in (opponents[i % len(opponents)] for i in range(config.training.num_envs))
     ]
 
 
