@@ -18,7 +18,7 @@ compatibility and more advanced training workflows remain future work.
   environment with `training.opponents` in [`configs/agent.yaml`](configs/agent.yaml).
   See [Training](#training) and the [training guide](docs/training-process.md).
 - Scripted opponents for the viewer and training, including one that hunts you and
-  parries every attack it can see.
+  parries every attack it can see, and one that runs away from you.
 - Pygame viewer with configurable idle, running, turning, single-slash attack,
   and airborne animation fallback, plus battle music and fighter sound effects.
 - Premade Knight Hero Platformer sprite assets, scaled to the configured
@@ -116,15 +116,13 @@ Controls:
 
 The repository includes the best weights so far, `checkpoints/best.pt`, so the viewer's
 trained opponent works straight after a clone with no training. Every other file in
-`checkpoints/` is gitignored. These weights come from a run of 3,714 iterations (about
-7.6 million steps). Over the whole run the agent won 88% of its 13,339 episodes, and it
-won every one of the last 100 against each of the scripted opponents. The viewer picks
-it up automatically when there is no `latest.pt`, or you can choose it in Settings.
-
-**These weights are out of date.** They were trained before parrying, so they no
-longer fit the network's inputs and outputs and the viewer cannot load them. Train a
-new agent (see below) and replace `best.pt` once it is clearly better; the figures
-above then need updating too.
+`checkpoints/` is gitignored. These weights come from a run of 1,702 iterations (about
+13.9 million steps). Over the whole run the agent won 97% of its 27,982 episodes. In the last 100 episodes it won
+every one against the approach, idle and perfect-parry opponents and 99 against the
+random one. It was trained before the runner opponent existed, so it has not been
+measured against it. The viewer picks it up automatically when there is no `latest.pt`,
+or you can choose it in Settings. Replace `best.pt` only when a run is clearly better,
+and update these figures when you do.
 
 ## Training
 
