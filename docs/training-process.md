@@ -15,8 +15,12 @@ defines:
 - `rollout_steps` — environment transitions collected in each cycle.
 - `checkpoint_interval` — cycles between checkpoint callbacks.
 - `seed` — optional seed for the initial environment reset.
-- `num_envs` — number of independent environments collected synchronously in
-  parallel. Set it to `1` for the scalar environment path.
+- `opponents` — the opponent of each parallel environment, one entry per
+  environment, in order. The number of entries is the number of environments, so
+  `[approach, approach, idle]` runs two against approach and one against idle, and
+  a single entry uses the scalar environment path.
+- `num_envs` — the most environments allowed. Training refuses to start, with an
+  error, if `opponents` lists more.
 - `randomize_spawns` — start each episode with random fighter positions.
 - `max_episode_steps` — episode time limit in simulation steps (1500 is 25
   simulated seconds at 60 Hz). `null` uses the environment default of
@@ -28,10 +32,10 @@ defines:
 - `print_interval` — iterations between printed statistics. The first and
   last iteration of a run always print.
 
-When `num_envs` is greater than one, environment `i` uses opponent
-`i % len(OPPONENTS)` from [`scripted.py`](../src/arena_ai/agents/scripted.py)
-(approach-and-attack, idle, random). With one environment the
-approach-and-attack opponent is used.
+Environment `i` plays `opponents[i]`. The names come from `OPPONENTS` in
+[`scripted.py`](../src/arena_ai/agents/scripted.py) (`approach`, `idle`, `random`).
+The practice opponents are not accepted, because the perfect-parry opponent cannot
+be beaten from the front, so the agent could not learn from it.
 
 An iteration is not an episode. A rollout collects exactly `rollout_steps`
 transitions, resetting the environment whenever an episode terminates or is
@@ -43,8 +47,8 @@ middle of an episode.
 [`TrainingLoop.run`](../src/arena_ai/training/train.py) performs this sequence:
 
 1. Reset the environment(s).
-2. Collect one fixed-size rollout with the unchanged policy. When `num_envs` is
-   greater than one, each environment advances together and contributes
+2. Collect one fixed-size rollout with the unchanged policy. With more than
+   one environment, each environment advances together and contributes
    `rollout_steps` transitions to the PPO batch.
 3. Pass the rollout to the update callback.
 4. Record training metrics.
@@ -284,4 +288,4 @@ py scripts/run_training.py
 ```
 
 The script uses the values in `configs/agent.yaml`; reduce `training.iterations`,
-`training.rollout_steps`, or `training.num_envs` there for a short smoke run.
+`training.rollout_steps`, or `training.opponents` there for a short smoke run.

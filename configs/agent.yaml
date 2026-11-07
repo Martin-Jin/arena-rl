@@ -21,7 +21,11 @@ training:
   rollout_steps: 512 # transitions collected before each policy update
   checkpoint_interval: 100 # iterations between checkpoint saves
   seed: null # optional seed for the initial environment reset
-  num_envs: 4 # independent environments collected in parallel
+  # One environment per entry, in order, each playing the named opponent (approach, idle,
+  # random). Repeat a name to run several environments against it, for example
+  # [approach, approach, idle] runs two against approach and one against idle.
+  opponents: [approach, idle, random, approach]
+  num_envs: 4 # the most environments allowed: training refuses to start with more opponents
   randomize_spawns: true # random fighter start positions each episode
   max_episode_steps: 1500 # episode time limit in sim steps (25 s at 60 Hz); null = 10 s
   stats_window: 100 # recent episodes used for the rolling episode stats (overall and per opponent)

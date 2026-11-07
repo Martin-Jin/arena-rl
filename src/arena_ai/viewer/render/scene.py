@@ -53,8 +53,12 @@ def draw_scene(
     fighters: Mapping[str, FighterState],
     tick: int,
     turning: bool = False,
+    hurt: Mapping[str, float] | None = None,
 ) -> None:
-    """Draw the arena and every fighter. Only the agent can show a turn frame."""
+    """Draw the arena and every fighter. Only the agent can show a turn frame.
+
+    ``hurt`` gives each fighter's hurt flash strength (0 to 1), as ``Hud.hurt_strength``.
+    """
     colors = config.viewer.ui.colors
     draw_arena(screen, config, to_screen)
     for fighter in fighters.values():
@@ -69,6 +73,8 @@ def draw_scene(
             to_screen,
             turning=turning and not is_opponent,
             shade=colors["opponent_tint"] if is_opponent else None,
+            hurt=(hurt or {}).get(fighter_id, 0.0),
+            effect_color=colors["opponent_health"] if is_opponent else None,
         )
         if not drawn:  # No sprite frames available: draw a plain box instead.
             height = config.game.fighter.height_m * pixels_per_meter

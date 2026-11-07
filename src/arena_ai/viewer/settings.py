@@ -17,6 +17,7 @@ PLAYER_OPTIONS = (("human", "You"), (TRAINED, "Trained agent"))
 OPPONENT_OPTIONS = (
     (TRAINED, "Trained agent"),
     ("approach", "Scripted: approach"),
+    ("parrier", "Scripted: perfect parry"),
     ("idle", "Idle dummy"),
     ("random", "Random"),
     ("none", "Practice (solo)"),

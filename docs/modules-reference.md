@@ -13,7 +13,7 @@ This document describes the intended purpose of each module and project director
 - `configs/` — Stores the YAML files read by the global configuration loader.
 - `configs/game.yaml` — Defines gameplay and observation constants, including
   attack timing and damage, fighter dimensions, arena dimensions and the
-  observation scaling limits. The parry frame counts and the observation
+  observation scaling limits, and the parry and counter timings. The observation
   `spec_version` and `reaction_delay_frames` values are loaded but not used by
   the simulation yet.
 - `configs/agent.yaml` — Defines neural-network settings, PPO hyperparameters
@@ -42,10 +42,11 @@ The simulation layer is deterministic and independent of rendering. It must not 
 - `src/arena_ai/sim/observation_vector.py` — Flattens observations into a
   fixed ordered and normalized vector whose layout matches the network input.
   It exposes the derived observation size so the network does not duplicate it
-  in configuration. Each fighter contributes eight features, scaled using the
+  in configuration. Each fighter contributes fourteen features, scaled using the
   game configuration's fixed observation limits. See
   [`docs/simulation-spec.md`](simulation-spec.md) for the exact order.
-- `src/arena_ai/sim/rules.py` — Implements state transitions, damage calculation, and collision handling.
+- `src/arena_ai/sim/rules.py` — Implements one fighter's step: movement, attack and
+  parry timing, the spam-shrunk parry window, the counter lunge and hover.
 
 ### Environments
 
@@ -78,7 +79,10 @@ The simulation layer is deterministic and independent of rendering. It must not 
   faster no-gradient version of sampling plus `log_prob` used for rollouts.
 - `src/arena_ai/agents/scripted.py` — Provides the non-learning opponents in
   the `OPPONENTS` registry: a deterministic approach-and-attack policy, an idle
-  policy and a uniformly random policy.
+  policy and a uniformly random policy. The `PRACTICE_OPPONENTS` registry holds the
+  perfect-parry hunter, which only the viewer offers: training samples from
+  `OPPONENTS` alone, because an opponent that parries every attack from the front
+  cannot be beaten that way.
 - `src/arena_ai/agents/policy.py` — Defines the PyTorch `ActorCritic` module
   with separate, configurable policy and value networks (input and output sizes
   come from the observation and action codecs), and `PolicyAdapter`, which
@@ -105,8 +109,8 @@ The simulation layer is deterministic and independent of rendering. It must not 
   updates, checkpoint callbacks, and training metrics. See
   [`docs/training-process.md`](training-process.md) for the complete current
   process and data flow.
-- `scripts/run_training.py` — Wires the model, optimizer, environments (each
-  parallel environment gets the next opponent from `OPPONENTS` in turn), PPO
+- `scripts/run_training.py` — Wires the model, optimizer, environments (one per
+  entry of `training.opponents`), PPO
   update callback, and checkpoint callback into the runnable training command.
   It also restores a saved run when `RESUME_FROM` is set.
 
@@ -176,7 +180,8 @@ The viewer layer is the only layer intended to depend on `pygame`.
 
 - `tests/` — Automated `unittest` tests. Run them with
   `py -m unittest discover -s tests`.
-- Determinism and simulation-rule tests are planned as the simulation grows.
+- The simulation tests include deterministic same-seed runs and the parry, counter
+  and stagger rules. Add a test with every rule change.
 
 ## Documentation and experiments
 

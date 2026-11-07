@@ -168,6 +168,8 @@ class TrainingLoop:
                 swings=count("swings"),
                 hits=count("hits"),
                 edge_steps=count("edge_steps"),
+                parry_attempts=count("parry_attempts"),
+                parries=count("parries"),
             ),
         )
 
@@ -364,13 +366,9 @@ class TrainingLoop:
             raise ValueError("print_interval must be positive")
         self._interrupt_pending = False
         if isinstance(self.environment, VectorEnv):
-            if config.num_envs != self.environment.num_envs:
-                raise ValueError("config.num_envs must match the vector environment")
-            observation, _ = self.environment.reset(seed=config.seed)
-        else:
-            if config.num_envs != 1:
-                raise ValueError("num_envs > 1 requires a VectorEnv")
-            observation, _ = self.environment.reset(seed=config.seed)
+            if self.environment.num_envs > config.num_envs:
+                raise ValueError("the vector environment has more instances than num_envs")
+        observation, _ = self.environment.reset(seed=config.seed)
         # Each iteration collects exactly rollout_steps environment steps and then
         # updates the policy once. The rollout spans as many episodes as it takes
         # and can end mid-episode, so it is a step budget, not a game.

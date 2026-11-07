@@ -7,7 +7,7 @@ from pathlib import Path
 import torch
 
 from arena_ai.agents.policy import ActorCritic, PolicyAdapter
-from arena_ai.agents.scripted import OPPONENTS
+from arena_ai.agents.scripted import training_opponents
 from arena_ai.config import Config, load_config
 from arena_ai.envs.training_envs.one_v_one_env import OneVOneEnv
 from arena_ai.envs.vector_env import VectorEnv
@@ -30,8 +30,10 @@ TRAINING_DEVICE = "auto"
 # run. The model, optimizer and progress counters are restored and
 # training.iterations more iterations are run on top of the saved ones. Leave as
 # None to start a new run.
-# RESUME_FROM: str | None = None
-RESUME_FROM = "checkpoints/best.pt"
+# checkpoints/best.pt predates the parry action and observation features, so it no
+# longer fits the network: train a new one before resuming from it again.
+RESUME_FROM: str | None = None
+# RESUME_FROM = "checkpoints/best.pt"
 
 
 def select_training_device() -> torch.device:
@@ -175,7 +177,7 @@ def run_training(config: Config | None = None) -> TrainingState:
 
     # Build the environment(s) and run the training loop.
     factories = make_factories(config)
-    environment = VectorEnv(factories) if config.training.num_envs > 1 else factories[0]()
+    environment = VectorEnv(factories) if len(factories) > 1 else factories[0]()
     loop = TrainingLoop(
         environment,
         policy,
@@ -211,7 +213,7 @@ def run_training(config: Config | None = None) -> TrainingState:
 
 def make_factories(config: Config):
     """Create a list of environment factories for the training loop."""
-    opponents = list(OPPONENTS.items())
+    opponents = training_opponents(config.training.opponents, config.training.num_envs)
     return [
         partial(
             OneVOneEnv,
@@ -220,7 +222,7 @@ def make_factories(config: Config):
             opponent_name=name,
             max_episode_steps=config.training.max_episode_steps,
         )
-        for name, policy in (opponents[i % len(opponents)] for i in range(config.training.num_envs))
+        for name, policy in opponents
     ]
 
 

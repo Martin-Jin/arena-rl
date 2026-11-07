@@ -29,7 +29,7 @@ BUTTON_HEIGHT = 56
 TURN_FRAMES = 6  # Render frames the turn animation is shown after a direction change.
 NOTICE_SECONDS = 5.0
 URGENT_SECONDS = 10  # The timer turns red for the last seconds of a timed match.
-HUMAN_HINT = "A / D  move     W  jump     Space / Click  attack     Esc  pause"
+HUMAN_HINT = "A / D  move     W / Space  jump     Click  attack     Q  parry     Esc  pause"
 WATCH_HINT = "Esc  pause"
 
 
@@ -107,7 +107,9 @@ class MatchScene:
         self.winner = ""  # Title of the result screen.
         self.subtitle = ""
         self.outcome = ""  # "agent", "opponent" or "draw" once the match is over.
-        self.app.audio.silence()
+        self.frozen = False  # The scene stops animating once the result screen is up.
+        self.app.audio.cut_effects()
+        self.app.audio.ensure_music()
 
     @property
     def labels(self) -> dict[str, str]:
@@ -162,6 +164,9 @@ class MatchScene:
         self.phase = OVER
         self.app.audio.silence()
         self.outcome = self._decide(timed_out)
+        # Whoever wins, the music stops at once and the effects still playing fade out.
+        self.app.audio.stop_music()
+        self.app.audio.fade_out_effects()
         if self.outcome == "draw":
             self.winner = "Draw"
         elif self.watching:
@@ -210,9 +215,10 @@ class MatchScene:
             int(keys[pygame.K_d] or keys[pygame.K_RIGHT])
             - int(keys[pygame.K_a] or keys[pygame.K_LEFT])
         )
-        jump = bool(keys[pygame.K_w] or keys[pygame.K_UP])
-        attack = bool(keys[pygame.K_SPACE] or pygame.mouse.get_pressed()[0])
-        return to_fighter_action(from_parts(move_dir, jump, attack))
+        jump = bool(keys[pygame.K_w] or keys[pygame.K_UP] or keys[pygame.K_SPACE])
+        attack = bool(pygame.mouse.get_pressed()[0])
+        parry = bool(keys[pygame.K_q])
+        return to_fighter_action(from_parts(move_dir, jump, attack, parry))
 
     def _simulate(self, dt: float) -> None:
         """Step the simulation in fixed timesteps, however long the frame took."""
@@ -238,9 +244,11 @@ class MatchScene:
             if move_dir:
                 self.last_move_dir = move_dir
             for fighter_id, fighter in self.fighters.items():
-                self.app.audio.update_fighter(
-                    fighter_id, fighter, actions[fighter_id].move_dir, before[fighter_id]
-                )
+                if fighter.parried:
+                    self.hud.parried(fighter_id, fighter)
+                if fighter.counter_started:
+                    self.hud.countered(fighter_id, fighter)
+                self.app.audio.update_fighter(fighter_id, fighter, before[fighter_id])
             self.accumulator -= self.dt
             if self.opponent_kind == "none":
                 continue  # Practice has no opponent to defeat and no time limit.
@@ -259,6 +267,13 @@ class MatchScene:
         elif self.phase == PLAYING:
             self.fight_elapsed += dt
             self._simulate(dt)
+        if self.phase == OVER:
+            # Freeze every animation behind the result screen. One zero-length update
+            # first shows the final hit (its number and the empty health bar).
+            if not self.frozen:
+                self.hud.update(0.0, self.fighters)
+                self.frozen = True
+            return
         if self.phase != PAUSED:
             self.render_tick += 1
             self.turn_timer = max(0, self.turn_timer - 1)
@@ -284,6 +299,7 @@ class MatchScene:
             self.fighters,
             self.render_tick,
             turning=self.turn_timer > 0,
+            hurt={fid: self.hud.hurt_strength(fid) for fid in self.fighters},
         )
         timer_seconds, urgent = self._timer()
         self.hud.draw(screen, self.fighters, self.labels, timer_seconds, urgent)

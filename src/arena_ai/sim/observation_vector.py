@@ -6,7 +6,7 @@ from arena_ai.config import Config, load_config
 from arena_ai.sim.observation import Observation
 
 # Update when new features are added to the fighter observation structure.
-FEATURES_PER_FIGHTER = 8
+FEATURES_PER_FIGHTER = 14
 
 
 def observation_size(opponent_count: int = 1) -> int:
@@ -36,7 +36,9 @@ def _fighter_vector(
     fighter_config = config.game.fighter
     observation_config = config.game.observation
 
-    # Order: x, y, vx, vy, on_ground, facing_dir, health, attack_frame.
+    combat = config.game.combat
+    # Order: x, y, vx, vy, on_ground, facing_dir, health, attack_frame, attack_counter,
+    # parry_frame, parry_window, counter_frames, stagger_frames, parry_held.
     return [
         _normalize(float(position["x"]), world.arena_width_m),
         _normalize(
@@ -48,9 +50,13 @@ def _fighter_vector(
         float(bool(fighter["on_ground"])),
         float(fighter["facing_dir"]),
         _normalize(float(fighter["health"]), fighter_config.max_health),
-        _normalize(
-            float(fighter["attack_frame"]), config.game.combat.attack_total_frames
-        ),
+        _normalize(float(fighter["attack_frame"]), combat.attack_total_frames),
+        float(bool(fighter["attack_counter"])),
+        _normalize(float(fighter["parry_frame"]), combat.parry_total_frames),
+        _normalize(float(fighter["parry_window"]), combat.parry_window_frames),
+        _normalize(float(fighter["counter_frames"]), combat.counter_window_frames),
+        _normalize(float(fighter["stagger_frames"]), combat.parried_stagger_frames),
+        float(bool(fighter["parry_held"])),
     ]
 
 

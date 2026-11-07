@@ -4,6 +4,7 @@ from array import array
 from dataclasses import dataclass
 import math
 from pathlib import Path
+import random
 
 import pygame
 
@@ -67,10 +68,11 @@ class FighterSnapshot:
     on_ground: bool
     attack_frame: int
     health: int
+    parry_frame: int
 
     @classmethod
     def of(cls, fighter: FighterState) -> "FighterSnapshot":
-        return cls(fighter.on_ground, fighter.attack_frame, fighter.health)
+        return cls(fighter.on_ground, fighter.attack_frame, fighter.health, fighter.parry_frame)
 
 
 class _RunningLoop:
@@ -121,6 +123,8 @@ class _RunningLoop:
         """Cut the loop off immediately."""
         for channel in self._channels:
             channel.stop()
+        self.running = False
+        self.direction = 0
 
 
 class AudioManager:
@@ -139,6 +143,10 @@ class AudioManager:
         pygame.mixer.set_num_channels(MIXER_CHANNELS)
         pygame.mixer.set_reserved(2 * MAX_FIGHTERS)
         self.running_fade_ms = config.running_fade_ms
+        self.match_end_fade_ms = config.match_end_fade_ms
+        # Parries alternate between their sounds, starting with a random one.
+        self._parry_sounds = sorted(name for name in self.effects if name.startswith("parry"))
+        self._next_parry = random.randrange(len(self._parry_sounds))
         self._loops: dict[str, _RunningLoop] = {}
         self.music_volume = config.music_volume
         self.music_filename = config.music
@@ -160,11 +168,32 @@ class AudioManager:
             if loop.running:
                 loop.stop()
 
+    def cut_effects(self) -> None:
+        """Stop every sound effect at once, footsteps included. The music keeps playing.
+
+        Use it when a round ends or a new one starts. ``silence`` only fades out the
+        footsteps, so a long one-shot such as a parry sound would otherwise carry on
+        into the next round.
+        """
+        pygame.mixer.stop()
+        for loop in self._loops.values():
+            loop.halt()
+
     def start_music(self) -> None:
         """Start the battle music and loop it until stopped."""
         pygame.mixer.music.load(MUSIC_ROOT / self.music_filename)
         pygame.mixer.music.set_volume(self.music_volume)
         pygame.mixer.music.play(loops=-1)
+
+    def ensure_music(self) -> None:
+        """Start the battle music if it is not playing, for example after a match end cut it."""
+        if not pygame.mixer.music.get_busy():
+            self.start_music()
+
+    def fade_out_effects(self) -> None:
+        """Fade every sound effect that is still playing out over ``match_end_fade_ms``."""
+        self.silence()
+        pygame.mixer.fadeout(self.match_end_fade_ms)
 
     def stop_music(self) -> None:
         """Stop the battle music."""
@@ -193,7 +222,6 @@ class AudioManager:
         self,
         fighter_id: str,
         fighter: FighterState,
-        move_dir: int,
         previous: FighterSnapshot,
     ) -> None:
         """Play the effects for what one fighter did during one simulation step.
@@ -203,17 +231,24 @@ class AudioManager:
         """
         # TODO: Gate running audio on walkable support contact, not a
         # floor-specific flag, when platform collision state is available.
-        moving = move_dir != 0 and fighter.on_ground
-        self._loop_for(fighter_id).update(moving, move_dir)
+        # Footsteps follow the fighter's actual speed, not the key held: a fighter that is
+        # parrying, or pressed against nothing, makes no steps.
+        moving = fighter.vx != 0 and fighter.on_ground
+        self._loop_for(fighter_id).update(moving, (fighter.vx > 0) - (fighter.vx < 0))
 
         if previous.attack_frame == 0 and fighter.attack_frame > 0:
-            self.play("attack")
+            self.play("counter" if fighter.counter_started else "attack")
+        if previous.parry_frame == 0 and fighter.parry_frame > 0:
+            self.play("shield_raise")
         if previous.on_ground and not fighter.on_ground:
             self.play("jump")
         elif not previous.on_ground and fighter.on_ground:
             self.play("landing")
         if fighter.health < previous.health:
             self.play("hit")
+        if fighter.parried:
+            self.play(self._parry_sounds[self._next_parry])
+            self._next_parry = (self._next_parry + 1) % len(self._parry_sounds)
 
     def close(self) -> None:
         """Stop active audio channels."""

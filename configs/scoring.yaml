@@ -5,3 +5,7 @@ scoring:
   defeat_penalty: 1.0
   edge_margin: 1.0
   edge_penalty_scale: 0.002
+  time_penalty_per_step: 0.0002 # every step; 0.3 over a 1500-step episode
+  parry_reward: 0.2 # a successful parry
+  missed_parry_penalty: 0.05 # a parry that ended without parrying anything
+  missed_attack_penalty: 0.02 # a swing that finished without hitting or being parried

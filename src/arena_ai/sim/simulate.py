@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from collections.abc import Mapping
 
 from arena_ai.config import Config, GameConfig
-from arena_ai.sim.rules import step_fighter
+from arena_ai.sim.rules import LEVEL_TOLERANCE_M, end_attack, step_fighter
 from arena_ai.sim.state import FighterState
 
 
@@ -15,6 +15,7 @@ class FighterAction:
     move_dir: int = 0
     jump: bool = False
     attack: bool = False
+    parry: bool = False
 
 
 def _validate_actions(
@@ -43,8 +44,9 @@ def _validate_actions(
                 f"move_dir for {fighter_id!r} must be -1, 0, or 1; "
                 f"got {action.move_dir}"
             )
-        if not isinstance(action.jump, bool) or not isinstance(action.attack, bool):
-            raise TypeError(f"jump and attack for {fighter_id!r} must be bools")
+        flags = (action.jump, action.attack, action.parry)
+        if not all(isinstance(flag, bool) for flag in flags):
+            raise TypeError(f"jump, attack and parry for {fighter_id!r} must be bools")
 
 
 def step_game(
@@ -67,6 +69,8 @@ def step_game(
             action.jump,
             config.game,
             attack=action.attack,
+            parry=action.parry,
+            target_x=_nearest_opponent_x(fighter_id, fighters),
         )
 
     for fighter_id, attacker in fighters.items():
@@ -75,19 +79,70 @@ def step_game(
         if attacker.attack_hit:
             continue
         for target_id, target in fighters.items():
-            if target_id != fighter_id and attack_hits(attacker, target, config.game):
+            if target_id == fighter_id or not attack_hits(attacker, target, config.game):
+                continue
+            if parry_blocks(target, attacker):
+                apply_parry(target, attacker, config.game)
+            else:
                 target.health = max(0, target.health - config.game.combat.attack_damage)
                 attacker.attack_hit = True
-                break
+            break
+
+
+def _nearest_opponent_x(
+    fighter_id: str, fighters: Mapping[str, FighterState]
+) -> float | None:
+    """Return the x position of the nearest other fighter, or None when alone."""
+    me = fighters[fighter_id]
+    others = [f for other_id, f in fighters.items() if other_id != fighter_id]
+    if not others:
+        return None
+    return min(others, key=lambda other: abs(other.x - me.x)).x
+
+
+def parry_blocks(target: FighterState, attacker: FighterState) -> bool:
+    """Return whether ``target`` parries a hit from ``attacker``.
+
+    The target must be inside the protected frames of its parry and the attacker's
+    center must be on the side it faces (or level with it). The hit already
+    overlaps the target, so attackers diving from above are covered, and an
+    attacker whose center is behind the target still lands the hit.
+    """
+    in_window = 0 < target.parry_frame <= target.parry_window
+    in_front = (attacker.x - target.x) * target.facing_dir >= -LEVEL_TOLERANCE_M
+    return in_window and in_front
+
+
+def apply_parry(target: FighterState, attacker: FighterState, config: GameConfig) -> None:
+    """Cancel the swing, stagger the attacker and give the parrier its counter window."""
+    combat = config.combat
+    attacker.stagger_from_frame = combat.normal_swing_frame(
+        attacker.attack_frame, attacker.attack_counter
+    )
+    end_attack(attacker)
+    attacker.stagger_frames = combat.parried_stagger_frames
+    target.parry_pose_frame = target.parry_frame
+    target.parry_frame = 0
+    target.parry_count = 0
+    target.parry_idle_frames = 0
+    target.parried = True
+    target.counter_frames = combat.counter_window_frames
+    if not target.on_ground:
+        # Hover: lift to at most the cap (never reduce a faster climb) and fall slowly.
+        target.vy = max(
+            target.vy,
+            min(target.vy + combat.parry_hover_impulse_mps, combat.parry_hover_max_vy_mps),
+        )
+        target.hover_frames = combat.parry_hover_frames
 
 
 def attacker_is_active(fighter: FighterState, config: GameConfig) -> bool:
     """Return whether a fighter is in the active attack frames."""
     combat = config.combat
     return (
-        combat.attack_windup_frames
+        combat.windup_frames(fighter.attack_counter)
         < fighter.attack_frame
-        <= (combat.attack_windup_frames + combat.attack_active_frames)
+        <= combat.windup_frames(fighter.attack_counter) + combat.attack_active_frames
     )
 
 
@@ -100,7 +155,9 @@ def attack_hits(
     fighter_width = config.fighter.width_m
     attack_range = config.combat.attack_range_m
     # Hitbox starts at the attacker's center, so overlapping targets are hit.
-    attack_start = attacker.x
+    # A counter also reaches behind the attacker, so walking through it does not dodge it.
+    behind = config.combat.counter_hitbox_back_m if attacker.attack_counter else 0.0
+    attack_start = attacker.x - attacker.facing_dir * behind
     attack_end = attacker.x + attacker.facing_dir * (fighter_width / 2 + attack_range)
     hitbox_left = min(attack_start, attack_end)
     hitbox_right = max(attack_start, attack_end)

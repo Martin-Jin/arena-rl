@@ -29,6 +29,8 @@ class EpisodeRecord:
     swings: int
     hits: int
     edge_steps: int  # Steps spent within the edge margin of a wall.
+    parry_attempts: int = 0
+    parries: int = 0
 
 
 class _Window:
@@ -37,6 +39,7 @@ class _Window:
     _FIELDS = (
         "wins", "losses", "truncated", "return", "length", "win_length",
         "loss_length", "dealt", "taken", "swings", "hits", "edge_steps",
+        "parry_attempts", "parries",
     )  # fmt: skip
 
     def __init__(self, size: int) -> None:
@@ -58,6 +61,8 @@ class _Window:
         sums["swings"] += sign * record.swings
         sums["hits"] += sign * record.hits
         sums["edge_steps"] += sign * record.edge_steps
+        sums["parry_attempts"] += sign * record.parry_attempts
+        sums["parries"] += sign * record.parries
 
     def add(self, record: EpisodeRecord) -> None:
         self._records.append(record)
@@ -83,6 +88,11 @@ class _Window:
             "damage_taken": s["taken"] / count,
             # Hits per swing started: low accuracy with many swings is spamming.
             "attack_accuracy": s["hits"] / s["swings"] if s["swings"] else 0.0,
+            # Parries that stopped an attack per parry started: low means mistimed spam.
+            "parry_accuracy": (
+                s["parries"] / s["parry_attempts"] if s["parry_attempts"] else 0.0
+            ),
+            "parries": s["parries"] / count,
             "wall_fraction": s["edge_steps"] / s["length"] if s["length"] else 0.0,
         }
 
@@ -130,12 +140,13 @@ def rollout_metrics(
     Kept as tensors so the caller can read every statistic back from the device
     with one transfer. ``actions`` holds flat action indices.
     """
-    move, jump, attack = decode_parts(actions)
+    move, jump, attack, parry = decode_parts(actions)
     left, right = MOVE_DIRS.index(-1), MOVE_DIRS.index(1)
     return {
         "reward_per_step": rewards.mean(),
         "attack_rate": attack.float().mean(),
         "jump_rate": jump.float().mean(),
+        "parry_rate": parry.float().mean(),
         "left_rate": (move == left).float().mean(),
         "right_rate": (move == right).float().mean(),
         "idle_rate": (actions == 0).float().mean(),

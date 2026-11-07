@@ -9,11 +9,15 @@ compatibility and more advanced training workflows remain future work.
 
 ## Current features
 
-- Fixed-timestep fighter simulation with movement, jumping, attacks, health,
-  damage, and hit detection.
+- Fixed-timestep fighter simulation with movement, jumping, attacks, parrying,
+  counter attacks, health, damage, and hit detection.
 - Configurable game, agent, and scoring values in [`configs/`](configs/).
-- Observation encoding and discrete action definitions for future agents.
-- Initial agent, rollout, PPO, checkpoint, and environment modules.
+- Observation encoding and discrete action definitions used by the learning agent.
+- **Training works today:** hand-written PPO, rollout, checkpoint, and environment
+  modules, run with `py scripts/run_training.py`. Choose the opponent of each parallel
+  environment with `training.opponents` in [`configs/agent.yaml`](configs/agent.yaml).
+  See [Training](#training) and the [training guide](docs/training-process.md).
+- Practice opponents for the viewer, including one that parries every attack it can see.
 - Pygame viewer with configurable idle, running, turning, single-slash attack,
   and airborne animation fallback, plus battle music and fighter sound effects.
 - Premade Knight Hero Platformer sprite assets, scaled to the configured
@@ -41,7 +45,8 @@ mouse, or the arrow keys with `Enter`. The settings menu has:
 - **Player** — you, or the trained agent (the start button then reads **Watch**
   and you spectate the agent fight the chosen opponent).
 - **Opponent** — a dropdown with the trained agent, the scripted
-  approach-and-attack fighter, an idle dummy, a random fighter, or solo practice
+  approach-and-attack fighter, a perfect-parry fighter (it parries every attack it can
+  see coming, so hit it while it is busy swinging or recovering), an idle dummy, a random fighter, or solo practice
   (not available while watching). The trained agent needs a checkpoint, so run
   training first. It can play its best move or sample varied moves.
 - **Checkpoint** — which file in `checkpoints/` the trained agent loads. Automatic
@@ -66,8 +71,9 @@ Controls:
 | ---------------------------------- | ---------- |
 | `A` or `Left`                      | Move left  |
 | `D` or `Right`                     | Move right |
-| `W` or `Up`                        | Jump       |
-| `Space` or left mouse button       | Attack     |
+| `W`, `Up` or `Space`               | Jump       |
+| Left mouse button                  | Attack     |
+| `Q`                                | Parry      |
 | `Esc` or `P`                       | Pause      |
 
 ## Documentation
@@ -113,6 +119,11 @@ trained opponent works straight after a clone with no training. Every other file
 7.6 million steps). Over the whole run the agent won 88% of its 13,339 episodes, and it
 won every one of the last 100 against each of the scripted opponents. The viewer picks
 it up automatically when there is no `latest.pt`, or you can choose it in Settings.
+
+**These weights are out of date.** They were trained before parrying, so they no
+longer fit the network's inputs and outputs and the viewer cannot load them. Train a
+new agent (see below) and replace `best.pt` once it is clearly better; the figures
+above then need updating too.
 
 ## Training
 
@@ -197,7 +208,7 @@ py -m unittest discover -s tests
 ```
 
 The simulation is intentionally independent of pygame so it can be used
-headlessly by future training environments. Keep pygame-dependent code inside
+headlessly by the training environments. Keep pygame-dependent code inside
 [`src/arena_ai/viewer/`](src/arena_ai/viewer/).
 
 ## License

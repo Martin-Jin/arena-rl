@@ -21,6 +21,26 @@ class FighterState:
     health: int = 100
     attack_frame: int = 0
     attack_hit: bool = False
+    attack_counter: bool = False  # The current swing is a counter (shorter wind-up).
+    lunge_dir: int = 0  # Direction of the counter lunge, fixed when the swing starts.
+    parry_frame: int = 0  # 0 when not parrying, else 1 at the press and counting up.
+    parry_window: int = 0  # Protected frames of the current parry.
+    parry_count: int = 0  # Recent parry presses, which shrink the next window.
+    parry_idle_frames: int = 0  # Frames since the last parry, capped at the reset time.
+    parry_held: bool = False  # Parry input of the previous step, so holding parries once.
+    # Visual only: the parry animation keeps playing after a successful parry, which ends
+    # the parry itself so the fighter can counter at once. This is the frame it is on.
+    parry_pose_frame: int = 0
+    stagger_frames: int = 0  # Frames left in which a parried fighter cannot attack.
+    # The normal-swing frame the parried swing had reached, for the deflect animation.
+    stagger_from_frame: int = 0
+    counter_frames: int = 0  # Frames left in which an attack is a counter.
+    hover_frames: int = 0  # Frames left of reduced gravity after an air parry.
+    # Events of the latest step, cleared at the start of the next one. Rewards read them.
+    parried: bool = False  # This fighter parried an attack.
+    counter_started: bool = False  # This fighter began a counter attack.
+    missed_attack: bool = False  # A swing finished without hitting or being parried.
+    missed_parry: bool = False  # A parry ended without parrying anything.
 
 
 def create_initial_fighters(

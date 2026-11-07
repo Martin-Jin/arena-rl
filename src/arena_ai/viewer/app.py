@@ -50,10 +50,13 @@ class App:
             self.scenes.pop()
 
     def to_main_menu(self) -> None:
-        self.audio.silence()
+        self.audio.cut_effects()
+        self.audio.ensure_music()
         self.scenes = [MainMenuScene(self)]
 
     def start_match(self) -> None:
+        self.audio.cut_effects()
+        self.audio.ensure_music()
         self.scenes = [MatchScene(self)]
 
     def quit(self) -> None:

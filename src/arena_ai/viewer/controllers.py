@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Protocol
 
-from arena_ai.agents.scripted import OPPONENTS
+from arena_ai.agents.scripted import SCRIPTED_OPPONENTS
 from arena_ai.config import Config
 from arena_ai.sim.observation import get_observation
 from arena_ai.sim.observation_vector import encode_observation
@@ -67,7 +67,7 @@ class ScriptedController:
     """A scripted opponent. Scripted policies play the ``"opponent"`` side."""
 
     def __init__(self, name: str, config: Config) -> None:
-        self.policy = OPPONENTS[name]
+        self.policy = SCRIPTED_OPPONENTS[name]
         self.config = config
 
     def action(self, fighters: Mapping[str, FighterState]) -> int:
@@ -130,7 +130,7 @@ def make_controller(
     """
     if kind == TRAINED:
         return TrainedController(config, greedy, fighter_id, checkpoint)
-    if kind in OPPONENTS:
+    if kind in SCRIPTED_OPPONENTS:
         if fighter_id != "opponent":
             raise ValueError("scripted policies can only control the opponent")
         return ScriptedController(kind, config)

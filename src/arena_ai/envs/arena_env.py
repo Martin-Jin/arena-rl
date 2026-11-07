@@ -41,6 +41,8 @@ class ArenaEnv(ABC):
         self.swings = 0  # Attacks the agent started.
         self.hits = 0  # Steps in which the agent damaged an opponent.
         self.edge_steps = 0  # Steps within the edge margin of a wall.
+        self.parry_attempts = 0  # Parries the agent started.
+        self.parries = 0  # Parries of the agent that stopped an attack.
 
     @property
     def episode_done(self) -> bool:
@@ -72,9 +74,10 @@ class ArenaEnv(ABC):
             fighter_id: fighter.health for fighter_id, fighter in self.fighters.items()
         }
         attack_frame_before = self.fighters["agent"].attack_frame
+        parry_frame_before = self.fighters["agent"].parry_frame
         step_game(self.fighters, actions, self.config)
         self.step_count += 1
-        self._track_episode(previous_health, attack_frame_before)
+        self._track_episode(previous_health, attack_frame_before, parry_frame_before)
 
         terminated = self.is_terminated()
         truncated = self.step_count >= self.max_episode_steps and not terminated
@@ -94,17 +97,25 @@ class ArenaEnv(ABC):
             "swings": self.swings,
             "hits": self.hits,
             "edge_steps": self.edge_steps,
+            "parry_attempts": self.parry_attempts,
+            "parries": self.parries,
         }
         return self.get_observation(), reward, terminated, truncated, info
 
     def _track_episode(
-        self, previous_health: Mapping[str, int], attack_frame_before: int
+        self,
+        previous_health: Mapping[str, int],
+        attack_frame_before: int,
+        parry_frame_before: int,
     ) -> None:
         """Update the cheap per-episode counters after one simulation step."""
         assert self.fighters is not None
         agent = self.fighters["agent"]
         if attack_frame_before == 0 and agent.attack_frame == 1:
             self.swings += 1
+        if parry_frame_before == 0 and agent.parry_frame == 1:
+            self.parry_attempts += 1
+        self.parries += agent.parried
         dealt = sum(
             previous_health[fighter_id] - fighter.health
             for fighter_id, fighter in self.fighters.items()

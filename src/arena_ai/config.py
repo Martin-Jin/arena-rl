@@ -1,6 +1,6 @@
 """Load the application's configuration from the YAML files in ``configs/``."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +43,18 @@ class CombatConfig:
     attack_range_m: float
     parry_window_frames: int
     parry_recovery_frames: int
+    parry_min_window_frames: int
+    parry_window_decay: float
+    parry_spam_reset_frames: int
+    parry_hover_impulse_mps: float
+    parry_hover_max_vy_mps: float
+    parry_hover_gravity_scale: float
+    parry_hover_frames: int
+    counter_window_frames: int
+    counter_windup_frames: int
+    counter_lunge_speed_mps: float
+    counter_hitbox_back_m: float
+    parried_stagger_frames: int
 
     @property
     def attack_total_frames(self) -> int:
@@ -52,6 +64,33 @@ class CombatConfig:
             + self.attack_active_frames
             + self.attack_recovery_frames
         )
+
+    def windup_frames(self, counter: bool) -> int:
+        """Wind-up length of a normal swing, or of the shorter counter swing."""
+        return self.counter_windup_frames if counter else self.attack_windup_frames
+
+    def normal_swing_frame(self, frame: int, counter: bool) -> int:
+        """Return the frame of a normal swing that looks like ``frame`` of this swing.
+
+        A counter has a shorter wind-up, so its frames line up with the later frames of
+        a normal swing. The viewer draws the attack animation from this frame.
+        """
+        if counter:
+            return frame + self.attack_windup_frames - self.counter_windup_frames
+        return frame
+
+    def swing_total_frames(self, counter: bool) -> int:
+        """Length of a full normal or counter swing."""
+        return (
+            self.windup_frames(counter)
+            + self.attack_active_frames
+            + self.attack_recovery_frames
+        )
+
+    @property
+    def parry_total_frames(self) -> int:
+        """Length of a rested parry: the longest window plus the recovery."""
+        return self.parry_window_frames + self.parry_recovery_frames
 
 
 @dataclass(frozen=True)
@@ -100,6 +139,9 @@ class TrainingConfig:
     rollout_steps: int
     checkpoint_interval: int
     seed: int | None
+    # Opponent of each parallel environment, one entry per environment.
+    opponents: list[str] = field(default_factory=lambda: ["approach"])
+    # The most environments training allows; ``opponents`` sets how many run.
     num_envs: int = 1
     randomize_spawns: bool = False
     # None keeps the environment default of ten simulated seconds.
@@ -128,6 +170,10 @@ class ScoringConfig:
     defeat_penalty: float
     edge_margin: float = 1.0
     edge_penalty_scale: float = 0.0
+    time_penalty_per_step: float = 0.0
+    parry_reward: float = 0.0
+    missed_parry_penalty: float = 0.0
+    missed_attack_penalty: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -158,6 +204,7 @@ class AudioConfig:
     normalization_rms: float
     normalization_peak: float
     running_fade_ms: int
+    match_end_fade_ms: int
     effects: dict[str, str]
     music: str
 
@@ -194,6 +241,23 @@ class ViewerUiConfig:
     fight_banner_seconds: float
     controls_hint_seconds: float
     damage_text_seconds: float
+    hurt_flash_seconds: float
+    hurt_flash_min_alpha: int
+    parry_bubble_border_px: int
+    parry_bubble_radius_scale: float
+    parry_bubble_arc_degrees: float
+    parry_bubble_burn: float
+    parry_flame_amplitude: float
+    parry_flame_speed: float
+    parry_particle_life_frames: int
+    parry_particle_speed_deg: float
+    parry_particle_drift: float
+    parry_particle_size_px: int
+    parry_flash_seconds: float
+    parry_flash_radius: int
+    counter_effect_seconds: float
+    counter_line_width_px: int
+    counter_line_carry_m: float
 
 
 @dataclass(frozen=True)

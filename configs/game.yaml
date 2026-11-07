@@ -14,17 +14,67 @@ fighter:
   width_to_height_ratio: 0.3
 
 combat:
-  attack_windup_frames: 12
+  # All "frames" below are simulation steps (1/60 s each). A swing runs attack_windup_frames,
+  # then attack_active_frames, then attack_recovery_frames, in that order.
+  # Frames from starting a swing until its first damaging frame. Nothing can hit during
+  # these, so this is how long the opponent has to see the swing and parry. The sprite
+  # shown on the first damaging frame is (attack_windup_frames + 1) // frame_duration.attack
+  # in viewer.yaml.
+  attack_windup_frames: 16
+  # Frames in which the swing can hit, right after the wind-up. One swing hits at most once.
   attack_active_frames: 4
+  # Frames after the active frames in which the swing cannot hit and no new attack can
+  # start. It is the attacker's cooldown.
   attack_recovery_frames: 14
   attack_damage: 10
   attack_range_m: 0.8
-  # TODO: parry is not implemented yet; the two parry values are loaded but unused.
-  parry_window_frames: 8
-  parry_recovery_frames: 20
+  # Parry: a press opens a protected window, then a fixed recovery. Holding the
+  # button parries once. The window halves with every press made soon after the
+  # last parry (spam), down to a minimum, and resets after a success or a pause.
+  # Frames right after the press in which an attack that hits is parried, for a parry
+  # started after a pause (about 133 ms at 8). Spamming shrinks it, never below
+  # parry_min_window_frames. The shield animation is drawn over exactly these frames.
+  parry_window_frames: 9
+  # Frames after the protected window in which the fighter cannot move, jump, attack or
+  # parry again and is not protected. Always the same length, however far spam shrank
+  # the window. A parry that stops an attack skips it.
+  parry_recovery_frames: 12
+  # The shortest the protected window can get from spamming, in frames. Set it equal to
+  # parry_window_frames to turn the spam penalty off.
+  parry_min_window_frames: 7
+  parry_window_decay: 0.5 # window multiplier for each press made within the reset time
+  # Frames since the last parry ended after which the next press gets the full window
+  # again (30 is 500 ms). A press made sooner counts as spam and shrinks the window.
+  parry_spam_reset_frames: 30
+  # A successful parry in the air gives an upward impulse (never above the cap) and
+  # reduced gravity for a while, so the fighter stays near its height for the counter.
+  parry_hover_impulse_mps: 5.0
+  parry_hover_max_vy_mps: 2.5
+  parry_hover_gravity_scale: 0.3
+  # Frames after a successful air parry during which gravity is scaled by
+  # parry_hover_gravity_scale. Ends early on landing.
+  parry_hover_frames: 30
+  # After a successful parry the next attack is a counter: a shorter wind-up and a
+  # lunge toward the opponent, fixed in direction when the counter starts.
+  # Frames after a successful parry in which the parrying fighter's next attack is a
+  # counter. The window ends when it attacks or when the frames run out.
+  counter_window_frames: 24
+  # Wind-up frames of a counter, in place of attack_windup_frames. The active and
+  # recovery frames are the same as a normal swing.
+  counter_windup_frames: 12
+  counter_lunge_speed_mps: 6.0 # horizontal speed during the counter's wind-up
+  # A counter's hitbox also reaches this far behind the attacker, so an opponent cannot
+  # dodge it by walking forward through the attacker (0.8 m is more than the 0.7 m an
+  # opponent walks in the 12 wind-up frames).
+  counter_hitbox_back_m: 0.8
+  # Frames after its swing is parried in which the attacker cannot start an attack. It
+  # replaces the rest of the swing, so compare it with attack_recovery_frames. The
+  # attacker can still move and parry. The viewer plays the swing backwards over these.
+  parried_stagger_frames: 28
 
 observation:
   # TODO: spec_version and reaction_delay_frames are loaded but not used yet.
+  # reaction_delay_frames will be the frames an observation lags behind the game.
   spec_version: 1
   reaction_delay_frames: 0
   max_observed_height_m: 1.3

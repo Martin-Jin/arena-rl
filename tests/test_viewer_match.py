@@ -32,6 +32,29 @@ def _play(scene: MatchScene, frames: int = 600) -> None:
             return
 
 
+class MatchEndTests(unittest.TestCase):
+    def tearDown(self) -> None:
+        pygame.quit()
+
+    def test_every_animation_freezes_once_the_match_is_over(self) -> None:
+        scene = MatchScene(_app(time_limit=0.0))
+        scene.update(1 / 60)
+        scene.phase = "playing"
+        scene.fighters["opponent"].health = 10
+        scene.fighters["agent"].x = scene.fighters["opponent"].x - 0.3
+        scene.fighters["agent"].facing_dir = 1
+        scene.fighters["agent"].attack_frame = scene.config.game.combat.attack_windup_frames
+        scene.update(1 / 60)  # The swing lands and the match ends.
+        self.assertEqual(scene.phase, "over")
+        scene.update(1 / 60)  # Registers the final hit once, then everything stops.
+        tick, hud_state = scene.render_tick, dict(scene.hud._health)
+        for _ in range(30):
+            scene.update(1 / 60)
+        self.assertEqual(scene.render_tick, tick)
+        self.assertEqual(scene.hud._health, hud_state)
+        self.assertEqual(scene.hud._health["opponent"], 0)  # The final hit was shown.
+
+
 class MatchTimeLimitTests(unittest.TestCase):
     def tearDown(self) -> None:
         pygame.quit()

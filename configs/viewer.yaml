@@ -11,16 +11,19 @@ animation:
     run: 21
     attack: 20
     turn: 21
-  frame_duration:
+    parry: 21
+  frame_duration: # simulation steps (1/60 s) each sprite of the animation is shown for
     idle: 6
     run: 4
     attack: 3
     turn: 1
+    parry: 1 # unused: the parry animation is stretched over the parry frames
   loop:
     idle: true
     run: true
     attack: false
     turn: false
+    parry: false
 
 audio:
   # Default levels. The settings menu overrides them and remembers the choice.
@@ -32,12 +35,20 @@ audio:
   normalization_rms: 0.18
   normalization_peak: 0.95
   running_fade_ms: 250
+  # When a match ends (a win, a defeat or a draw) the music stops at once and every sound
+  # effect still playing fades out over this many milliseconds.
+  match_end_fade_ms: 1200
   effects:
     attack: sword_swing.mp3
+    counter: counter.mp3 # played in place of the attack sound when a counter attack starts
     hit: hit.mp3
     jump: jump.mp3
     landing: jump_landing.mp3
     running: running.mp3
+    shield_raise: shield_raise.mp3 # played when a fighter starts a parry
+    # Every name starting with "parry" is one of the sounds a parry alternates between.
+    parry_1: parry1.mp3
+    parry_2: parry2.mp3
   music: battle_music.mp3
 
 match:
@@ -70,6 +81,44 @@ ui:
   fight_banner_seconds: 0.7
   controls_hint_seconds: 8.0
   damage_text_seconds: 0.9
+  # A fighter that is hurt flashes: for this many seconds it fades down toward the
+  # damage_taken color and this opacity (0-255), then back to normal.
+  hurt_flash_seconds: 0.35
+  hurt_flash_min_alpha: 110
+  # While a fighter's parry window is open a bubble outline shows on the side it faces, in
+  # its side's color (the accent color for the agent, opponent_health for the opponent,
+  # and the same for the parry flash, Parry and Counter texts and the counter line). It
+  # has no fill and does not fade. The border is this many pixels thick, the radius is
+  # this share of the fighter's height, and the arc is this many degrees (180 is a half
+  # circle). It burns away from both ends over the window, so by the last frame only
+  # (1 - parry_bubble_burn) of the arc is left, and then it is gone.
+  parry_bubble_border_px: 3
+  parry_bubble_radius_scale: 0.7
+  parry_bubble_arc_degrees: 200
+  parry_bubble_burn: 0.6
+  # The edge is uneven, like a flame: its radius wobbles by up to this share of the radius
+  # (more toward the ends and as the window runs out), flickering at this many radians of
+  # animation per frame.
+  parry_flame_amplitude: 0.12
+  parry_flame_speed: 0.9
+  # Each end of the arc sheds particles every frame. A particle lasts this many frames,
+  # flows backward along the bubble's surface by this many degrees per frame, drifts
+  # outward by this share of the radius per frame, and is this many pixels wide.
+  parry_particle_life_frames: 14
+  parry_particle_speed_deg: 7
+  parry_particle_drift: 0.03
+  parry_particle_size_px: 3
+  # A successful parry shows a ring and sparks that grow to this radius in pixels over
+  # this many seconds.
+  parry_flash_seconds: 0.35
+  parry_flash_radius: 70
+  # A counter attack cuts a straight line that follows the fighter, and a "Counter" text.
+  # If the counter hits, the line carries on this many meters past the opponent. If it is
+  # parried, the line stops at the parrying fighter. Once the line has stopped it fades
+  # out over counter_effect_seconds.
+  counter_effect_seconds: 0.4
+  counter_line_width_px: 4
+  counter_line_carry_m: 0.8
   colors:
     background: [244, 245, 247]
     floor: [226, 229, 234]
