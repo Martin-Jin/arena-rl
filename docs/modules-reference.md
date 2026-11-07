@@ -106,6 +106,7 @@ The simulation layer is deterministic and independent of rendering. It must not 
 - `scripts/run_training.py` — Wires the model, optimizer, environments (each
   parallel environment gets the next opponent from `OPPONENTS` in turn), PPO
   update callback, and checkpoint callback into the runnable training command.
+  It also restores a saved run when `RESUME_FROM` is set.
 
 ### Viewer
 

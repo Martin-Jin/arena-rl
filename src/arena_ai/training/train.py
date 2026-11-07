@@ -88,6 +88,7 @@ class TrainingLoop:
         step_callback: StepCallback | None = None,
         device: torch.device | str | None = None,
         stats_window: int = 100,
+        initial_state: TrainingState | None = None,
     ) -> None:
         # One training loop consists of the:
         # - the environment in which the agent is learning
@@ -101,7 +102,8 @@ class TrainingLoop:
         self.save_checkpoint = save_checkpoint
         self.step_callback = step_callback
         self.device = device
-        self.state = TrainingState()
+        # Pass a restored state to continue a previous run's counters.
+        self.state = initial_state if initial_state is not None else TrainingState()
         self._opponent_stats = OpponentStats(stats_window)
         self._current_episode_return = 0.0
         self._vector_episode_returns: list[float] = []
@@ -282,6 +284,10 @@ class TrainingLoop:
         An iteration is not an episode. Each iteration collects exactly
         ``rollout_steps`` environment steps, spanning as many episodes as it
         takes, and then updates the policy once.
+
+        ``config.iterations`` is the number of iterations to run now. When the
+        loop was given a restored state, they are added after the iterations it
+        already completed, and iteration numbers keep counting from there.
         """
         if config.iterations < 1:
             raise ValueError("iterations must be positive")
@@ -300,7 +306,8 @@ class TrainingLoop:
         # Each iteration collects exactly rollout_steps environment steps and then
         # updates the policy once. The rollout spans as many episodes as it takes
         # and can end mid-episode, so it is a step budget, not a game.
-        for iteration in range(1, config.iterations + 1):
+        first_iteration = self.state.iteration + 1
+        for iteration in range(first_iteration, first_iteration + config.iterations):
             if isinstance(self.environment, VectorEnv):
                 batch, observation, last_value = self.collect_vector_rollout(
                     observation, config.rollout_steps

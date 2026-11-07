@@ -1,6 +1,7 @@
 """Run the Arena AI PPO training workflow."""
 
 from functools import partial
+from datetime import datetime
 from pathlib import Path
 
 import torch
@@ -10,7 +11,7 @@ from arena_ai.agents.scripted import OPPONENTS
 from arena_ai.config import Config, load_config
 from arena_ai.envs.training_envs.one_v_one_env import OneVOneEnv
 from arena_ai.envs.vector_env import VectorEnv
-from arena_ai.training.checkpoints import save_checkpoint
+from arena_ai.training.checkpoints import load_checkpoint, save_checkpoint
 from arena_ai.training.ppo import (
     advantage_estimation,
     discounted_returns,
@@ -22,6 +23,12 @@ from arena_ai.training.train import TrainingLoop, TrainingState
 # Switch this to True to render every simulation step during training.
 VISUALIZE_TRAINING = False
 TRAINING_DEVICE = "auto"
+# Set to a checkpoint path, for example "checkpoints/latest.pt", to continue that
+# run. The model, optimizer and progress counters are restored and
+# training.iterations more iterations are run on top of the saved ones. Leave as
+# None to start a new run.
+RESUME_FROM: str | None = None
+# e.g. RESUME_FROM = "checkpoints/latest.pt" to continue that run
 
 
 def select_training_device() -> torch.device:
@@ -120,13 +127,31 @@ def run_training(config: Config | None = None) -> TrainingState:
         model.parameters(), lr=config.agent.policy.learning_rate
     )
     policy = PolicyAdapter(model, device, "cpu")
+    resumed_state: TrainingState | None = None
+    if RESUME_FROM is not None:
+        saved = load_checkpoint(RESUME_FROM, model, optimizer, map_location=device)
+        resumed_state = saved["training_state"]
+        policy.sync()  # the CPU acting copy must start from the restored weights
+        if config.training.seed is not None:
+            # Offset so the continued run does not replay the first run's stream.
+            torch.manual_seed(config.training.seed + resumed_state.iteration)
+        print(
+            f"Resuming from {RESUME_FROM} at iteration {resumed_state.iteration}; "
+            f"running {config.training.iterations} more."
+        )
     environment_factory = partial(OneVOneEnv, config)
     update_policy = build_update_callback(policy, optimizer, config)
     checkpoint_path = Path("checkpoints") / "latest.pt"
+    # Each run also keeps numbered checkpoints in its own folder, so starting a
+    # new run overwrites latest.pt but never an earlier run's history.
+    run_dir = Path("checkpoints") / datetime.now().strftime("run-%Y%m%d-%H%M%S")
 
     def checkpoint(state: TrainingState) -> None:
         """Save a checkpoint, then print the latest training metrics."""
         save_checkpoint(checkpoint_path, model, optimizer, config, state)
+        save_checkpoint(
+            run_dir / f"iter_{state.iteration:06d}.pt", model, optimizer, config, state
+        )
         m = state.metrics
         print(
             f"[iter {state.iteration}] steps={state.environment_steps} "
@@ -165,6 +190,7 @@ def run_training(config: Config | None = None) -> TrainingState:
         step_callback=visualizer,
         device=device,
         stats_window=config.training.stats_window,
+        initial_state=resumed_state,
     )
     try:
         state = loop.run(config.training)

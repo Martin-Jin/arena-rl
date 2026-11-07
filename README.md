@@ -97,6 +97,14 @@ completed training state are saved to `checkpoints/latest.pt` before the script
 exits. A checkpoint is also saved, and a metrics line printed, every
 `checkpoint_interval` iterations.
 
+To continue a stopped run, set `RESUME_FROM = "checkpoints/latest.pt"` near the
+top of [`scripts/run_training.py`](scripts/run_training.py). It restores the
+model, optimizer and progress counters and runs `training.iterations` more
+iterations on top of the saved ones. Leave it as `None` to start a new run. Each
+run also keeps numbered checkpoints in `checkpoints/run-<timestamp>/`, so a new
+run overwrites `latest.pt` but never an earlier run's history. See
+[Resuming a run](docs/training-process.md#resuming-a-run).
+
 Training automatically uses CUDA when PyTorch detects a CUDA-capable GPU and
 falls back to the CPU otherwise. Set `TRAINING_DEVICE = "cpu"` or
 `TRAINING_DEVICE = "cuda"` in [`scripts/run_training.py`](scripts/run_training.py)

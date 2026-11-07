@@ -123,6 +123,29 @@ actions, rewards, terminal flags, values, and old log-probabilities are stored.
 The rollout is converted to a [`RolloutBatch`](../src/arena_ai/training/rollout.py)
 after collection and is discarded after the update.
 
+## Resuming a run
+
+`scripts/run_training.py` saves `checkpoints/latest.pt` at every checkpoint
+interval and on `Ctrl+C`. It also writes `iter_<number>.pt` files into a
+per-run folder, `checkpoints/run-<timestamp>/`, so earlier runs are kept when
+`latest.pt` is overwritten by a new run.
+
+To continue a run, set `RESUME_FROM` near the top of the script to a checkpoint
+path. The script then:
+
+1. Restores the model weights, optimizer state and `TrainingState` (iteration,
+   environment steps, episodes and wins).
+2. Synchronizes the CPU acting copy of the network with the restored weights.
+3. Runs `training.iterations` **more** iterations, numbered after the saved
+   ones. A run saved at iteration 600 with `iterations: 600` ends at 1200.
+
+A resumed run is a valid continuation, not an exact replay. These are not saved:
+the random number generators (a configured seed is offset by the saved iteration
+so the stream does not repeat), the rolling per-opponent statistics windows
+(they refill over the next `stats_window` episodes), and the episode that was in
+progress. The network shape in `agent.yaml` must match the checkpoint or loading
+fails.
+
 ## Bootstrapping and episode boundaries
 
 Each transition stores `next_values[t]`, the critic value for the observation
