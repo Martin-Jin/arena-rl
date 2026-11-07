@@ -47,12 +47,12 @@ the same animated sprite frames as the learner with a light-red tint.
 
 Controls:
 
-| Key | Action |
-|---|---|
-| `A` | Move left |
-| `D` | Move right |
-| `W` | Jump |
-| `Space` | Attack |
+| Key            | Action     |
+| -------------- | ---------- |
+| `A`            | Move left  |
+| `D`            | Move right |
+| `W`            | Jump       |
+| `Space or LMB` | Attack     |
 
 ## Project layout
 

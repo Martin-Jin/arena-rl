@@ -218,7 +218,7 @@ while running:
     #   W: jump
     #   A: move left
     #   D: move right
-    #   SPACE: attack
+    #   SPACE or LEFT MOUSE: attack
     keys = pygame.key.get_pressed()
     # -1 for right, 0 for no movement, 1 for left
     move_dir = 0 if game_over else int(keys[pygame.K_d]) - int(keys[pygame.K_a])
@@ -227,7 +227,8 @@ while running:
     if move_dir:
         last_move_dir = move_dir
     jump = not game_over and keys[pygame.K_w]
-    attack = not game_over and keys[pygame.K_SPACE]
+    mouse_buttons = pygame.mouse.get_pressed()
+    attack = not game_over and (keys[pygame.K_SPACE] or mouse_buttons[0])
 
     # Simulate enough fixed timesteps to catch up after a lag spike.
     while accumulator >= DT and not game_over:
