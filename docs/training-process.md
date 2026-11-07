@@ -15,6 +15,8 @@ defines:
 - `rollout_steps` — environment transitions collected in each cycle.
 - `checkpoint_interval` — cycles between checkpoint callbacks.
 - `seed` — optional seed for the initial environment reset.
+- `num_envs` — number of independent environments collected synchronously in
+  parallel. Set it to `1` for the scalar environment path.
 
 An iteration is not an episode. A rollout collects exactly `rollout_steps`
 transitions, resetting the environment whenever an episode terminates or is
@@ -25,8 +27,10 @@ middle of an episode.
 
 [`TrainingLoop.run`](../src/arena_ai/training/train.py) performs this sequence:
 
-1. Reset the environment.
-2. Collect one fixed-size rollout with the unchanged policy.
+1. Reset the environment(s).
+2. Collect one fixed-size rollout with the unchanged policy. When `num_envs` is
+   greater than one, each environment advances together and contributes
+   `rollout_steps` transitions to the PPO batch.
 3. Pass the rollout to the update callback.
 4. Record training metrics.
 5. Save a checkpoint when the configured interval is reached.
@@ -85,7 +89,9 @@ is collected.
 When training visualization is enabled, the visualizer receives the terminal
 frame for one simulation step only. `TrainingLoop` then resets the environment
 within the same rollout, so visualization never waits for a training episode's
-end screen or restart button.
+end screen or restart button. With parallel collection enabled, only the
+environment with the highest current episode return is rendered; all
+environments still contribute transitions to the shared policy update.
 
 [`TrainingLoop.collect_rollout`](../src/arena_ai/training/train.py) runs policy
 inference under `torch.no_grad()`. The acting interface is intentionally
@@ -168,5 +174,5 @@ configured interval. Run it from the repository root with:
 py scripts/run_training.py
 ```
 
-The script uses the values in `configs/agent.yaml`; reduce `training.iterations`
-and `training.rollout_steps` there for a short smoke run.
+The script uses the values in `configs/agent.yaml`; reduce `training.iterations`,
+`training.rollout_steps`, or `training.num_envs` there for a short smoke run.

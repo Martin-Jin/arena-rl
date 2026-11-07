@@ -8,6 +8,7 @@ import torch
 from arena_ai.agents.policy import ActorCritic, PolicyAdapter
 from arena_ai.config import Config, TrainingConfig, load_config
 from arena_ai.envs.training_envs.one_v_one_env import OneVOneEnv
+from arena_ai.envs.vector_env import VectorEnv
 from arena_ai.training.checkpoints import save_checkpoint
 from arena_ai.training.ppo import (
     advantage_estimation,
@@ -107,8 +108,13 @@ def run_training(config: Config | None = None) -> TrainingState:
         from arena_ai.viewer.training import TrainingVisualizer
 
         visualizer = TrainingVisualizer(config)
+    environment = (
+        VectorEnv([environment_factory] * config.training.num_envs)
+        if config.training.num_envs > 1
+        else environment_factory()
+    )
     loop = TrainingLoop(
-        environment_factory(),
+        environment,
         policy,
         update_policy,
         save_checkpoint=checkpoint,
@@ -121,6 +127,7 @@ def run_training(config: Config | None = None) -> TrainingState:
                 rollout_steps=config.training.rollout_steps,
                 checkpoint_interval=config.training.checkpoint_interval,
                 seed=config.training.seed,
+                num_envs=config.training.num_envs,
             )
         )
         checkpoint(state)

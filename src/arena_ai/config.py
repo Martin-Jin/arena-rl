@@ -85,6 +85,7 @@ class TrainingConfig:
     rollout_steps: int
     checkpoint_interval: int
     seed: int | None
+    num_envs: int = 1
 
 
 @dataclass(frozen=True)

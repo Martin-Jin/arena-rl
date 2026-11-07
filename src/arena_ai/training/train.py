@@ -12,17 +12,20 @@ import torch
 
 from arena_ai.config import TrainingConfig, load_config
 from arena_ai.envs.arena_env import ArenaEnv
+from arena_ai.envs.vector_env import VectorEnv
 from arena_ai.training.rollout import Rollout, RolloutBatch
 
 
 class Policy(Protocol):
     """Act in an environment and estimate values for observations."""
 
-    def act(self, observation: list[float]) -> tuple[int, float]:
-        """Return ``(action, log_probability)`` for one observation."""
+    def act(
+        self, observation: list[float] | list[list[float]]
+    ) -> tuple[int, float] | tuple[list[int], list[float]]:
+        """Return actions and log probabilities for one or more observations."""
 
-    def value(self, observation: list[float]) -> float:
-        """Return the critic estimate for one observation."""
+    def value(self, observation: list[float] | list[list[float]]) -> float | list[float]:
+        """Return critic estimates for one or more observations."""
 
 
 class UpdatePolicy(Protocol):
@@ -72,7 +75,7 @@ class TrainingLoop:
 
     def __init__(
         self,
-        environment: ArenaEnv,
+        environment: ArenaEnv | VectorEnv,
         policy: Policy,
         update_policy: UpdatePolicy,
         *,
@@ -92,6 +95,7 @@ class TrainingLoop:
         self.step_callback = step_callback
         self.state = TrainingState()
         self._current_episode_return = 0.0
+        self._vector_episode_returns: list[float] = []
 
     def collect_rollout(
         self,
@@ -171,6 +175,86 @@ class TrainingLoop:
             )
         return batch, observation, last_value
 
+    def collect_vector_rollout(
+        self,
+        observations: list[list[float]],
+        steps: int,
+    ) -> tuple[RolloutBatch, list[list[float]], list[float]]:
+        """Collect one rollout step from every environment in each iteration."""
+        if not isinstance(self.environment, VectorEnv):
+            raise TypeError("vector rollouts require a VectorEnv")
+        environment_count = self.environment.num_envs
+        rollout = Rollout(environment_count)
+        next_values: list[list[float]] = []
+        if len(self._vector_episode_returns) != environment_count:
+            self._vector_episode_returns = [0.0] * environment_count
+
+        with torch.no_grad():
+            for _ in range(steps):
+                action_result = self.policy.act(observations)
+                if not (
+                    isinstance(action_result[0], list)
+                    and isinstance(action_result[1], list)
+                ):
+                    raise TypeError(
+                        "batched policy must return lists of actions and log probabilities"
+                    )
+                actions, log_probabilities = action_result
+                values = self.policy.value(observations)
+                if not isinstance(values, list):
+                    raise TypeError("batched policy must return a list of values")
+                next_observations, rewards, terminated, truncated, infos = (
+                    self.environment.step(actions)
+                )
+                final_observations = [
+                    info.get("final_observation", observation)
+                    for info, observation in zip(infos, next_observations)
+                ]
+                final_values = self.policy.value(final_observations)
+                if not isinstance(final_values, list):
+                    raise TypeError("batched policy must return a list of values")
+                rollout.add(
+                    observations,
+                    actions,
+                    rewards,
+                    terminated,
+                    truncated,
+                    values,
+                    log_probabilities,
+                )
+                next_values.append(final_values)
+                for index, (reward, ended, timed_out, info) in enumerate(
+                    zip(rewards, terminated, truncated, infos)
+                ):
+                    self._vector_episode_returns[index] += reward
+                    if ended or timed_out:
+                        self.state.episodes += 1
+                        self.state.episode_return = self._vector_episode_returns[index]
+                        if info.get("winner") == "agent":
+                            self.state.wins += 1
+                        self._vector_episode_returns[index] = 0.0
+                if self.step_callback is not None:
+                    best_index = max(
+                        range(environment_count),
+                        key=lambda index: self._vector_episode_returns[index],
+                    )
+                    self.step_callback(self.environment.envs[best_index])
+                observations = next_observations
+                self.state.environment_steps += environment_count
+
+        batch = rollout.as_batch()
+        batch = replace(
+            batch,
+            next_values=torch.tensor(
+                next_values, dtype=batch.values.dtype, device=batch.values.device
+            ),
+        )
+        with torch.no_grad():
+            last_value = self.policy.value(observations)
+        if not isinstance(last_value, list):
+            raise TypeError("batched policy must return a list of values")
+        return batch, observations, last_value
+
     def run(self, config: TrainingConfig) -> TrainingState:
         """Run the training loop: one rollout plus one update per iteration.
 
@@ -184,15 +268,26 @@ class TrainingLoop:
             raise ValueError("rollout_steps must be positive")
         if config.checkpoint_interval < 1:
             raise ValueError("checkpoint_interval must be positive")
-        observation, _ = self.environment.reset(seed=config.seed)
+        if isinstance(self.environment, VectorEnv):
+            if config.num_envs != self.environment.num_envs:
+                raise ValueError("config.num_envs must match the vector environment")
+            observation, _ = self.environment.reset(seed=config.seed)
+        else:
+            if config.num_envs != 1:
+                raise ValueError("num_envs > 1 requires a VectorEnv")
+            observation, _ = self.environment.reset(seed=config.seed)
         # Each iteration collects exactly rollout_steps environment steps and then
         # updates the policy once. The rollout spans as many episodes as it takes
         # and can end mid-episode, so it is a step budget, not a game.
         for iteration in range(1, config.iterations + 1):
-            batch, observation, last_value = self.collect_rollout(
-                observation,
-                config.rollout_steps,
-            )
+            if isinstance(self.environment, VectorEnv):
+                batch, observation, last_value = self.collect_vector_rollout(
+                    observation, config.rollout_steps
+                )
+            else:
+                batch, observation, last_value = self.collect_rollout(
+                    observation, config.rollout_steps
+                )
             self.state.metrics = dict(
                 self.update_policy(
                     batch,

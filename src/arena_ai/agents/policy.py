@@ -69,27 +69,42 @@ class PolicyAdapter:
         self.model = model
         self.device = device
 
-    def act(self, observation: list[float]) -> tuple[int, float]:
-        """Sample an action and return Python scalars for rollout storage."""
+    def act(
+        self, observation: list[float] | list[list[float]]
+    ) -> tuple[int, float] | tuple[list[int], list[float]]:
+        """Sample one action or a batch of actions for rollout storage."""
+        batched = bool(observation) and isinstance(observation[0], list)
         observation_tensor = torch.tensor(
             observation, dtype=torch.float32, device=self.device
         ).unsqueeze(0)
+        if batched:
+            observation_tensor = observation_tensor.squeeze(0)
         with torch.no_grad():
             # use the policy network to compute the action logits for the given observation.
             logits = self.model.policy_network(observation_tensor)
         distribution = torch.distributions.Categorical(logits=logits)
         action = distribution.sample()
+        if batched:
+            return (
+                [int(item) for item in action.tolist()],
+                [float(item) for item in distribution.log_prob(action).tolist()],
+            )
         return int(action.item()), float(distribution.log_prob(action).item())
 
-    def value(self, observation: list[float]) -> float:
-        """Estimate one observation's value as a Python float."""
+    def value(self, observation: list[float] | list[list[float]]) -> float | list[float]:
+        """Estimate one observation or a batch of observations."""
+        batched = bool(observation) and isinstance(observation[0], list)
         observation_tensor = torch.tensor(
             observation, dtype=torch.float32, device=self.device
         ).unsqueeze(0)
+        if batched:
+            observation_tensor = observation_tensor.squeeze(0)
         with torch.no_grad():
             # uses the value network that is part of the actor-critic model to estimate
             # the value of the given observation.
             value = self.model.value_network(observation_tensor)
+        if batched:
+            return [float(item) for item in value.squeeze(-1).tolist()]
         return float(value.squeeze().item())
 
     def forward(self, observations: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:

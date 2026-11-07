@@ -21,3 +21,4 @@ training:
   rollout_steps: 2048 # transitions collected before each policy update
   checkpoint_interval: 100 # iterations between checkpoint saves
   seed: null # optional seed for the initial environment reset
+  num_envs: 4 # independent environments collected in parallel
