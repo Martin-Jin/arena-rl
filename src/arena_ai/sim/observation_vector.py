@@ -5,8 +5,10 @@ from collections.abc import Mapping
 from arena_ai.config import Config, load_config
 from arena_ai.sim.observation import Observation
 
+# Update when new features are added to the fighter observation structure.
+FEATURES_PER_FIGHTER = 8
 
-FEATURES_PER_FIGHTER = 7
+
 def observation_size(opponent_count: int = 1) -> int:
     """Return the encoded vector size for the configured opponent count."""
     if opponent_count < 1:
@@ -33,6 +35,7 @@ def _fighter_vector(
     world = config.game.world
     fighter_config = config.game.fighter
     observation_config = config.game.observation
+
     # Order: normalized x, y, vx, vy, on_ground, facing_dir, health.
     return [
         _normalize(float(position["x"]), world.arena_width_m),
@@ -45,6 +48,7 @@ def _fighter_vector(
         float(bool(fighter["on_ground"])),
         float(fighter["facing_dir"]),
         _normalize(float(fighter["health"]), fighter_config.max_health),
+        _normalize(float(fighter["attack_frame"]), fighter_config.attack_max_frame),
     ]
 
 

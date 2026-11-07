@@ -106,9 +106,7 @@ render_tick = 0
 turn_timer = 0
 last_move_dir = 0
 fighters = (
-    create_initial_fighters(config.game)
-    if VIEW_OPPONENT
-    else {"agent": FighterState()}
+    create_initial_fighters(config.game) if VIEW_OPPONENT else {"agent": FighterState()}
 )
 game_over = False
 winner = ""
@@ -148,7 +146,9 @@ def draw_health_ui() -> None:
         fighter = fighters[fighter_id]
         x = margin if index == 0 else screen.get_width() - margin - bar_width
         background = pygame.Rect(x, y, bar_width, bar_height)
-        health_ratio = max(0.0, min(1.0, fighter.health / config.game.fighter.max_health))
+        health_ratio = max(
+            0.0, min(1.0, fighter.health / config.game.fighter.max_health)
+        )
         fill = pygame.Rect(x, y, round(bar_width * health_ratio), bar_height)
         pygame.draw.rect(screen, ui.health_background_color, background)
         pygame.draw.rect(screen, color, fill)
@@ -196,6 +196,7 @@ def draw_end_screen() -> pygame.Rect:
     screen.blit(text, text.get_rect(center=button.center))
     return button
 
+
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -230,14 +231,23 @@ while running:
     # Simulate enough fixed timesteps to catch up after a lag spike.
     while accumulator >= DT and not game_over:
         agent = fighters["agent"]
-        actions = {"agent": to_fighter_action(
-            3 if jump and move_dir == 0 else
-            4 if jump and move_dir < 0 else
-            5 if jump and move_dir > 0 else
-            1 if move_dir < 0 else
-            2 if move_dir > 0 else
-            6 if attack else 0
-        )}
+        actions = {
+            "agent": to_fighter_action(
+                3
+                if jump and move_dir == 0
+                else 4
+                if jump and move_dir < 0
+                else 5
+                if jump and move_dir > 0
+                else 1
+                if move_dir < 0
+                else 2
+                if move_dir > 0
+                else 6
+                if attack
+                else 0
+            )
+        }
         if VIEW_OPPONENT:
             structured = get_observation(
                 agent,

@@ -9,6 +9,7 @@ description = "A 2D arena fighting game with a reinforcement learning opponent."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "numpy",
     "pygame-ce",
     "PyYAML",
 ]

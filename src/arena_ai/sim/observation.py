@@ -18,6 +18,7 @@ class FighterObservation(TypedDict):
     on_ground: bool
     facing_dir: int
     health: int
+    attack_frame: int
     """Stores the observation of a single fighter."""
 
 
@@ -35,6 +36,7 @@ def _fighter_observation(fighter: FighterState) -> FighterObservation:
         "on_ground": fighter.on_ground,
         "facing_dir": fighter.facing_dir,
         "health": fighter.health,
+        "attack_frame": fighter.attack_frame,
     }
 
 

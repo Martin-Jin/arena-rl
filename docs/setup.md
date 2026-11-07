@@ -23,7 +23,8 @@ py -m pip install -e ".[cpu]"
 ```
 
 The project dependencies are declared in [`pyproject.toml`](../pyproject.toml).
-The CPU extra installs the standard PyPI PyTorch wheel.
+The project install provides NumPy, pygame-ce, and PyYAML. The CPU extra also
+installs the standard PyPI PyTorch wheel.
 
 ### NVIDIA CUDA installation
 

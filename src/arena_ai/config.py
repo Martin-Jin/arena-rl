@@ -26,6 +26,7 @@ class FighterConfig:
     move_speed_mps: float
     jump_velocity_mps: float
     height_m: float
+    attack_max_frame: int
 
 
 @dataclass(frozen=True)
