@@ -167,7 +167,7 @@ def idle(observation, config=None) -> int:
 
 
 def runner(observation: list[float], config: Config | None = None) -> int:
-    """Run away from the learner, and jump over it when pinned against a wall.
+    """Run away from the learner, and go past it by jumping when pinned against a wall.
 
     It never attacks or parries, so it can only be beaten by catching it. Running at
     the same speed as the learner, it is only caught when it is cornered, which the
@@ -185,10 +185,19 @@ def runner(observation: list[float], config: Config | None = None) -> int:
     self_x = observation[14] * arena_width
     away = -1 if dx > 0 else 1  # Run left when the learner is on the right.
     wall_gap = self_x if away < 0 else arena_width - self_x
-    if wall_gap < game.fighter.width_m:
-        if abs(dx) < 1.5 * reach and observation[18] == 1.0:  # Cornered, learner close, grounded.
+    toward = Action.MOVE_RIGHT if dx > 0 else Action.MOVE_LEFT
+    # Near the wall behind it, running away is a dead end, so go past the learner instead:
+    # walk toward it and jump over it once close. This fighter's own velocity is the memory
+    # that keeps it going. Without it, walking toward the learner moves it out of the zone,
+    # fleeing moves it back in, and it shuffles left and right at the wall.
+    heading_toward = observation[16] * dx > 0
+    trap_zone = 4 * reach if heading_toward else 2 * reach
+    if wall_gap < trap_zone:
+        if abs(dx) < 2 * reach and observation[18] == 1.0:
             return int(Action.MOVE_RIGHT_JUMP if dx > 0 else Action.MOVE_LEFT_JUMP)
-        return int(Action.IDLE)
+        return int(toward)
+    if abs(dx) > 4 * reach:
+        return int(Action.IDLE)  # The learner is far off, so there is nothing to run from.
     return int(Action.MOVE_LEFT if away < 0 else Action.MOVE_RIGHT)
 
 

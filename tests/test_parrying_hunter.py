@@ -179,6 +179,39 @@ class RunnerTests(unittest.TestCase):
         action = runner(self.observe(wall - 0.8, wall - 0.1), CONFIG)
         self.assertEqual(action, int(Action.MOVE_LEFT_JUMP))
 
+    def test_it_jumps_over_the_learner_before_it_reaches_the_wall(self) -> None:
+        wall = CONFIG.game.world.arena_width_m
+        action = runner(self.observe(wall - 3.0, wall - 1.5), CONFIG)
+        self.assertEqual(action, int(Action.MOVE_LEFT_JUMP))
+
+    def test_it_does_not_shuffle_at_the_wall_while_a_learner_walks_slowly_at_it(self) -> None:
+        # Regression: walking toward the learner left the wall zone, fleeing re-entered it,
+        # so the runner switched direction every few frames and stayed pinned.
+        wall = CONFIG.game.world.arena_width_m
+        fighters = {
+            "agent": FighterState(x=wall - 6.0),
+            "opponent": FighterState(x=wall - 0.1, facing_dir=-1),
+        }
+        switches, last = 0, 0
+        for step_index in range(300):
+            observation = encode_observation(
+                get_observation(fighters["agent"], {"opponent": fighters["opponent"]}, CONFIG),
+                CONFIG,
+            )
+            action = to_fighter_action(runner(observation, CONFIG))
+            if action.move_dir:
+                switches += bool(last) and action.move_dir != last
+                last = action.move_dir
+            walk = 1 if step_index % 3 == 0 else 0
+            step_game(fighters, {"agent": FighterAction(move_dir=walk), "opponent": action}, CONFIG)
+        self.assertLessEqual(switches, 3)
+
+    def test_it_heads_back_past_a_distant_learner_instead_of_waiting_at_the_wall(self) -> None:
+        # Regression: cornered with the learner not yet close, it used to stand still.
+        wall = CONFIG.game.world.arena_width_m
+        action = runner(self.observe(wall - 5.0, wall - 0.1), CONFIG)
+        self.assertEqual(action, int(Action.MOVE_LEFT))
+
     def test_it_is_a_scripted_opponent_for_training(self) -> None:
         self.assertIs(OPPONENTS["runner"], runner)
 
