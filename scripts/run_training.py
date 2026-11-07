@@ -131,6 +131,15 @@ def run_training(config: Config | None = None) -> TrainingState:
             )
         )
         checkpoint(state)
+    except KeyboardInterrupt:
+        # Preserve the latest model even when training is stopped between
+        # configured checkpoint intervals.
+        checkpoint(loop.state)
+        print(
+            f"\nTraining interrupted at iteration {loop.state.iteration}; "
+            f"checkpoint saved to {checkpoint_path}."
+        )
+        state = loop.state
     finally:
         if visualizer is not None:
             visualizer.close()

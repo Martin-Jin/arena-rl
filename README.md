@@ -30,6 +30,12 @@ Start the manual viewer from the repository root:
 py -m arena_ai.viewer.game
 ```
 
+To play against the trained agent, first run training so
+`checkpoints/latest.pt` exists, then set `PLAY_AGAINST_TRAINED_AGENT = True`
+near the top of [`src/arena_ai/viewer/game.py`](src/arena_ai/viewer/game.py).
+Leave `VIEW_OPPONENT = True`. The trained opponent uses greedy action
+selection from the latest checkpoint.
+
 The viewer starts with a scripted opponent enabled. To run the single-fighter
 practice mode instead, set `VIEW_OPPONENT = False` near the top of
 [`src/arena_ai/viewer/game.py`](src/arena_ai/viewer/game.py). The opponent uses
@@ -75,6 +81,10 @@ Run training from the repository root with:
 ```powershell
 py scripts/run_training.py
 ```
+
+Press `Ctrl+C` to stop training. The latest in-memory model, optimizer, and
+completed training state are saved to `checkpoints/latest.pt` before the script
+exits.
 
 To visualize training, set `VISUALIZE_TRAINING = True` near the top of
 [`scripts/run_training.py`](scripts/run_training.py). The viewer renders every

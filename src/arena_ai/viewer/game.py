@@ -3,8 +3,10 @@
 # simulation and renders the game using Pygame.
 
 import pygame
+import torch
 
 from arena_ai.agents.action import to_fighter_action
+from arena_ai.agents.policy import ActorCritic
 from arena_ai.config import load_config
 from arena_ai.agents.scripted import approach_and_attack
 from arena_ai.sim.observation import get_observation
@@ -13,13 +15,25 @@ from arena_ai.sim.simulate import step_game
 from arena_ai.sim.state import FighterState, create_initial_fighters
 from arena_ai.viewer.annimation import draw_fighter
 from arena_ai.viewer.audio import AudioManager
+from arena_ai.training.checkpoints import load_checkpoint
 
 # Switch this to False to run the original single-fighter practice viewer.
 VIEW_OPPONENT = True
+# When enabled, the opponent uses the latest trained checkpoint instead of the
+# scripted policy. VIEW_OPPONENT must also be enabled.
+PLAY_AGAINST_TRAINED_AGENT = False
+TRAINED_AGENT_CHECKPOINT = "checkpoints/latest.pt"
 
 # Load all application configuration from the YAML files in configs/.
 config = load_config()
 DT = config.game.world.dt_seconds
+trained_model: ActorCritic | None = None
+if PLAY_AGAINST_TRAINED_AGENT:
+    if not VIEW_OPPONENT:
+        raise ValueError("PLAY_AGAINST_TRAINED_AGENT requires VIEW_OPPONENT")
+    trained_model = ActorCritic(config)
+    load_checkpoint(TRAINED_AGENT_CHECKPOINT, trained_model)
+    trained_model.eval()
 
 PIXELS_PER_METER = config.viewer.rendering.pixels_per_meter
 FLOOR_PX = config.viewer.rendering.floor_y_px
@@ -28,6 +42,23 @@ FLOOR_PX = config.viewer.rendering.floor_y_px
 # Convert meters to pixels for rendering.
 def to_screen(x_m: float, y_m: float) -> tuple[float, float]:
     return x_m * PIXELS_PER_METER, FLOOR_PX - y_m * PIXELS_PER_METER
+
+
+def trained_opponent_action() -> int:
+    """Choose a greedy action for the trained model from the opponent view."""
+    if trained_model is None:
+        raise RuntimeError("trained opponent model has not been loaded")
+    structured = get_observation(
+        fighters["opponent"],
+        {"agent": fighters["agent"]},
+        config,
+    )
+    observation = torch.tensor(
+        encode_observation(structured, config), dtype=torch.float32
+    ).unsqueeze(0)
+    with torch.no_grad():
+        logits, _ = trained_model(observation)
+    return int(torch.argmax(logits, dim=-1).item())
 
 
 def render(
@@ -213,9 +244,13 @@ while running:
                 {"opponent": fighters["opponent"]},
                 config,
             )
-            opponent_action = approach_and_attack(
-                encode_observation(structured, config),
-                config,
+            opponent_action = (
+                trained_opponent_action()
+                if PLAY_AGAINST_TRAINED_AGENT
+                else approach_and_attack(
+                    encode_observation(structured, config),
+                    config,
+                )
             )
             actions["opponent"] = to_fighter_action(opponent_action)
         was_on_ground = agent.on_ground
