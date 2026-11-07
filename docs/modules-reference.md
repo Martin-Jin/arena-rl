@@ -163,6 +163,7 @@ The viewer layer is the only layer intended to depend on `pygame`.
 - `docs/simulation-spec.md` — Documents the action set, observation layout, rewards and timing.
 - `docs/training-process.md` — Documents the training loop and PPO data flow.
 - `docs/setup.md` — Documents installation.
+- `docs/hardware.md` — Documents which training steps run on the CPU or GPU and why.
 
 ## Generated and runtime data
 

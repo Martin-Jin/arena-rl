@@ -104,7 +104,8 @@ to override the default. PPO tensors and optimizer updates run on the selected
 device. Per-step action selection and value estimates during rollouts run on a
 CPU copy of the network that is synchronized after each update, because the
 network is small and per-step GPU transfers would be slower. The deterministic
-game simulation and pygame visualization are also CPU-bound.
+game simulation and pygame visualization are also CPU-bound. See the
+[hardware guide](docs/hardware.md) for what runs where and why.
 
 To visualize training, set `VISUALIZE_TRAINING = True` near the top of
 [`scripts/run_training.py`](scripts/run_training.py). The viewer renders every
