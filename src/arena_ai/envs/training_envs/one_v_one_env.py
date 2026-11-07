@@ -46,17 +46,8 @@ class OneVOneEnv(ArenaEnv):
 
     def create_initial_fighters(self) -> dict[str, FighterState]:
         """Create the one-versus-one starting state, optionally randomized."""
-        fighters = create_initial_fighters(self.config.game)
-        if not self.config.training.randomize_spawns:
-            return fighters
-        world = self.config.game.world
-        margin = self.config.game.fighter.width_m / 2
-        for fighter in fighters.values():
-            fighter.x = self.rng.uniform(margin, world.arena_width_m - margin)
-        agent, opponent = fighters["agent"], fighters["opponent"]
-        agent.facing_dir = 1 if opponent.x >= agent.x else -1
-        opponent.facing_dir = -agent.facing_dir
-        return fighters
+        rng = self.rng if self.config.training.randomize_spawns else None
+        return create_initial_fighters(self.config.game, rng)
 
     def get_actions(
         self,

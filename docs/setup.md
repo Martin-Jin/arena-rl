@@ -65,15 +65,10 @@ With the virtual environment active:
 py -m arena_ai.viewer.game
 ```
 
-The viewer defaults to playing against the trained agent, so it needs
-`checkpoints/latest.pt` (see below).
-
-The viewer controls are documented in the [project README](../README.md).
-
-Set `PLAY_AGAINST_TRAINED_AGENT = False` in
-[`src/arena_ai/viewer/game.py`](../src/arena_ai/viewer/game.py) to fight the
-scripted opponent without a checkpoint, or also set `VIEW_OPPONENT = False` for
-single-fighter practice mode.
+The viewer opens on a start menu. It defaults to the trained agent as the
+opponent when `checkpoints/latest.pt` exists, and to the scripted opponent
+otherwise. Change the opponent, audio and other options in **Settings**; the
+[README](../README.md) lists the controls.
 
 To watch training rollouts, set `VISUALIZE_TRAINING = True` in
 [`scripts/run_training.py`](../scripts/run_training.py) before running the

@@ -48,7 +48,7 @@ def load_frames(
     return frames
 
 
-ASSET_ROOT = Path(__file__).resolve().parents[3] / "assets" / "sprites" / "fighter"
+ASSET_ROOT = Path(__file__).resolve().parents[4] / "assets" / "sprites" / "fighter"
 
 anims = {
     name: Animation(

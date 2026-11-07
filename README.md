@@ -28,32 +28,36 @@ The setup guide includes separate CPU and NVIDIA CUDA installation commands.
 Use the CUDA command before running training if you want PyTorch to use your
 GPU; the training script automatically selects CUDA when it is available.
 
-Start the manual viewer from the repository root:
+Start the viewer from the repository root:
 
 ```powershell
 py -m arena_ai.viewer.game
 ```
 
-The viewer is configured by constants near the top of
-[`src/arena_ai/viewer/game.py`](src/arena_ai/viewer/game.py):
+The viewer opens on a start menu with **Play**, **Settings** and **Quit**. Use the
+mouse, or the arrow keys with `Enter`. The settings menu has:
 
-- `PLAY_AGAINST_TRAINED_AGENT = True` makes the opponent use greedy action
-  selection from `checkpoints/latest.pt`, so run training first. Set it to
-  `False` to fight the scripted approach-and-attack opponent instead.
-- `VIEW_OPPONENT = False` runs the single-fighter practice mode. It cannot be
-  combined with `PLAY_AGAINST_TRAINED_AGENT = True`.
+- **Audio** — music and sound-effect volume.
+- **Opponent** — the trained agent (needs `checkpoints/latest.pt`, so run
+  training first), the scripted approach-and-attack fighter, an idle dummy, a
+  random fighter, or solo practice. The trained agent can play its best move or
+  sample varied moves.
+- **Random starting positions** and whether to show the controls hint.
 
-The opponent uses the same animated sprite frames as the learner with a
-light-red tint.
+Choices are saved to `data/viewer_settings.json` (gitignored) and restored on the
+next launch. In a match, `Esc` opens a pause menu with a way back to Settings,
+and the result screen offers to play again. The opponent uses the same animated
+sprites as the player with a light-red tint.
 
 Controls:
 
-| Key            | Action     |
-| -------------- | ---------- |
-| `A`            | Move left  |
-| `D`            | Move right |
-| `W`            | Jump       |
-| `Space or LMB` | Attack     |
+| Key                                | Action     |
+| ---------------------------------- | ---------- |
+| `A` or `Left`                      | Move left  |
+| `D` or `Right`                     | Move right |
+| `W` or `Up`                        | Jump       |
+| `Space` or left mouse button       | Attack     |
+| `Esc` or `P`                       | Pause      |
 
 ## Project layout
 

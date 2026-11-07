@@ -68,8 +68,7 @@ class AudioManager:
             )
             for name, filename in config.effects.items()
         }
-        for effect in self.effects.values():
-            effect.set_volume(config.effects_volume)
+        self.set_effects_volume(config.effects_volume)
         pygame.mixer.set_reserved(2)
         self.running_channels = (
             pygame.mixer.Channel(0),
@@ -81,6 +80,22 @@ class AudioManager:
         self._running_direction = 0
         self.music_volume = config.music_volume
         self.music_filename = config.music
+
+    def set_effects_volume(self, volume: float) -> None:
+        """Set the master volume of every sound effect (0 to 1)."""
+        self.effects_volume = volume
+        for effect in self.effects.values():
+            effect.set_volume(volume)
+
+    def set_music_volume(self, volume: float) -> None:
+        """Set the music volume (0 to 1), including music that is playing."""
+        self.music_volume = volume
+        pygame.mixer.music.set_volume(volume)
+
+    def silence(self) -> None:
+        """Fade out the running loop, for example when the game is paused."""
+        if self._running:
+            self._stop_running()
 
     def start_music(self) -> None:
         """Start the battle music and loop it until stopped."""

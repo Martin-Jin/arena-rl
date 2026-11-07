@@ -23,6 +23,7 @@ animation:
     turn: false
 
 audio:
+  # Default levels. The settings menu overrides them and remembers the choice.
   # Applied after per-file RMS/peak normalization.
   effects_volume: 0.5
   # Music master volume.
@@ -39,33 +40,59 @@ audio:
     running: running.mp3
   music: battle_music.mp3
 
+opponent:
+  # Checkpoint used by the "Trained agent" choices, relative to the repository.
+  checkpoint_path: checkpoints/latest.pt
+
 ui:
-  font_size: 32
-  button_font_size: 40
-  health_bar_width: 360
-  health_bar_height: 28
-  health_bar_margin: 24
-  health_bar_y: 24
-  health_border_width: 2
-  health_background_color: [55, 55, 55]
-  agent_health_color: [55, 170, 75]
-  opponent_health_color: [210, 65, 65]
-  text_color: [0, 0, 0]
-  opponent_tint: [255, 140, 140]
-  background_color: [255, 255, 255]
-  fallback_agent_color: [255, 0, 0]
-  fallback_opponent_color: [139, 0, 0]
-  overlay_color: [0, 0, 0]
+  # The first installed font in this list is used; pygame's default is the fallback.
+  font_names: [segoe ui semilight, helvetica neue, helvetica, arial]
+  font_sizes:
+    title: 88
+    heading: 48
+    body: 26
+    small: 20
   overlay_alpha: 150
-  restart_button_width: 220
-  restart_button_height: 64
-  restart_button_color: [70, 120, 210]
-  restart_button_border_color: [255, 255, 255]
-  restart_button_border_width: 2
-  restart_button_radius: 8
-  end_title_y_offset: 70
-  health_label: "Your health"
-  opponent_health_label: "Opponent health"
-  restart_label: "Restart"
-  win_message: "You win!"
-  loss_message: "Opponent wins"
+  health_bar_width: 400
+  health_bar_height: 18
+  health_bar_margin: 40
+  health_bar_y: 22
+  # A damage trail stays for this long, then drains this fraction of max health per second.
+  health_trail_delay_seconds: 0.4
+  health_trail_speed: 0.5
+  # "Ready" is shown while the fight is paused, then "Fight!" fades out.
+  ready_seconds: 0.9
+  fight_banner_seconds: 0.7
+  controls_hint_seconds: 8.0
+  damage_text_seconds: 0.9
+  colors:
+    background: [244, 245, 247]
+    floor: [226, 229, 234]
+    floor_line: [196, 202, 211]
+    panel: [255, 255, 255]
+    panel_border: [225, 228, 233]
+    text: [28, 32, 40]
+    text_muted: [120, 128, 140]
+    accent: [59, 110, 235]
+    accent_hover: [41, 92, 214]
+    on_accent: [255, 255, 255]
+    button: [255, 255, 255]
+    button_hover: [238, 242, 250]
+    button_border: [214, 219, 227]
+    track: [222, 226, 232]
+    overlay: [20, 24, 32]
+    shadow: [30, 35, 45]
+    agent_health: [52, 168, 100]
+    opponent_health: [222, 76, 76]
+    health_background: [231, 234, 239]
+    health_trail: [243, 201, 112]
+    damage_dealt: [38, 140, 84]
+    damage_taken: [214, 64, 64]
+    swing_windup: [240, 170, 60]
+    swing_active: [222, 76, 76]
+    swing_recovery: [160, 168, 180]
+    victory: [38, 140, 84]
+    defeat: [214, 64, 64]
+    opponent_tint: [255, 140, 140]
+    fallback_agent: [59, 110, 235]
+    fallback_opponent: [200, 70, 70]
