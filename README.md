@@ -105,6 +105,15 @@ Controls:
   preserved source sheets and animations not yet connected to game actions.
 - [`docs/`](docs/) — project documentation, indexed below.
 
+## Trained agent
+
+The repository includes the best weights so far, `checkpoints/best.pt`, so the viewer's
+trained opponent works straight after a clone with no training. Every other file in
+`checkpoints/` is gitignored. These weights come from a run of 3,714 iterations (about
+7.6 million steps). Over the whole run the agent won 88% of its 13,339 episodes, and it
+won every one of the last 100 against each of the scripted opponents. The viewer picks
+it up automatically when there is no `latest.pt`, or you can choose it in Settings.
+
 ## Training
 
 See the [training process guide](docs/training-process.md) for the current

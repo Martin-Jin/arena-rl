@@ -191,5 +191,6 @@ The viewer layer is the only layer intended to depend on `pygame`.
 ## Generated and runtime data
 
 - `data/` — Stores logged fights and other runtime-generated data; gitignored.
-- `checkpoints/` — Stores saved model checkpoints; gitignored.
+- `checkpoints/` — Stores saved model checkpoints. Gitignored, except `best.pt`, the best
+  trained weights, which is committed so the viewer works after a clone.
 - `runs/` — Stores TensorBoard logs and other training-run outputs; gitignored.

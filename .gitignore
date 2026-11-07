@@ -5,7 +5,9 @@ CLAUDE.local.md
 CLAUDE.md
 
 data/
-checkpoints/
+# Ignore every checkpoint except the best weights, which are shared on purpose.
+checkpoints/*
+!checkpoints/best.pt
 runs/
 .venv/
 __pycache__/
