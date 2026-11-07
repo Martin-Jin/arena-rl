@@ -94,6 +94,7 @@ def build_update_callback(
                     policy_config.value_loss_coef,
                     policy_config.entropy_coef,
                 )
+        policy.sync()
         return metrics
 
     return update_policy
@@ -114,7 +115,7 @@ def run_training(config: Config | None = None) -> TrainingState:
     optimizer = torch.optim.Adam(
         model.parameters(), lr=config.agent.policy.learning_rate
     )
-    policy = PolicyAdapter(model, device)
+    policy = PolicyAdapter(model, device, "cpu")
     environment_factory = partial(OneVOneEnv, config)
     update_policy = build_update_callback(policy, optimizer, config)
     checkpoint_path = Path("checkpoints") / "latest.pt"
@@ -193,4 +194,7 @@ def make_factories(config: Config):
 
 
 if __name__ == "__main__":
+    # Since relatively small MLP, we can limit PyTorch to a single thread for training,
+    # which can reduce overhead and improves performance.
+    torch.set_num_threads(1)
     run_training()

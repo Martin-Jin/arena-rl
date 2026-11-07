@@ -1,6 +1,8 @@
 """Actor-critic policy used by the training entry point."""
 
 import torch
+import copy
+
 from torch import nn
 
 from arena_ai.agents.action import ACTION_COUNT
@@ -66,10 +68,18 @@ class ActorCritic(nn.Module):
 class PolicyAdapter:
     """Bridge the actor-critic module to environment action selection."""
 
-    def __init__(self, model: ActorCritic, device: torch.device) -> None:
+    def __init__(
+        self, model: ActorCritic, device: torch.device, act_device: str = "cpu"
+    ) -> None:
         # Initiates the network of the agent and sets the device to be used for computations (CPU or GPU).
         self.model = model
         self.device = device
+        self.act_device = torch.device(act_device)
+        self.actor = copy.deepcopy(model).to(self.act_device).eval()
+
+    def sync(self) -> None:
+        """Copy updated weights into the acting copy."""
+        self.actor.load_state_dict(self.model.state_dict())
 
     def act(
         self, observation: list[float] | list[list[float]]
@@ -77,13 +87,13 @@ class PolicyAdapter:
         """Sample one action or a batch of actions for rollout storage."""
         batched = bool(observation) and isinstance(observation[0], list)
         observation_tensor = torch.tensor(
-            observation, dtype=torch.float32, device=self.device
+            observation, dtype=torch.float32, device=self.act_device
         ).unsqueeze(0)
         if batched:
             observation_tensor = observation_tensor.squeeze(0)
         with torch.no_grad():
             # use the policy network to compute the action logits for the given observation.
-            logits = self.model.policy_network(observation_tensor)
+            logits = self.actor.policy_network(observation_tensor)
         distribution = FactoredCategorical(logits=logits)
         action = distribution.sample()
         if batched:
@@ -99,14 +109,14 @@ class PolicyAdapter:
         """Estimate one observation or a batch of observations."""
         batched = bool(observation) and isinstance(observation[0], list)
         observation_tensor = torch.tensor(
-            observation, dtype=torch.float32, device=self.device
+            observation, dtype=torch.float32, device=self.act_device
         ).unsqueeze(0)
         if batched:
             observation_tensor = observation_tensor.squeeze(0)
         with torch.no_grad():
             # uses the value network that is part of the actor-critic model to estimate
             # the value of the given observation.
-            value = self.model.value_network(observation_tensor)
+            value = self.actor.value_network(observation_tensor)
         if batched:
             return [float(item) for item in value.squeeze(-1).tolist()]
         return float(value.squeeze().item())
