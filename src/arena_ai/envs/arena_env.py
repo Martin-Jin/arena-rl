@@ -9,7 +9,7 @@ from arena_ai.sim.observation import get_observation
 from arena_ai.sim.observation_vector import encode_observation
 from arena_ai.sim.simulate import FighterAction, step_game
 from arena_ai.sim.state import FighterState
-from arena_ai.envs.reward import calculate_reward
+from arena_ai.envs.reward import calculate_reward, wall_distance
 
 
 class ArenaEnv(ABC):
@@ -32,6 +32,15 @@ class ArenaEnv(ABC):
         self.fighters: dict[str, FighterState] | None = None
         self.step_count = 0
         self._episode_done = False
+        self._reset_counters()
+
+    def _reset_counters(self) -> None:
+        """Zero the per-episode counters that are reported in ``info``."""
+        self.damage_dealt = 0
+        self.damage_taken = 0
+        self.swings = 0  # Attacks the agent started.
+        self.hits = 0  # Steps in which the agent damaged an opponent.
+        self.edge_steps = 0  # Steps within the edge margin of a wall.
 
     @property
     def episode_done(self) -> bool:
@@ -44,6 +53,7 @@ class ArenaEnv(ABC):
         self.fighters = self.create_initial_fighters()
         self.step_count = 0
         self._episode_done = False
+        self._reset_counters()
         return self.get_observation(), {}
 
     def step(
@@ -61,8 +71,10 @@ class ArenaEnv(ABC):
         previous_health = {
             fighter_id: fighter.health for fighter_id, fighter in self.fighters.items()
         }
+        attack_frame_before = self.fighters["agent"].attack_frame
         step_game(self.fighters, actions, self.config)
         self.step_count += 1
+        self._track_episode(previous_health, attack_frame_before)
 
         terminated = self.is_terminated()
         truncated = self.step_count >= self.max_episode_steps and not terminated
@@ -74,8 +86,36 @@ class ArenaEnv(ABC):
             winner = "agent"
         elif terminated:
             winner = "opponent"
-        info = {"step_count": self.step_count, "winner": winner}
+        info = {
+            "step_count": self.step_count,
+            "winner": winner,
+            "damage_dealt": self.damage_dealt,
+            "damage_taken": self.damage_taken,
+            "swings": self.swings,
+            "hits": self.hits,
+            "edge_steps": self.edge_steps,
+        }
         return self.get_observation(), reward, terminated, truncated, info
+
+    def _track_episode(
+        self, previous_health: Mapping[str, int], attack_frame_before: int
+    ) -> None:
+        """Update the cheap per-episode counters after one simulation step."""
+        assert self.fighters is not None
+        agent = self.fighters["agent"]
+        if attack_frame_before == 0 and agent.attack_frame == 1:
+            self.swings += 1
+        dealt = sum(
+            previous_health[fighter_id] - fighter.health
+            for fighter_id, fighter in self.fighters.items()
+            if fighter_id != "agent"
+        )
+        if dealt > 0:
+            self.hits += 1
+            self.damage_dealt += dealt
+        self.damage_taken += previous_health["agent"] - agent.health
+        if wall_distance(agent, self.config) < self.config.scoring.edge_margin:
+            self.edge_steps += 1
 
     def get_observation(self) -> list[float]:
         """Return the current flattened and normalized observation vector."""

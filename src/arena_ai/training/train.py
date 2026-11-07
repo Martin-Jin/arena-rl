@@ -6,6 +6,7 @@ loop independent from a particular network implementation.
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
+from time import perf_counter
 from typing import Protocol
 
 import torch
@@ -14,7 +15,7 @@ from arena_ai.config import TrainingConfig
 from arena_ai.envs.arena_env import ArenaEnv
 from arena_ai.envs.vector_env import VectorEnv
 from arena_ai.training.rollout import Rollout, RolloutBatch
-from arena_ai.training.stats import OpponentStats
+from arena_ai.training.stats import EpisodeRecord, EpisodeStats
 
 
 class Policy(Protocol):
@@ -47,6 +48,7 @@ class UpdatePolicy(Protocol):
 # A function that saves a checkpoint given the current training state.
 SaveCheckpoint = Callable[["TrainingState"], None]
 StepCallback = Callable[[ArenaEnv], None]
+LogCallback = Callable[["TrainingState"], None]
 
 
 def _require_python_int(value: object, name: str) -> int:
@@ -71,7 +73,8 @@ class TrainingState:
     wins: int = 0
     episode_return: float = 0.0
     metrics: dict[str, float] = field(default_factory=dict)
-    # Rolling per-opponent statistics over the most recent episodes.
+    # Rolling statistics over the most recent episodes: overall, and per opponent.
+    episode_stats: dict[str, float] = field(default_factory=dict)
     opponent_stats: dict[str, dict[str, float]] = field(default_factory=dict)
 
 
@@ -86,6 +89,7 @@ class TrainingLoop:
         *,
         save_checkpoint: SaveCheckpoint | None = None,
         step_callback: StepCallback | None = None,
+        log_callback: LogCallback | None = None,
         device: torch.device | str | None = None,
         stats_window: int = 100,
         initial_state: TrainingState | None = None,
@@ -101,21 +105,41 @@ class TrainingLoop:
         self.update_policy = update_policy
         self.save_checkpoint = save_checkpoint
         self.step_callback = step_callback
+        self.log_callback = log_callback
         self.device = device
         # Pass a restored state to continue a previous run's counters.
         self.state = initial_state if initial_state is not None else TrainingState()
-        self._opponent_stats = OpponentStats(stats_window)
+        self._episode_stats = EpisodeStats(stats_window)
+        # Seconds the last rollout spent in the environment and in the policy.
+        self._env_seconds = 0.0
+        self._policy_seconds = 0.0
         self._current_episode_return = 0.0
         self._vector_episode_returns: list[float] = []
 
-    def _record_episode(self, info: Mapping[str, object], truncated: bool) -> None:
-        """Add a finished episode to the rolling per-opponent statistics."""
-        length = info.get("step_count")
-        self._opponent_stats.record(
+    def _record_episode(
+        self, info: Mapping[str, object], truncated: bool, episode_return: float
+    ) -> None:
+        """Add a finished episode to the rolling statistics."""
+
+        def count(key: str) -> int:
+            value = info.get(key, 0)
+            return value if isinstance(value, int) else 0
+
+        winner = info.get("winner")
+        self._episode_stats.record(
             str(info.get("opponent", "unknown")),
-            won=info.get("winner") == "agent",
-            truncated=truncated,
-            length=length if isinstance(length, int) else 0,
+            EpisodeRecord(
+                won=winner == "agent",
+                lost=winner == "opponent",
+                truncated=truncated,
+                length=count("step_count"),
+                episode_return=episode_return,
+                damage_dealt=count("damage_dealt"),
+                damage_taken=count("damage_taken"),
+                swings=count("swings"),
+                hits=count("hits"),
+                edge_steps=count("edge_steps"),
+            ),
         )
 
     def collect_rollout(
@@ -135,31 +159,33 @@ class TrainingLoop:
         # Used for the bootstrap term in GAE. At a truncated step it is V(final_observation),
         # and at the end of the rollout it is V(obs) of the observation carried forward.
         next_values: list[float] = []
+        # Wall-clock time in the policy and the environment, for the timing stats.
+        policy_seconds = env_seconds = 0.0
         with torch.no_grad():
             for _ in range(steps):
+                started = perf_counter()
                 action_result = self.policy.act(observation)
                 action = _require_python_int(action_result[0], "act action")
                 log_probability = _require_python_float(
                     action_result[1], "act log_probability"
                 )
-                # Calculated the critic value for the current observation before
-                # stepping the environment.
-                value = _require_python_float(
-                    self.policy.value(observation), "value"
-                )
+                # Critic value of the current observation, before stepping.
+                value = _require_python_float(self.policy.value(observation), "value")
+                acted = perf_counter()
                 next_observation, reward, terminated, truncated, info = (
                     self.environment.step(action)
                 )
                 if self.step_callback is not None:
                     self.step_callback(self.environment)
+                stepped = perf_counter()
                 self._current_episode_return += reward
-                final_observation = next_observation
-                # Calculate the value of the final observation for bootstrapping. This is
-                # done after the step to ensure that the final observation is not
-                # overwritten by a subsequent reset.
+                # Value of the final observation, for bootstrapping. It is computed
+                # before any reset so the reset observation cannot replace it.
                 next_value = _require_python_float(
-                    self.policy.value(final_observation), "value"
+                    self.policy.value(next_observation), "value"
                 )
+                policy_seconds += (acted - started) + (perf_counter() - stepped)
+                env_seconds += stepped - acted
                 rollout.add(
                     observation,
                     action,
@@ -172,16 +198,17 @@ class TrainingLoop:
                 next_values.append(next_value)
                 self.state.environment_steps += 1
                 observation = next_observation
-                # Evaluate the terminal or truncated observation before reset.
-                # The value is retained in next_values for correct bootstrapping.
+                # The terminal or truncated observation was valued above and is
+                # kept in next_values, so it is safe to reset now.
                 if terminated or truncated:
                     self.state.episodes += 1
                     self.state.episode_return = self._current_episode_return
                     if info.get("winner") == "agent":
                         self.state.wins += 1
-                    self._record_episode(info, truncated)
+                    self._record_episode(info, truncated, self._current_episode_return)
                     self._current_episode_return = 0.0
                     observation, _ = self.environment.reset()
+        self._env_seconds, self._policy_seconds = env_seconds, policy_seconds
         batch = rollout.as_batch(device=self.device)
         batch = replace(
             batch,
@@ -211,8 +238,10 @@ class TrainingLoop:
         if len(self._vector_episode_returns) != environment_count:
             self._vector_episode_returns = [0.0] * environment_count
 
+        policy_seconds = env_seconds = 0.0
         with torch.no_grad():
             for _ in range(steps):
+                started = perf_counter()
                 action_result = self.policy.act(observations)
                 if not (
                     isinstance(action_result[0], list)
@@ -225,9 +254,11 @@ class TrainingLoop:
                 values = self.policy.value(observations)
                 if not isinstance(values, list):
                     raise TypeError("batched policy must return a list of values")
+                acted = perf_counter()
                 next_observations, rewards, terminated, truncated, infos = (
                     self.environment.step(actions)
                 )
+                stepped = perf_counter()
                 final_observations = [
                     info.get("final_observation", observation)
                     for info, observation in zip(infos, next_observations)
@@ -235,6 +266,8 @@ class TrainingLoop:
                 final_values = self.policy.value(final_observations)
                 if not isinstance(final_values, list):
                     raise TypeError("batched policy must return a list of values")
+                policy_seconds += (acted - started) + (perf_counter() - stepped)
+                env_seconds += stepped - acted
                 rollout.add(
                     observations,
                     actions,
@@ -254,7 +287,9 @@ class TrainingLoop:
                         self.state.episode_return = self._vector_episode_returns[index]
                         if info.get("winner") == "agent":
                             self.state.wins += 1
-                        self._record_episode(info, timed_out)
+                        self._record_episode(
+                            info, timed_out, self._vector_episode_returns[index]
+                        )
                         self._vector_episode_returns[index] = 0.0
                 if self.step_callback is not None:
                     best_index = max(
@@ -264,6 +299,7 @@ class TrainingLoop:
                     self.step_callback(self.environment.envs[best_index])
                 observations = next_observations
                 self.state.environment_steps += environment_count
+        self._env_seconds, self._policy_seconds = env_seconds, policy_seconds
 
         batch = rollout.as_batch(device=self.device)
         batch = replace(
@@ -295,6 +331,8 @@ class TrainingLoop:
             raise ValueError("rollout_steps must be positive")
         if config.checkpoint_interval < 1:
             raise ValueError("checkpoint_interval must be positive")
+        if config.print_interval < 1:
+            raise ValueError("print_interval must be positive")
         if isinstance(self.environment, VectorEnv):
             if config.num_envs != self.environment.num_envs:
                 raise ValueError("config.num_envs must match the vector environment")
@@ -307,7 +345,10 @@ class TrainingLoop:
         # updates the policy once. The rollout spans as many episodes as it takes
         # and can end mid-episode, so it is a step budget, not a game.
         first_iteration = self.state.iteration + 1
-        for iteration in range(first_iteration, first_iteration + config.iterations):
+        last_iteration = first_iteration + config.iterations - 1
+        for iteration in range(first_iteration, last_iteration + 1):
+            steps_before = self.state.environment_steps
+            started = perf_counter()
             if isinstance(self.environment, VectorEnv):
                 batch, observation, last_value = self.collect_vector_rollout(
                     observation, config.rollout_steps
@@ -316,7 +357,8 @@ class TrainingLoop:
                 batch, observation, last_value = self.collect_rollout(
                     observation, config.rollout_steps
                 )
-            self.state.metrics = dict(
+            collected = perf_counter()
+            metrics = dict(
                 self.update_policy(
                     batch,
                     last_value,
@@ -325,22 +367,37 @@ class TrainingLoop:
                     next_values=batch.next_values,
                 )
             )
+            finished = perf_counter()
             # Update the training state with the latest metrics and progress.
-            self.state.metrics.update(
+            self.state.iteration = iteration
+            self.state.episode_stats = self._episode_stats.overall()
+            self.state.opponent_stats = self._episode_stats.by_opponent()
+            seconds = finished - started
+            metrics.update(
                 {
-                    "episode_return": self.state.episode_return,
-                    "win_rate": (
-                        self.state.wins / self.state.episodes
-                        if self.state.episodes
-                        else 0.0
-                    ),
+                    # Rolling over the last stats_window episodes, unlike the
+                    # cumulative counts below.
+                    "win_rate": self.state.episode_stats.get("win_rate", 0.0),
                     "episodes": float(self.state.episodes),
                     "wins": float(self.state.wins),
+                    "rollout_seconds": collected - started,
+                    "env_seconds": self._env_seconds,
+                    "policy_seconds": self._policy_seconds,
+                    "update_seconds": finished - collected,
+                    "iteration_seconds": seconds,
+                    "steps_per_second": (
+                        (self.state.environment_steps - steps_before) / seconds
+                        if seconds > 0
+                        else 0.0
+                    ),
                 }
             )
-            self.state.opponent_stats = self._opponent_stats.summary()
-            # update the iteration count in the training state after each iteration
-            self.state.iteration = iteration
+            self.state.metrics = metrics
+            if self.log_callback is not None and (
+                iteration in (first_iteration, last_iteration)
+                or iteration % config.print_interval == 0
+            ):
+                self.log_callback(self.state)
             # Save a checkpoint if the save_checkpoint callback is provided and
             # the current iteration is a multiple of the checkpoint interval.
             if (

@@ -104,8 +104,11 @@ class TrainingConfig:
     randomize_spawns: bool = False
     # None keeps the environment default of ten simulated seconds.
     max_episode_steps: int | None = None
-    # Number of recent episodes per opponent used for rolling statistics.
+    # Number of recent episodes used for the rolling statistics.
     stats_window: int = 100
+    # Print the training statistics, and how many iterations apart.
+    print_stats: bool = True
+    print_interval: int = 10
 
 
 @dataclass(frozen=True)

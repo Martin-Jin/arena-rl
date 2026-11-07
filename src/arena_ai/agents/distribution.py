@@ -32,9 +32,13 @@ class FactoredCategorical:
         parts = decode_parts(action)
         return sum(head.log_prob(part) for head, part in zip(self.heads, parts))
 
+    def head_entropies(self) -> list[torch.Tensor]:
+        """Return each head's entropy, in the order of ``HEAD_NAMES``."""
+        return [head.entropy() for head in self.heads]
+
     def entropy(self) -> torch.Tensor:
         """Return the joint entropy (sum over the independent heads)."""
-        return sum(head.entropy() for head in self.heads)
+        return sum(self.head_entropies())
 
 
 def sample_with_log_prob(logits: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:

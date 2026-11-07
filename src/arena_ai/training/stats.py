@@ -1,47 +1,142 @@
-"""Rolling per-opponent episode statistics for training diagnostics."""
+"""Cheap rolling training statistics: episode outcomes and per-batch behaviour.
+
+Everything here is designed to cost almost nothing next to a simulation step.
+Episode statistics keep running sums over a sliding window, so recording an
+episode and reading a summary are O(1) however large the window is. Behaviour
+statistics are a handful of vectorized operations on the rollout batch that the
+update already holds.
+"""
 
 from collections import deque
 from dataclasses import dataclass
 
+import torch
+
+from arena_ai.agents.action import MOVE_DIRS, decode_parts
+
 
 @dataclass(frozen=True)
-class _EpisodeResult:
+class EpisodeRecord:
+    """What one finished episode contributes to the rolling statistics."""
+
     won: bool
+    lost: bool  # The opponent won. A truncated episode is neither won nor lost.
     truncated: bool
     length: int
+    episode_return: float
+    damage_dealt: int
+    damage_taken: int
+    swings: int
+    hits: int
+    edge_steps: int  # Steps spent within the edge margin of a wall.
 
 
-class OpponentStats:
-    """Track win rate, truncation rate and mean length over recent episodes.
+class _Window:
+    """Running sums over the most recent ``size`` episodes."""
 
-    Each opponent keeps its own window of the last ``window`` episodes, so a
-    rate is comparable between opponents even when they are not sampled equally.
+    _FIELDS = (
+        "wins", "losses", "truncated", "return", "length", "win_length",
+        "loss_length", "dealt", "taken", "swings", "hits", "edge_steps",
+    )  # fmt: skip
+
+    def __init__(self, size: int) -> None:
+        self._size = size
+        self._records: deque[EpisodeRecord] = deque()
+        self._sums = dict.fromkeys(self._FIELDS, 0.0)
+
+    def _apply(self, record: EpisodeRecord, sign: int) -> None:
+        sums = self._sums
+        sums["wins"] += sign * record.won
+        sums["losses"] += sign * record.lost
+        sums["truncated"] += sign * record.truncated
+        sums["return"] += sign * record.episode_return
+        sums["length"] += sign * record.length
+        sums["win_length"] += sign * record.length * record.won
+        sums["loss_length"] += sign * record.length * record.lost
+        sums["dealt"] += sign * record.damage_dealt
+        sums["taken"] += sign * record.damage_taken
+        sums["swings"] += sign * record.swings
+        sums["hits"] += sign * record.hits
+        sums["edge_steps"] += sign * record.edge_steps
+
+    def add(self, record: EpisodeRecord) -> None:
+        self._records.append(record)
+        self._apply(record, 1)
+        if len(self._records) > self._size:
+            self._apply(self._records.popleft(), -1)
+
+    def summary(self) -> dict[str, float]:
+        count = len(self._records)
+        if count == 0:
+            return {}
+        s = self._sums
+        return {
+            "episodes": float(count),
+            "win_rate": s["wins"] / count,
+            "truncation_rate": s["truncated"] / count,
+            "mean_return": s["return"] / count,
+            "mean_length": s["length"] / count,
+            # How long wins and losses take: shorter wins mean a more decisive agent.
+            "win_length": s["win_length"] / s["wins"] if s["wins"] else 0.0,
+            "loss_length": s["loss_length"] / s["losses"] if s["losses"] else 0.0,
+            "damage_dealt": s["dealt"] / count,
+            "damage_taken": s["taken"] / count,
+            # Hits per swing started: low accuracy with many swings is spamming.
+            "attack_accuracy": s["hits"] / s["swings"] if s["swings"] else 0.0,
+            "wall_fraction": s["edge_steps"] / s["length"] if s["length"] else 0.0,
+        }
+
+
+class EpisodeStats:
+    """Rolling episode statistics, overall and for each opponent.
+
     A high truncation rate against an opponent (for example ``idle``) means the
-    episode time limit, not the fight, is ending its episodes.
+    episode time limit, not the fight, is ending its episodes. Each opponent
+    keeps its own window, so rates stay comparable when opponents are not
+    sampled equally.
     """
 
     def __init__(self, window: int = 100) -> None:
         if window < 1:
             raise ValueError("window must be positive")
         self.window = window
-        self._results: dict[str, deque[_EpisodeResult]] = {}
+        self._overall = _Window(window)
+        self._per_opponent: dict[str, _Window] = {}
 
-    def record(
-        self, opponent: str, *, won: bool, truncated: bool, length: int
-    ) -> None:
+    def record(self, opponent: str, record: EpisodeRecord) -> None:
         """Record one finished episode against ``opponent``."""
-        results = self._results.setdefault(opponent, deque(maxlen=self.window))
-        results.append(_EpisodeResult(won, truncated, length))
+        self._overall.add(record)
+        if opponent not in self._per_opponent:
+            self._per_opponent[opponent] = _Window(self.window)
+        self._per_opponent[opponent].add(record)
 
-    def summary(self) -> dict[str, dict[str, float]]:
-        """Return rolling statistics keyed by opponent name."""
-        summary: dict[str, dict[str, float]] = {}
-        for opponent, results in sorted(self._results.items()):
-            count = len(results)
-            summary[opponent] = {
-                "episodes": float(count),
-                "win_rate": sum(r.won for r in results) / count,
-                "truncation_rate": sum(r.truncated for r in results) / count,
-                "mean_length": sum(r.length for r in results) / count,
-            }
-        return summary
+    def overall(self) -> dict[str, float]:
+        """Return statistics over the last ``window`` episodes of any opponent."""
+        return self._overall.summary()
+
+    def by_opponent(self) -> dict[str, dict[str, float]]:
+        """Return statistics keyed by opponent name."""
+        return {
+            name: window.summary()
+            for name, window in sorted(self._per_opponent.items())
+        }
+
+
+def rollout_metrics(
+    actions: torch.Tensor, rewards: torch.Tensor
+) -> dict[str, torch.Tensor]:
+    """Return what the agent did in a rollout, as 0-d tensors.
+
+    Kept as tensors so the caller can read every statistic back from the device
+    with one transfer. ``actions`` holds flat action indices.
+    """
+    move, jump, attack = decode_parts(actions)
+    left, right = MOVE_DIRS.index(-1), MOVE_DIRS.index(1)
+    return {
+        "reward_per_step": rewards.mean(),
+        "attack_rate": attack.float().mean(),
+        "jump_rate": jump.float().mean(),
+        "left_rate": (move == left).float().mean(),
+        "right_rate": (move == right).float().mean(),
+        "idle_rate": (actions == 0).float().mean(),
+    }

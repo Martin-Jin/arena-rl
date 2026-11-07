@@ -101,8 +101,13 @@ py scripts/run_training.py
 
 Press `Ctrl+C` to stop training. The latest in-memory model, optimizer, and
 completed training state are saved to `checkpoints/latest.pt` before the script
-exits. A checkpoint is also saved, and a metrics line printed, every
-`checkpoint_interval` iterations.
+exits. A checkpoint is also saved every `checkpoint_interval` iterations.
+
+Training prints a statistics block every `training.print_interval` iterations
+(win rate, approximate KL, clip fraction, explained variance, per-head entropy,
+action shares, combat figures and timing). Set `training.print_stats: false` in
+[`configs/agent.yaml`](configs/agent.yaml) for silent training. See
+[Training statistics](docs/training-process.md#training-statistics).
 
 To continue a stopped run, set `RESUME_FROM = "checkpoints/latest.pt"` near the
 top of [`scripts/run_training.py`](scripts/run_training.py). It restores the

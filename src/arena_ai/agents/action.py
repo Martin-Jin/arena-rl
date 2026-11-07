@@ -47,6 +47,7 @@ _FIGHTER_ACTIONS: dict[Action, FighterAction] = {
 MOVE_DIRS = (0, -1, 1)
 # Head order: move (none/left/right), jump, attack.
 HEAD_SIZES = (len(MOVE_DIRS), 2, 2)
+HEAD_NAMES = ("move", "jump", "attack")
 LOGIT_COUNT = sum(HEAD_SIZES)
 # Mixed-radix strides, e.g. (3, 2, 2) -> (1, 3, 6).
 HEAD_STRIDES = tuple(math.prod(HEAD_SIZES[:i]) for i in range(len(HEAD_SIZES)))

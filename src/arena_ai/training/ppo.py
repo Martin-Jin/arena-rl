@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 import torch
 from torch import nn
+from arena_ai.agents.action import HEAD_NAMES
 from arena_ai.agents.distribution import FactoredCategorical
 
 
@@ -137,16 +138,17 @@ def normalize_advantages(advantages: torch.Tensor) -> torch.Tensor:
     return (advantages - advantages.mean()) / standard_deviation
 
 
-def entropy_from_logits(logits: torch.Tensor) -> torch.Tensor:
-    """Return mean categorical entropy for a batch of action logits.
-    Measures how spread out the action distribution is, which encourages exploration."""
-    return FactoredCategorical(logits).entropy().mean()
+def explained_variance(values: torch.Tensor, returns: torch.Tensor) -> torch.Tensor:
+    """Return how much of the return variance the critic predicts.
 
-
-def entropy_loss(logits: torch.Tensor) -> torch.Tensor:
-    """Return the signed entropy loss used in the combined PPO loss.
-    Negative because we want to maximize entropy, but optimizers minimize loss."""
-    return -entropy_from_logits(logits)
+    ``1 - Var(returns - values) / Var(returns)``: near 1 is a good critic, near 0
+    predicts nothing and below 0 is worse than a constant. Unlike the value loss
+    its scale does not depend on the reward. Returns a 0-d tensor, and 0 when the
+    returns do not vary.
+    """
+    variance = returns.var(unbiased=False)
+    ratio = (returns - values).var(unbiased=False) / variance.clamp_min(1e-8)
+    return torch.where(variance > 1e-8, 1 - ratio, torch.zeros_like(ratio))
 
 
 def total_loss(
@@ -154,17 +156,20 @@ def total_loss(
     advantages: torch.Tensor,
     value_preds: torch.Tensor,
     returns: torch.Tensor,
-    logits: torch.Tensor,
+    entropy: torch.Tensor,
     clip_range: float,
     value_loss_coef: float,
     entropy_coef: float,
-) -> torch.Tensor:
-    """Combine policy, value, and entropy terms into the PPO loss."""
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Combine the policy, value and entropy terms into the PPO loss.
+
+    Returns ``(loss, policy_loss, value_loss)``. The entropy is subtracted
+    because the optimizer minimizes, and more entropy encourages exploration.
+    """
     policy_loss = -surrogate_objective(prob_ratio, advantages, clip_range)
     value_loss = critic_loss(value_preds, returns)
-    return (
-        policy_loss + value_loss_coef * value_loss + entropy_coef * entropy_loss(logits)
-    )
+    loss = policy_loss + value_loss_coef * value_loss - entropy_coef * entropy
+    return loss, policy_loss, value_loss
 
 
 def optimize_policy(
@@ -200,32 +205,49 @@ def train_step(
     value_loss_coef: float,
     entropy_coef: float,
     max_grad_norm: float | None = 0.5,
-) -> dict[str, float]:
-    """Run one PPO update for a policy returning ``(logits, values)``. Wrapper for
-    the loss functions and the optimizer step. Returns a dictionary of loss values
-    for logging."""
+) -> dict[str, torch.Tensor]:
+    """Run one PPO update for a policy returning ``(logits, values)``.
+
+    Returns detached 0-d tensors, not Python floats. Reading a GPU tensor back
+    forces a device sync, so the caller averages the tensors over its minibatches
+    and reads them once. The statistics reuse values the loss already computed:
+
+    - ``approx_kl``: how far the policy moved from the one that collected the
+      data (a non-negative estimate). Large means unstable, near 0 means the
+      policy barely changes.
+    - ``clip_fraction``: the share of samples whose probability ratio left the
+      clip range. Around 0.1 to 0.2 is typical, 0 means updates barely move the
+      policy and a persistently high value means they are too aggressive.
+    - ``entropy_<head>``: entropy of each action head, which shows if one head
+      (for example jump) collapses early.
+    """
     logits, value_preds = policy(observations)
     distribution = FactoredCategorical(logits)
     new_log_probs = distribution.log_prob(actions)
     prob_ratio = probability_ratio(new_log_probs, old_log_probs)
-    loss = total_loss(
+    head_entropies = [entropy.mean() for entropy in distribution.head_entropies()]
+    entropy = sum(head_entropies)
+    loss, policy_loss, value_loss = total_loss(
         prob_ratio,
         advantages,
         value_preds.squeeze(-1),
         returns,
-        logits,
+        entropy,
         clip_range,
         value_loss_coef,
         entropy_coef,
     )
     optimize_policy(optimizer, loss, max_grad_norm)
-    # Return loss values for logging, without tracking gradients.
     with torch.no_grad():
-        return {
-            "loss": loss.item(),
-            "policy_loss": -surrogate_objective(
-                prob_ratio, advantages, clip_range
-            ).item(),
-            "value_loss": critic_loss(value_preds.squeeze(-1), returns).item(),
-            "entropy": distribution.entropy().mean().item(),
+        ratio = prob_ratio.detach()
+        stats = {
+            "loss": loss,
+            "policy_loss": policy_loss,
+            "value_loss": value_loss,
+            "entropy": entropy,
+            "approx_kl": ((ratio - 1) - (new_log_probs.detach() - old_log_probs)).mean(),
+            "clip_fraction": ((ratio - 1).abs() > clip_range).float().mean(),
         }
+        for name, head_entropy in zip(HEAD_NAMES, head_entropies):
+            stats[f"entropy_{name}"] = head_entropy
+        return {name: value.detach() for name, value in stats.items()}

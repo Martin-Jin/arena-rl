@@ -95,8 +95,10 @@ The simulation layer is deterministic and independent of rendering. It must not 
 - `src/arena_ai/training/ppo.py` — Calculates GAE and bootstrapped critic
   targets, then calculates PPO policy, value, and entropy losses and applies
   optimizer updates.
-- `src/arena_ai/training/stats.py` — Tracks rolling per-opponent win rate,
-  truncation rate and mean episode length for training diagnostics.
+- `src/arena_ai/training/stats.py` — Cheap training statistics: rolling episode
+  statistics overall and per opponent (running sums, so O(1) to update) and
+  behaviour statistics for a rollout batch (action shares, reward per step).
+- `src/arena_ai/training/report.py` — Formats the latest statistics for printing.
 - `src/arena_ai/training/checkpoints.py` — Saves and restores the policy,
   optimizer, configuration, and training progress.
 - `src/arena_ai/training/train.py` — Owns rollout collection across episodes,

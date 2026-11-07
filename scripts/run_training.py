@@ -15,9 +15,12 @@ from arena_ai.training.checkpoints import load_checkpoint, save_checkpoint
 from arena_ai.training.ppo import (
     advantage_estimation,
     discounted_returns,
+    explained_variance,
     normalize_advantages,
     train_step,
 )
+from arena_ai.training.report import format_stats
+from arena_ai.training.stats import rollout_metrics
 from arena_ai.training.train import TrainingLoop, TrainingState
 
 # Switch this to True to render every simulation step during training.
@@ -72,14 +75,15 @@ def build_update_callback(
             policy_config.gae_lambda,
             episode_ends.cpu(),
         ).to(device)
-        returns = discounted_returns(
+        cpu_returns = discounted_returns(
             batch.rewards.cpu(),
             terminated.cpu(),
             torch.as_tensor(last_value, dtype=cpu_values.dtype),
             policy_config.discount_factor,
             episode_ends.cpu(),
             next_values.cpu(),
-        ).to(device)
+        )
+        returns = cpu_returns.to(device)
         # 2. Normalize advantages to stabilize training.
         advantages = normalize_advantages(advantages)
         # 3. Flatten the batch to prepare for mini-batch training.
@@ -88,12 +92,13 @@ def build_update_callback(
         flat_returns = returns.reshape(-1)
         # 4. Split the batch into mini-batches and perform multiple epochs of training.
         batch_size = min(policy_config.batch_size, len(flat.actions))
-        metrics: dict[str, float] = {}
+        totals: dict[str, torch.Tensor] = {}
+        minibatches = 0
         for _ in range(policy_config.num_epochs):
             # Randomly permute the batch indices to create mini-batches for training.
             permutation = torch.randperm(len(flat.actions), device=flat.actions.device)
             for indices in permutation.split(batch_size):
-                metrics = train_step(
+                stats = train_step(
                     policy.forward,
                     optimizer,
                     flat.observations[indices],
@@ -105,8 +110,19 @@ def build_update_callback(
                     policy_config.value_loss_coef,
                     policy_config.entropy_coef,
                 )
+                for name, value in stats.items():
+                    totals[name] = totals[name] + value if name in totals else value
+                minibatches += 1
         policy.sync()
-        return metrics
+        # Average over every minibatch (the last one alone is noisy), add the
+        # batch-level statistics, and read everything back with one device
+        # transfer. Reading each value separately would sync the GPU every time.
+        tensors = {name: value / minibatches for name, value in totals.items()}
+        tensors["explained_variance"] = explained_variance(
+            cpu_values.reshape(-1), cpu_returns.reshape(-1)
+        ).to(device)
+        tensors.update(rollout_metrics(flat.actions, flat.rewards))
+        return dict(zip(tensors, torch.stack(list(tensors.values())).tolist()))
 
     return update_policy
 
@@ -147,29 +163,13 @@ def run_training(config: Config | None = None) -> TrainingState:
     run_dir = Path("checkpoints") / datetime.now().strftime("run-%Y%m%d-%H%M%S")
 
     def checkpoint(state: TrainingState) -> None:
-        """Save a checkpoint, then print the latest training metrics."""
+        """Save the latest model and training progress."""
         save_checkpoint(checkpoint_path, model, optimizer, config, state)
         save_checkpoint(
             run_dir / f"iter_{state.iteration:06d}.pt", model, optimizer, config, state
         )
-        m = state.metrics
-        print(
-            f"[iter {state.iteration}] steps={state.environment_steps} "
-            f"episodes={int(m.get('episodes', 0))} "
-            f"win_rate={m.get('win_rate', 0.0):.2%} "
-            f"episode_return={m.get('episode_return', 0.0):.3f} "
-            f"loss={m.get('loss', 0.0):.4f} "
-            f"policy_loss={m.get('policy_loss', 0.0):.4f} "
-            f"value_loss={m.get('value_loss', 0.0):.4f} "
-            f"entropy={m.get('entropy', 0.0):.3f}"
-        )
-        for name, stats in state.opponent_stats.items():
-            print(
-                f"    vs {name}: episodes={int(stats['episodes'])} "
-                f"win_rate={stats['win_rate']:.0%} "
-                f"truncation_rate={stats['truncation_rate']:.0%} "
-                f"mean_length={stats['mean_length']:.0f}"
-            )
+        if config.training.print_stats:
+            print(f"[iter {state.iteration}] checkpoint saved to {checkpoint_path}")
 
     visualizer = None
     if VISUALIZE_TRAINING:
@@ -188,6 +188,11 @@ def run_training(config: Config | None = None) -> TrainingState:
         update_policy,
         save_checkpoint=checkpoint,
         step_callback=visualizer,
+        log_callback=(
+            (lambda state: print(format_stats(state)))
+            if config.training.print_stats
+            else None
+        ),
         device=device,
         stats_window=config.training.stats_window,
         initial_state=resumed_state,

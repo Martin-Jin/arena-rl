@@ -21,8 +21,12 @@ defines:
 - `max_episode_steps` — episode time limit in simulation steps (1500 is 25
   simulated seconds at 60 Hz). `null` uses the environment default of
   `sim_hz * 10` steps. A fight that reaches the limit is truncated, not won.
-- `stats_window` — number of recent episodes per opponent used for rolling
-  statistics.
+- `stats_window` — number of recent episodes used for the rolling episode
+  statistics, overall and per opponent.
+- `print_stats` — print the training statistics. Set `false` for silent
+  training. The statistics are still computed and saved in checkpoints.
+- `print_interval` — iterations between printed statistics. The first and
+  last iteration of a run always print.
 
 When `num_envs` is greater than one, environment `i` uses opponent
 `i % len(OPPONENTS)` from [`scripted.py`](../src/arena_ai/agents/scripted.py)
@@ -182,30 +186,78 @@ environment adds `info["winner"]` at natural episode termination:
 The reward is defined in [`docs/simulation-spec.md`](simulation-spec.md). The
 loop accumulates rewards for the current episode. When an episode ends, it
 records the completed return and increments the episode count. It increments
-the win count only when `info["winner"] == "agent"`. The metrics exposed after
-each update include:
+the win count only when `info["winner"] == "agent"`.
 
-- `episode_return` — the most recently completed episode return.
-- `win_rate` — cumulative learner wins divided by completed episodes.
-- `episodes` and `wins` — cumulative counts.
-- PPO loss metrics returned by the update callback (`loss`, `policy_loss`,
-  `value_loss` and `entropy`, from the last minibatch of the update).
+Besides `step_count` and `winner`, the environment reports cheap per-episode
+counters in `info`: `damage_dealt`, `damage_taken`, `swings` (attacks the
+learner started), `hits` (steps in which it damaged an opponent), `edge_steps`
+(steps within `edge_margin` of a wall) and `opponent` (the opponent's name).
 
-`scripts/run_training.py` prints these metrics each time it saves a checkpoint.
+## Training statistics
+
+`scripts/run_training.py` prints a block like this every `print_interval`
+iterations when `print_stats` is true:
+
+```text
+[iter 100] steps=204,800 episodes=312
+  results  win 41%  return +0.35  reward/step +0.0021  (last 100 episodes)
+  policy   kl 0.0120  clip 14%  explained var 0.72  entropy 2.31 (move 0.99 jump 0.60 attack 0.60)
+  loss     total 0.2295  policy -0.0020  value 0.5175
+  actions  attack 31%  jump 12%  left 20%  right 25%  idle 22%
+  combat   accuracy 38%  dealt 71  taken 45  near wall 8%  win length 612  loss length 480
+  time     0.81s/iter  rollout 0.52s (env 0.10s policy 0.41s)  update 0.28s  2,530 steps/s
+  vs approach  win 33%  timeout 0%  length 571  (6 episodes)
+```
+
+**Why these numbers:** the return of a single episode is noisy, so the results
+line uses a rolling window. The policy and critic lines say whether learning is
+healthy, and the actions and combat lines say what the agent is actually doing.
+
+| Line | Measure | How to read it |
+| --- | --- | --- |
+| results | `win`, `return` | Rolling over the last `stats_window` episodes, so recent progress shows. `reward/step` is the mean reward of the rollout and does not depend on how many episodes finished. |
+| policy | `kl` | Approximate KL divergence (how far the update moved the policy), averaged over minibatches. Very large means unstable. Near 0 means a learning rate that is too low or a converged policy. |
+| policy | `clip` | Share of samples whose probability ratio hit the clip range. About 10% to 20% is typical. 0% means updates barely move the policy, and persistently high means they are too aggressive. |
+| policy | `explained var` | `1 - Var(returns - values) / Var(returns)`. Near 1 is a good critic, near 0 predicts nothing, below 0 is worse than a constant. Its scale does not depend on the reward, unlike the value loss. |
+| policy | `entropy` | The sum of the three heads, then each head alone, so one head collapsing early (for example never jumping) is visible. |
+| loss | `total`, `policy`, `value` | Averaged over every minibatch of the update, not only the last one. |
+| actions | `attack`, `jump`, `left`, `right`, `idle` | Share of rollout steps. `idle` is the no-op action. |
+| combat | `accuracy` | Hits per swing started. Many swings with a low accuracy means the agent is spamming. |
+| combat | `dealt`, `taken` | Mean damage per episode, which is clearer than the reward because the reward also includes the wall penalty. |
+| combat | `near wall` | Share of steps within `edge_margin` of a wall, which shows whether it still hugs walls. |
+| combat | `win length`, `loss length` | Mean episode length in steps for wins and for losses. Shorter wins mean a more decisive agent. |
+| time | `s/iter`, `rollout`, `update`, `steps/s` | Wall-clock time. The rollout splits into time in the environment (`env`) and in the policy (`policy`, the network's acting and value calls). The remainder is bookkeeping. This shows whether the simulation or the network is the bottleneck. |
+
+**Cost:** these are designed to cost almost nothing next to a simulation step.
+Measured on this machine, per iteration of 2,048 steps:
+
+- Episode statistics keep running sums over the window, so recording an episode
+  takes about 6 microseconds and a summary about 3, however large the window.
+- The behaviour statistics and explained variance are a few vectorized
+  operations on the batch the update already holds, about 0.3 ms.
+- The timing uses four `perf_counter` calls per step, about 0.6 microseconds,
+  about 1 ms per iteration.
+- The PPO statistics reuse values the loss already computed and are read from
+  the GPU once per update, not once per minibatch. Reading a GPU value forces a
+  sync, so this is also faster than the earlier per-minibatch reads.
+- Formatting a printed block takes about 16 microseconds, so printing is cheap
+  too. Turning `print_stats` off only silences the output.
+
+The metrics after each update are in `TrainingState.metrics` (the values above,
+plus cumulative `episodes` and `wins`), the rolling overall figures are in
+`TrainingState.episode_stats`, and the per-opponent ones in
+`TrainingState.opponent_stats`.
 
 ### Per-opponent statistics
 
 `OneVOneEnv` adds `info["opponent"]` (the opponent's name in `OPPONENTS`). The
 loop records every finished episode in
-[`OpponentStats`](../src/arena_ai/training/stats.py) and exposes
-`TrainingState.opponent_stats`: for each opponent, over its last `stats_window`
-episodes, the `win_rate`, `truncation_rate`, `mean_length` (in steps) and
-`episodes` count. These are printed under each checkpoint line. A high
-truncation rate against an opponent, such as `idle`, means the time limit is
-ending episodes before the fight is decided, so raise `max_episode_steps`.
-
-An iteration may end mid-episode, so an incomplete episode is not counted until
-the environment reports termination or truncation.
+[`EpisodeStats`](../src/arena_ai/training/stats.py), which keeps one rolling
+window overall and one per opponent. Per opponent it reports `win_rate`,
+`truncation_rate`, `mean_length` and the episode count, plus every figure in the
+tables above. A high truncation rate against an opponent, such as `idle`, means
+the time limit is ending episodes before the fight is decided, so raise
+`max_episode_steps`.
 
 ## PPO update boundary
 
