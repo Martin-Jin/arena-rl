@@ -81,7 +81,7 @@ def render(
             shade=config.viewer.ui.opponent_tint if is_opponent else None,
         ):
             h_px = config.game.fighter.height_m * PIXELS_PER_METER
-            w_px = h_px * 0.3
+            w_px = config.game.fighter.width_m * PIXELS_PER_METER
             x_px, y_px = to_screen(fighter.x, fighter.y)
             color = (
                 config.viewer.ui.fallback_opponent_color

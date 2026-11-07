@@ -11,7 +11,7 @@ This document describes the intended purpose of each module and project director
 ## Configuration
 
 - `configs/` — Stores the YAML files read by the global configuration loader.
-- `configs/game.yaml` — Defines gameplay and observation constants, including damage, cooldowns, parry timing, and arena dimensions.
+- `configs/game.yaml` — Defines gameplay and observation constants, including damage, cooldowns, parry timing, fighter dimensions, and arena dimensions.
 - `configs/agent.yaml` — Defines neural-network settings for the agent and
   training-loop defaults, including hidden-layer sizes, rollout length, and
   checkpoint interval.

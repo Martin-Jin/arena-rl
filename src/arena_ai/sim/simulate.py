@@ -84,8 +84,10 @@ def step_game(
 def attacker_is_active(fighter: FighterState, config: GameConfig) -> bool:
     """Return whether a fighter is in the active attack frames."""
     combat = config.combat
-    return combat.attack_windup_frames < fighter.attack_frame <= (
-        combat.attack_windup_frames + combat.attack_active_frames
+    return (
+        combat.attack_windup_frames
+        < fighter.attack_frame
+        <= (combat.attack_windup_frames + combat.attack_active_frames)
     )
 
 
@@ -95,10 +97,11 @@ def attack_hits(
     config: GameConfig,
 ) -> bool:
     """Return whether an attacker's forward hitbox overlaps a target."""
-    fighter_width = config.fighter.height_m * 0.3
+    fighter_width = config.fighter.width_m
     attack_range = config.combat.attack_range_m
-    attack_start = attacker.x + attacker.facing_dir * fighter_width / 2
-    attack_end = attack_start + attacker.facing_dir * attack_range
+    # Hitbox starts at the attacker's center, so overlapping targets are hit.
+    attack_start = attacker.x
+    attack_end = attacker.x + attacker.facing_dir * (fighter_width / 2 + attack_range)
     hitbox_left = min(attack_start, attack_end)
     hitbox_right = max(attack_start, attack_end)
     target_left = target.x - fighter_width / 2

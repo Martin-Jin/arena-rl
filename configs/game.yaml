@@ -12,6 +12,7 @@ fighter:
   jump_velocity_mps: 6.9
   height_m: 0.9
   attack_max_frame: 30
+  width_to_height_ratio: 0.3
 
 combat:
   attack_windup_frames: 12

@@ -27,6 +27,12 @@ class FighterConfig:
     jump_velocity_mps: float
     height_m: float
     attack_max_frame: int
+    width_to_height_ratio: float
+
+    @property
+    def width_m(self) -> float:
+        """Fighter body width, derived from height."""
+        return self.height_m * self.width_to_height_ratio
 
 
 @dataclass(frozen=True)
