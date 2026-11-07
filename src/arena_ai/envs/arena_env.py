@@ -9,6 +9,7 @@ from arena_ai.sim.observation import get_observation
 from arena_ai.sim.observation_vector import encode_observation
 from arena_ai.sim.simulate import FighterAction, step_game
 from arena_ai.sim.state import FighterState
+from arena_ai.envs.reward import calculate_reward
 
 
 class ArenaEnv(ABC):
@@ -58,8 +59,7 @@ class ArenaEnv(ABC):
         current_observation = self.get_observation()
         actions = self.get_actions(action, current_observation)
         previous_health = {
-            fighter_id: fighter.health
-            for fighter_id, fighter in self.fighters.items()
+            fighter_id: fighter.health for fighter_id, fighter in self.fighters.items()
         }
         step_game(self.fighters, actions, self.config)
         self.step_count += 1
@@ -103,26 +103,10 @@ class ArenaEnv(ABC):
         """Convert scenario controller decisions into ID-keyed simulation actions."""
 
     def calculate_reward(self, previous_health: Mapping[str, int]) -> float:
-        """Reward damage dealt, damage received, and terminal outcomes."""
+        """Delegate to the shared reward module."""
         if self.fighters is None:
             return 0.0
-        agent_damage = previous_health["agent"] - self.fighters["agent"].health
-        opponent_damage = sum(
-            previous_health[fighter_id] - fighter.health
-            for fighter_id, fighter in self.fighters.items()
-            if fighter_id != "agent"
-        )
-        scoring = self.config.scoring
-        reward = scoring.damage_reward_scale * (opponent_damage - agent_damage)
-        if self.fighters["agent"].health <= 0:
-            reward -= scoring.defeat_penalty
-        elif any(
-            fighter.health <= 0
-            for fighter_id, fighter in self.fighters.items()
-            if fighter_id != "agent"
-        ):
-            reward += scoring.victory_reward
-        return reward
+        return calculate_reward(previous_health, self.fighters, self.config)
 
     def is_terminated(self) -> bool:
         """Return whether the scenario has reached a natural terminal state."""

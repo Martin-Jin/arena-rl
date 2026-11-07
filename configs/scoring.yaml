@@ -3,3 +3,5 @@ scoring:
   damage_reward_scale: 0.1
   victory_reward: 1.0
   defeat_penalty: 1.0
+  edge_margin: 1.0
+  edge_penalty_scale: 0.002

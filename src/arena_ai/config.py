@@ -111,6 +111,8 @@ class ScoringConfig:
     damage_reward_scale: float
     victory_reward: float
     defeat_penalty: float
+    edge_margin: float = 1.0
+    edge_penalty_scale: float = 0.0
 
 
 @dataclass(frozen=True)

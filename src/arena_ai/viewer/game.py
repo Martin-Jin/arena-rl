@@ -22,7 +22,7 @@ from arena_ai.agents.action import from_parts, to_fighter_action
 VIEW_OPPONENT = True
 # When enabled, the opponent uses the latest trained checkpoint instead of the
 # scripted policy. VIEW_OPPONENT must also be enabled.
-PLAY_AGAINST_TRAINED_AGENT = False
+PLAY_AGAINST_TRAINED_AGENT = True
 TRAINED_AGENT_CHECKPOINT = "checkpoints/latest.pt"
 
 # Load all application configuration from the YAML files in configs/.

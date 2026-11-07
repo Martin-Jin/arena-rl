@@ -45,6 +45,7 @@ The simulation layer is deterministic and independent of rendering. It must not 
 - `src/arena_ai/envs/arena_env.py` — Defines the shared abstract environment
   lifecycle: reset, step, observations, episode limits, and terminal status.
   It must remain headless and must not import `pygame`.
+- `src/arena_ai/envs/reward.py` — Calculates the learner's per-step reward (damage, terminal outcomes, and wall-proximity penalty) as a pure function of fighter state and scoring config.
 - `src/arena_ai/envs/vector_env.py` — Runs independent headless environments
   synchronously and auto-resets completed instances for batched collection.
 - `src/arena_ai/envs/training_envs/` — Contains concrete environments for
@@ -79,9 +80,6 @@ The simulation layer is deterministic and independent of rendering. It must not 
   workflows.
 - `src/arena_ai/envs/arena_env.py` — Calculates terminal and shaping rewards
   from the learner's perspective.
-- `src/arena_ai/training/rewards.py` — Legacy reward stub currently unused by
-  the active environment; remove or implement it when reward logic is moved
-  out of `ArenaEnv`.
 - `src/arena_ai/training/rollout.py` — Stores observations, actions, rewards,
   termination flags, and policy values/log probabilities collected from rollouts.
 - `src/arena_ai/training/ppo.py` — Calculates GAE and bootstrapped critic
