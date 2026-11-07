@@ -1,4 +1,4 @@
-"""Menu widgets with mouse and keyboard support: buttons, sliders and toggles."""
+"""Menu widgets with mouse and keyboard support: buttons, sliders, toggles and dropdowns."""
 
 from collections.abc import Callable, Sequence
 
@@ -36,6 +36,18 @@ class Widget:
 
     def draw(self, surface: pygame.Surface, theme: Theme, focused: bool) -> None:
         raise NotImplementedError
+
+    # Widgets that pop something over the rest of the menu (a dropdown list)
+    # take over input while it is open and draw it after everything else.
+    @property
+    def captures_input(self) -> bool:
+        return False
+
+    def handle_captured_event(self, event: pygame.event.Event) -> None:
+        """Handle any event while ``captures_input`` is true."""
+
+    def draw_overlay(self, surface: pygame.Surface, theme: Theme) -> None:
+        """Draw the popped-over part, on top of every other widget."""
 
 
 class Button(Widget):
@@ -288,6 +300,139 @@ class Selector(_Row):
         )
 
 
+class Dropdown(_Row):
+    """Pick one option from a list that opens under the control.
+
+    Use this for longer lists; ``Selector`` suits two or three options.
+    """
+
+    ITEM_HEIGHT = 38
+
+    def __init__(
+        self,
+        label: str,
+        options: Sequence[tuple[str, str]],
+        get: Callable[[], str],
+        set_: Callable[[str], None],
+        option_enabled: Callable[[str], bool] | None = None,
+        enabled_fn: Callable[[], bool] | None = None,
+    ) -> None:
+        super().__init__(label, enabled_fn)
+        self.options = list(options)
+        self._get = get
+        self._set = set_
+        self._option_enabled = option_enabled or (lambda value: True)
+        self._open = False
+        self._highlight = 0
+
+    @property
+    def control(self) -> pygame.Rect:
+        return pygame.Rect(self.rect.right - 320, self.rect.y, 304, self.rect.height)
+
+    @property
+    def captures_input(self) -> bool:
+        return self._open
+
+    def _list_rect(self, surface_height: int = 720) -> pygame.Rect:
+        control = self.control
+        height = self.ITEM_HEIGHT * len(self.options) + 12
+        top = control.bottom + 4
+        if top + height > surface_height - 8:  # Not enough room below: open upward.
+            top = control.y - 4 - height
+        return pygame.Rect(control.x, top, control.width, height)
+
+    def _item_rect(self, index: int) -> pygame.Rect:
+        box = self._list_rect()
+        return pygame.Rect(
+            box.x + 6,
+            box.y + 6 + index * self.ITEM_HEIGHT,
+            box.width - 12,
+            self.ITEM_HEIGHT,
+        )
+
+    def _open_list(self) -> None:
+        values = [value for value, _ in self.options]
+        self._highlight = values.index(self._get()) if self._get() in values else 0
+        self._open = True
+
+    def _choose(self, index: int) -> None:
+        value = self.options[index][0]
+        if self._option_enabled(value):
+            self._set(value)
+            self._open = False
+
+    def _move_highlight(self, step: int) -> None:
+        for _ in range(len(self.options)):
+            self._highlight = (self._highlight + step) % len(self.options)
+            if self._option_enabled(self.options[self._highlight][0]):
+                return
+
+    def on_key(self, key: int) -> None:
+        if key in ENTER_KEYS + (pygame.K_RIGHT, pygame.K_LEFT):
+            self._open_list()
+
+    def on_mouse_down(self, pos: tuple[int, int]) -> None:
+        if self.control.collidepoint(pos):
+            self._open_list()
+
+    def handle_captured_event(self, event: pygame.event.Event) -> None:
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self._open = False
+            elif event.key == pygame.K_UP:
+                self._move_highlight(-1)
+            elif event.key == pygame.K_DOWN:
+                self._move_highlight(1)
+            elif event.key in ENTER_KEYS:
+                self._choose(self._highlight)
+        elif event.type == pygame.MOUSEMOTION:
+            for index in range(len(self.options)):
+                if self._item_rect(index).collidepoint(event.pos):
+                    self._highlight = index
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for index in range(len(self.options)):
+                if self._item_rect(index).collidepoint(event.pos):
+                    self._choose(index)
+                    return
+            self._open = False  # A click anywhere else closes the list.
+
+    def draw(self, surface: pygame.Surface, theme: Theme, focused: bool) -> None:
+        self.draw_row(surface, theme, focused)
+        control = self.control
+        current = dict(self.options).get(self._get(), "")
+        theme.text(
+            surface,
+            current,
+            "small",
+            theme.color("text" if self.enabled else "text_muted"),
+            (control.x + 14, control.centery),
+            "midleft",
+        )
+        x, y = control.right - 16, control.centery
+        # A chevron pointing down, or up while the list is open.
+        tilt = -3 if self._open else 3
+        pygame.draw.lines(
+            surface,
+            theme.color("text_muted"),
+            False,
+            [(x - 6, y - tilt), (x, y + tilt), (x + 6, y - tilt)],
+            2,
+        )
+
+    def draw_overlay(self, surface: pygame.Surface, theme: Theme) -> None:
+        if not self._open:
+            return
+        theme.draw_panel(surface, self._list_rect(surface.get_height()), radius=ROW_RADIUS)
+        for index, (value, label) in enumerate(self.options):
+            item = self._item_rect(index)
+            enabled = self._option_enabled(value)
+            if index == self._highlight and enabled:
+                pygame.draw.rect(surface, theme.color("button_hover"), item, border_radius=8)
+            selected = value == self._get()
+            color = theme.color("accent" if selected else "text" if enabled else "text_muted")
+            theme.text(surface, label, "small", color, (item.x + 10, item.centery), "midleft")
+
+
 class Menu:
     """A group of widgets sharing keyboard focus and mouse handling."""
 
@@ -301,7 +446,16 @@ class Menu:
             if self.widgets[self.focus].enabled:
                 return
 
+    @property
+    def captures_input(self) -> bool:
+        """True while a widget (an open dropdown) needs every event itself."""
+        return any(widget.captures_input for widget in self.widgets)
+
     def handle_event(self, event: pygame.event.Event) -> None:
+        for widget in self.widgets:
+            if widget.captures_input:
+                widget.handle_captured_event(event)
+                return
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_UP:
                 self._move_focus(-1)
@@ -327,6 +481,8 @@ class Menu:
     def draw(self, surface: pygame.Surface, theme: Theme) -> None:
         for index, widget in enumerate(self.widgets):
             widget.draw(surface, theme, index == self.focus)
+        for widget in self.widgets:  # Popped-over parts go on top of everything.
+            widget.draw_overlay(surface, theme)
 
 
 def stack(

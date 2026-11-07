@@ -7,11 +7,15 @@ from typing import TYPE_CHECKING
 import pygame
 
 from arena_ai.viewer.controllers import TRAINED, trained_available
-from arena_ai.viewer.settings import (
-    OPPONENT_OPTIONS,
-    save_settings,
+from arena_ai.viewer.settings import OPPONENT_OPTIONS, PLAYER_OPTIONS, save_settings
+from arena_ai.viewer.ui.widgets import (
+    Button,
+    Dropdown,
+    Menu,
+    Selector,
+    Slider,
+    Toggle,
 )
-from arena_ai.viewer.ui.widgets import Button, Menu, Selector, Slider, Toggle
 
 if TYPE_CHECKING:
     from arena_ai.viewer.app import App
@@ -42,11 +46,25 @@ class SettingsScene:
         def set_attr(name: str):
             return lambda value: setattr(settings, name, value)
 
-        # Make it obvious why the trained agent cannot be chosen.
-        opponent_options = [
-            (value, label + ("" if value != TRAINED or trained_ok else " (no checkpoint)"))
-            for value, label in OPPONENT_OPTIONS
-        ]
+        def with_note(options, suffix: str = ""):
+            """Label the trained-agent choice, and say why if it is unavailable."""
+            return [
+                (
+                    value,
+                    label
+                    + (suffix if value == TRAINED else "")
+                    + (" (no checkpoint)" if value == TRAINED and not trained_ok else ""),
+                )
+                for value, label in options
+            ]
+
+        def set_player(value: str) -> None:
+            settings.player = value
+            if value != "human" and settings.opponent == "none":
+                settings.opponent = "approach"  # An AI needs someone to fight.
+
+        def trained_plays() -> bool:
+            return trained_ok and TRAINED in (settings.player, settings.opponent)
         rows = [
             Slider("Music", lambda: settings.music_volume, set_music),
             Slider(
@@ -55,19 +73,27 @@ class SettingsScene:
                 set_effects,
                 on_release=lambda: app.audio.play("hit"),
             ),
-            Selector(
+            Dropdown(
+                "Player",
+                with_note(PLAYER_OPTIONS, " (watch)"),
+                lambda: settings.player,
+                set_player,
+                option_enabled=lambda value: value != TRAINED or trained_ok,
+            ),
+            Dropdown(
                 "Opponent",
-                opponent_options,
+                with_note(OPPONENT_OPTIONS),
                 lambda: settings.opponent,
                 set_attr("opponent"),
-                option_enabled=lambda value: value != TRAINED or trained_ok,
+                option_enabled=lambda value: (value != TRAINED or trained_ok)
+                and not (value == "none" and settings.player != "human"),
             ),
             Selector(
                 "Trained agent plays",
                 (("greedy", "Best move"), ("sampled", "Varied")),
                 lambda: "greedy" if settings.trained_greedy else "sampled",
                 lambda value: setattr(settings, "trained_greedy", value == "greedy"),
-                enabled_fn=lambda: settings.opponent == TRAINED and trained_ok,
+                enabled_fn=trained_plays,
             ),
             Toggle(
                 "Random starting positions",
@@ -82,7 +108,7 @@ class SettingsScene:
         ]
         self.back = Button("Back", self.close, primary=True)
         self.menu = Menu([*rows, self.back])
-        self._sections = [("Audio", rows[0:2]), ("Opponent", rows[2:5]), ("Display", rows[5:6])]
+        self._sections = [("Audio", rows[0:2]), ("Match", rows[2:6]), ("Display", rows[6:7])]
         self._layout()
 
     def _layout(self) -> None:
@@ -90,7 +116,7 @@ class SettingsScene:
         center_x = self.app.screen.get_width() // 2
         x = center_x - PANEL_WIDTH // 2 + 24
         width = PANEL_WIDTH - 48
-        y = 130
+        y = 102
         self._headers: list[tuple[str, int]] = []
         for title, rows in self._sections:
             self._headers.append((title.upper(), y))
@@ -102,7 +128,7 @@ class SettingsScene:
         self.back.rect = pygame.Rect(0, 0, 200, 50)
         self.back.rect.midtop = (center_x, y + 4)
         self.panel = pygame.Rect(
-            center_x - PANEL_WIDTH // 2, 112, PANEL_WIDTH, self.back.rect.bottom + 24 - 112
+            center_x - PANEL_WIDTH // 2, 84, PANEL_WIDTH, self.back.rect.bottom + 24 - 84
         )
 
     def close(self) -> None:
@@ -110,7 +136,8 @@ class SettingsScene:
         self.app.pop()
 
     def handle_event(self, event: pygame.event.Event) -> None:
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+        escape = event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
+        if escape and not self.menu.captures_input:  # Escape first closes a dropdown.
             self.close()
             return
         self.menu.handle_event(event)
@@ -122,7 +149,7 @@ class SettingsScene:
         theme = self.app.theme
         screen.fill(theme.color("background"))
         center_x = screen.get_width() // 2
-        theme.text(screen, "Settings", "heading", theme.color("text"), (center_x, 62), "center")
+        theme.text(screen, "Settings", "heading", theme.color("text"), (center_x, 44), "center")
         theme.draw_panel(screen, self.panel)
         for title, y in self._headers:
             theme.text(

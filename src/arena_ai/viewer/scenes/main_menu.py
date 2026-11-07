@@ -25,9 +25,10 @@ class MainMenuScene:
 
     def __init__(self, app: App) -> None:
         self.app = app
+        self.play = Button("Play", app.start_match, primary=True)
         self.menu = Menu(
             [
-                Button("Play", app.start_match, primary=True),
+                self.play,
                 Button("Settings", lambda: app.push(SettingsScene(app))),
                 Button("Quit", app.quit),
             ]
@@ -48,6 +49,8 @@ class MainMenuScene:
 
     def update(self, dt: float) -> None:
         self.tick += 1
+        # Settings can change while this scene sits underneath them.
+        self.play.label = "Play" if self.app.settings.player == "human" else "Watch"
 
     def _matchup_text(self) -> str:
         settings = self.app.settings

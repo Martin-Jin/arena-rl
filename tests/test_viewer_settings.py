@@ -13,7 +13,7 @@ import pygame
 from arena_ai.config import load_config
 from arena_ai.sim.state import create_initial_fighters
 from arena_ai.viewer.settings import load_settings, save_settings
-from arena_ai.viewer.ui.widgets import Button, Menu
+from arena_ai.viewer.ui.widgets import Button, Dropdown, Menu
 
 
 class ViewerSettingsTests(unittest.TestCase):
@@ -87,6 +87,41 @@ class MenuTests(unittest.TestCase):
         menu.handle_event(down)
         menu.handle_event(enter)
         self.assertEqual(clicked, ["c"])
+
+
+    def test_dropdown_opens_skips_disabled_options_and_selects(self) -> None:
+        chosen = {"value": "a"}
+        dropdown = Dropdown(
+            "Pick",
+            [("a", "A"), ("b", "B"), ("c", "C")],
+            lambda: chosen["value"],
+            lambda value: chosen.update(value=value),
+            option_enabled=lambda value: value != "b",
+        )
+        menu = Menu([dropdown])
+        press = lambda key: menu.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key))
+        press(pygame.K_RETURN)  # Open the list.
+        self.assertTrue(menu.captures_input)
+        press(pygame.K_DOWN)  # "b" is disabled, so the highlight lands on "c".
+        press(pygame.K_RETURN)
+        self.assertEqual(chosen["value"], "c")
+        self.assertFalse(menu.captures_input)
+
+    def test_escape_closes_an_open_dropdown_without_choosing(self) -> None:
+        chosen = {"value": "a"}
+        dropdown = Dropdown(
+            "Pick",
+            [("a", "A"), ("b", "B")],
+            lambda: chosen["value"],
+            lambda value: chosen.update(value=value),
+        )
+        menu = Menu([dropdown])
+        press = lambda key: menu.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key))
+        press(pygame.K_RETURN)
+        press(pygame.K_DOWN)
+        press(pygame.K_ESCAPE)
+        self.assertFalse(menu.captures_input)
+        self.assertEqual(chosen["value"], "a")
 
 
 if __name__ == "__main__":

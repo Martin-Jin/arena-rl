@@ -38,9 +38,12 @@ The viewer opens on a start menu with **Play**, **Settings** and **Quit**. Use t
 mouse, or the arrow keys with `Enter`. The settings menu has:
 
 - **Audio** — music and sound-effect volume.
-- **Opponent** — the trained agent (needs `checkpoints/latest.pt`, so run
-  training first), the scripted approach-and-attack fighter, an idle dummy, a
-  random fighter, or solo practice. The trained agent can play its best move or
+- **Player** — you, or the trained agent (the start button then reads **Watch**
+  and you spectate the agent fight the chosen opponent).
+- **Opponent** — a dropdown with the trained agent, the scripted
+  approach-and-attack fighter, an idle dummy, a random fighter, or solo practice
+  (not available while watching). The trained agent needs
+  `checkpoints/latest.pt`, so run training first. It can play its best move or
   sample varied moves.
 - **Random starting positions** and whether to show the controls hint.
 
