@@ -25,8 +25,7 @@ def surrogate_objective(
     advantages: torch.Tensor,
     clip_range: float,
 ) -> torch.Tensor:
-    """Return the mean clipped PPO surrogate objective over
-    all timesteps in one episode."""
+    """Return the mean clipped PPO surrogate objective over a rollout."""
     clipped_ratio = torch.clamp(prob_ratio, 1 - clip_range, 1 + clip_range)
     return torch.minimum(
         prob_ratio * advantages,
@@ -44,23 +43,34 @@ def advantage_estimation(
     rewards: torch.Tensor,
     values: torch.Tensor,
     next_values: torch.Tensor,
-    dones: torch.Tensor,
+    terminated: torch.Tensor,
     discount_factor: float,
     gae_lambda: float,
+    episode_ends: torch.Tensor | None = None,
 ) -> torch.Tensor:
-    """Calculate generalized advantage estimates for a rollout."""
+    """Calculate GAE for one or multiple environments.
+
+    ``terminated`` controls value bootstrapping. ``episode_ends`` additionally
+    cuts the recursive estimate at time-limit truncations.
+    """
+    if episode_ends is None:
+        episode_ends = terminated
     advantages = torch.zeros_like(rewards)
-    last_advantage = torch.zeros((), dtype=rewards.dtype, device=rewards.device)
+    last_advantage = torch.zeros_like(rewards[0])
     for t in reversed(range(len(rewards))):
-        # handle multiple episodes in a batch by zeroing out the
-        # advantage when the episode is done
-        not_done = 1 - dones[t].to(rewards.dtype)
+        not_terminated = 1 - terminated[t].to(rewards.dtype)
+        not_episode_end = 1 - episode_ends[t].to(rewards.dtype)
         # delta = r_t + gamma * V(s_{t+1}) * (1 - done) - V(s_t)
         # weighted sum of deltas with discounting and GAE lambda,
         # instead of a one step advantage
-        delta = rewards[t] + discount_factor * next_values[t] * not_done - values[t]
+        delta = (
+            rewards[t]
+            + discount_factor * next_values[t] * not_terminated
+            - values[t]
+        )
         last_advantage = (
-            delta + discount_factor * gae_lambda * not_done * last_advantage
+            delta
+            + discount_factor * gae_lambda * not_episode_end * last_advantage
         )
         advantages[t] = last_advantage
     # tensor of advantages for each time step per episode in the rollout
@@ -69,17 +79,42 @@ def advantage_estimation(
 
 def discounted_returns(
     rewards: torch.Tensor,
-    dones: torch.Tensor,
+    terminated: torch.Tensor,
     last_value: torch.Tensor,
     discount_factor: float,
+    episode_ends: torch.Tensor | None = None,
+    next_values: torch.Tensor | None = None,
 ) -> torch.Tensor:
-    """Calculate bootstrapped discounted returns for a rollout."""
+    """Calculate returns for one or multiple environments.
+
+    ``terminated`` controls value bootstrapping. ``episode_ends`` additionally
+    cuts the recursive return at time-limit truncations. Pass ``next_values``
+    when truncations can occur before the final rollout timestep.
+    """
+    if episode_ends is None:
+        episode_ends = terminated
     returns = torch.zeros_like(rewards)
     running_return = last_value
     for t in reversed(range(len(rewards))):
-        not_done = 1 - dones[t].to(rewards.dtype)
-        # r_t + gamma * R_{t+1} * (1 - done)
-        running_return = rewards[t] + discount_factor * running_return * not_done
+        not_terminated = 1 - terminated[t].to(rewards.dtype)
+        # A terminated state has no bootstrap value. At a truncation, use the
+        # value of the final observation rather than the reset episode.
+        if episode_ends[t].any() and next_values is None:
+            raise ValueError(
+                "next_values is required when returns include episode truncations"
+            )
+        if next_values is not None and episode_ends[t].any():
+            continuation = torch.where(
+                episode_ends[t],
+                next_values[t],
+                running_return,
+            )
+        else:
+            continuation = running_return
+        running_return = (
+            rewards[t]
+            + discount_factor * continuation * not_terminated
+        )
         returns[t] = running_return
     return returns
 

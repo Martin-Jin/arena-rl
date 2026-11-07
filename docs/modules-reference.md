@@ -43,6 +43,8 @@ The simulation layer is deterministic and independent of rendering. It must not 
 - `src/arena_ai/envs/arena_env.py` — Defines the shared abstract environment
   lifecycle: reset, step, observations, episode limits, and terminal status.
   It must remain headless and must not import `pygame`.
+- `src/arena_ai/envs/vector_env.py` — Runs independent headless environments
+  synchronously and auto-resets completed instances for batched collection.
 - `src/arena_ai/envs/training_envs/` — Contains concrete environments for
   training and scenario testing.
 - `src/arena_ai/envs/training_envs/one_v_one_env.py` — Implements the current
