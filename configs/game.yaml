@@ -11,7 +11,6 @@ fighter:
   move_speed_mps: 4.0
   jump_velocity_mps: 6.9
   height_m: 0.9
-  attack_max_frame: 30
   width_to_height_ratio: 0.3
 
 combat:
@@ -20,10 +19,12 @@ combat:
   attack_recovery_frames: 14
   attack_damage: 10
   attack_range_m: 0.8
+  # TODO: parry is not implemented yet; the two parry values are loaded but unused.
   parry_window_frames: 8
   parry_recovery_frames: 20
 
 observation:
+  # TODO: spec_version and reaction_delay_frames are loaded but not used yet.
   spec_version: 1
   reaction_delay_frames: 0
   max_observed_height_m: 1.3

@@ -11,13 +11,21 @@ This document describes the intended purpose of each module and project director
 ## Configuration
 
 - `configs/` — Stores the YAML files read by the global configuration loader.
-- `configs/game.yaml` — Defines gameplay and observation constants, including damage, cooldowns, parry timing, fighter dimensions, and arena dimensions.
-- `configs/agent.yaml` — Defines neural-network settings for the agent and
-  training-loop defaults, including hidden-layer sizes, rollout length, and
-  checkpoint interval.
-- `configs/scoring.yaml` — Defines reward scales and terminal win/loss rewards
-  used by training environments.
-- `src/arena_ai/config.py` — Loads all YAML files from `configs/` and exposes the typed game settings plus the agent settings.
+- `configs/game.yaml` — Defines gameplay and observation constants, including
+  attack timing and damage, fighter dimensions, arena dimensions and the
+  observation scaling limits. The parry frame counts and the observation
+  `spec_version` and `reaction_delay_frames` values are loaded but not used by
+  the simulation yet.
+- `configs/agent.yaml` — Defines neural-network settings, PPO hyperparameters
+  and training-loop defaults, including hidden-layer sizes, rollout length,
+  checkpoint interval, number of parallel environments and spawn
+  randomization.
+- `configs/scoring.yaml` — Defines reward scales, terminal win/loss rewards and
+  the wall-proximity penalty used by training environments.
+- `configs/viewer.yaml` — Defines viewer display, animation timing, audio,
+  health UI, end-screen, and asset settings.
+- `src/arena_ai/config.py` — Loads all YAML files from `configs/` into one typed
+  `Config` object (game, agent, training, scoring and viewer settings).
 
 ## Core package
 
@@ -34,9 +42,9 @@ The simulation layer is deterministic and independent of rendering. It must not 
 - `src/arena_ai/sim/observation_vector.py` — Flattens observations into a
   fixed ordered and normalized vector whose layout matches the network input.
   It exposes the derived observation size so the network does not duplicate it
-  in configuration. Position, velocity, and health features are scaled using
-  the game configuration's fixed observation limits. Each fighter also
-  contributes grounded and facing-direction features.
+  in configuration. Each fighter contributes eight features, scaled using the
+  game configuration's fixed observation limits. See
+  [`docs/simulation-spec.md`](simulation-spec.md) for the exact order.
 - `src/arena_ai/sim/rules.py` — Implements state transitions, damage calculation, and collision handling.
 
 ### Environments
@@ -45,14 +53,16 @@ The simulation layer is deterministic and independent of rendering. It must not 
 - `src/arena_ai/envs/arena_env.py` — Defines the shared abstract environment
   lifecycle: reset, step, observations, episode limits, and terminal status.
   It must remain headless and must not import `pygame`.
-- `src/arena_ai/envs/reward.py` — Calculates the learner's per-step reward (damage, terminal outcomes, and wall-proximity penalty) as a pure function of fighter state and scoring config.
+- `src/arena_ai/envs/reward.py` — Calculates the learner's per-step reward
+  (damage, terminal outcomes, and wall-proximity penalty) as a pure function of
+  fighter state and scoring config.
 - `src/arena_ai/envs/vector_env.py` — Runs independent headless environments
   synchronously and auto-resets completed instances for batched collection.
 - `src/arena_ai/envs/training_envs/` — Contains concrete environments for
   training and scenario testing.
 - `src/arena_ai/envs/training_envs/one_v_one_env.py` — Implements the current
   one-learning-agent versus one-opponent scenario, including its initial
-  fighters and opponent policy.
+  fighters (optionally randomized spawn positions) and opponent policy.
 
 ### Agents
 
@@ -60,26 +70,25 @@ The simulation layer is deterministic and independent of rendering. It must not 
 - `src/arena_ai/agents/action.py` — Defines the fixed discrete action encoding
   (movement, jump, and attack combinations), derives its action count, converts
   a policy index into a `FighterAction`, and maps input parts back to an index.
-  including `ATTACK`, derives its action count, and converts a policy index
-  into a `FighterAction`.
-- `src/arena_ai/agents/scripted.py` — Controls the non-learning opponent with a
-  deterministic approach-and-attack baseline policy.
-- `src/arena_ai/agents/policy.py` — Defines the current PyTorch networks and
-  their configurable hidden-layer structure. The policy and value networks are
-  separate. Input and output sizes are derived from the observation and action
-  codecs.
-- `src/arena_ai/agents/policy.py` — Converts fixed observation vectors into
-  action probabilities, samples actions during training, and selects greedy
-  actions during evaluation.
-- `src/arena_ai/agents/training.py` — Reserved for the agent training workflow; implementation is not yet complete.
+  It also defines the factored move/jump/attack head layout used by the
+  network.
+- `src/arena_ai/agents/distribution.py` — Implements `FactoredCategorical`,
+  independent move, jump and attack distributions that sample, score and
+  report the entropy of a flat action index.
+- `src/arena_ai/agents/scripted.py` — Provides the non-learning opponents in
+  the `OPPONENTS` registry: a deterministic approach-and-attack policy, an idle
+  policy and a uniformly random policy.
+- `src/arena_ai/agents/policy.py` — Defines the PyTorch `ActorCritic` module
+  with separate, configurable policy and value networks (input and output sizes
+  come from the observation and action codecs), and `PolicyAdapter`, which
+  samples actions and estimates values for rollouts from a CPU copy of the
+  network that is synchronized after each update.
 
 ### Training
 
 - `src/arena_ai/training/` — Contains the first learner-versus-scripted-opponent
   workflow and later self-play, fine-tuning, curriculum, and opponent-pool
   workflows.
-- `src/arena_ai/envs/arena_env.py` — Calculates terminal and shaping rewards
-  from the learner's perspective.
 - `src/arena_ai/training/rollout.py` — Stores observations, actions, rewards,
   termination flags, and policy values/log probabilities collected from rollouts.
 - `src/arena_ai/training/ppo.py` — Calculates GAE and bootstrapped critic
@@ -91,9 +100,9 @@ The simulation layer is deterministic and independent of rendering. It must not 
   updates, checkpoint callbacks, and training metrics. See
   [`docs/training-process.md`](training-process.md) for the complete current
   process and data flow.
-- `scripts/run_training.py` — Wires the model, optimizer, one-versus-one environment,
-  PPO update callback, and checkpoint callback into the runnable training
-  command.
+- `scripts/run_training.py` — Wires the model, optimizer, environments (each
+  parallel environment gets the next opponent from `OPPONENTS` in turn), PPO
+  update callback, and checkpoint callback into the runnable training command.
 
 ### Viewer
 
@@ -101,6 +110,8 @@ The viewer layer is the only layer intended to depend on `pygame`.
 
 - `src/arena_ai/viewer/` — Provides rendering and interactive display functionality.
 - `src/arena_ai/viewer/game.py` — Runs the interactive pygame game loop.
+- `src/arena_ai/viewer/animation.py` — Loads the configured sprite animations,
+  scales them to the fighter hitbox and draws a fighter for its current state.
 - `src/arena_ai/viewer/training.py` — Renders accelerated training simulation
   steps when training visualization is enabled.
 - `src/arena_ai/viewer/audio.py` — Loads configured music and sound effects
@@ -111,7 +122,7 @@ The viewer layer is the only layer intended to depend on `pygame`.
 
 ### Utilities
 
-- `src/arena_ai/utils/` — Contains shared supporting functionality for logging, random seeding, and replay recording.
+- `src/arena_ai/utils/` — Planned home for logging, random seeding, and replay recording. It is empty for now.
 
 ## Assets
 
@@ -127,18 +138,18 @@ The viewer layer is the only layer intended to depend on `pygame`.
 - `assets/audio/effects/` — Stores one-shot and looping fighter sound effects
   for attacks, movement, jumping, landing, and hits.
 - `assets/audio/music/` — Stores looping battle music.
-- `configs/viewer.yaml` — Defines viewer display, animation timing, audio,
-  health UI, end-screen, and asset settings.
 - `assets/fonts/` — Stores fonts used by the user interface.
 
 ## Entry points
 
 - `src/arena_ai/viewer/game.py` — Current interactive pygame game loop.
-- Command-line scripts for training and evaluation are planned under `scripts/`.
+- `scripts/run_training.py` — Runs headless PPO training.
+- Evaluation and play scripts are planned under `scripts/`.
 
 ## Tests
 
-- `tests/` — Reserved for automated tests organized to mirror the source package.
+- `tests/` — Automated `unittest` tests. Run them with
+  `py -m unittest discover -s tests`.
 - Determinism and simulation-rule tests are planned as the simulation grows.
 
 ## Documentation and experiments
@@ -146,6 +157,9 @@ The viewer layer is the only layer intended to depend on `pygame`.
 - `notebooks/` — Contains exploratory analysis, experiments, and visualizations.
 - `docs/` — Contains project specifications and reference documentation.
 - `docs/modules-reference.md` — Describes the current and planned responsibility of each project module and directory.
+- `docs/simulation-spec.md` — Documents the action set, observation layout, rewards and timing.
+- `docs/training-process.md` — Documents the training loop and PPO data flow.
+- `docs/setup.md` — Documents installation.
 
 ## Generated and runtime data
 

@@ -17,10 +17,6 @@ def probability_ratio(
     return torch.exp(new_log_probs - old_log_probs)
 
 
-# Keep the original misspelling as a compatibility alias.
-probabilty_ratio = probability_ratio
-
-
 def surrogate_objective(
     prob_ratio: torch.Tensor,
     advantages: torch.Tensor,

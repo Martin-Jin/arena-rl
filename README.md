@@ -34,16 +34,17 @@ Start the manual viewer from the repository root:
 py -m arena_ai.viewer.game
 ```
 
-To play against the trained agent, first run training so
-`checkpoints/latest.pt` exists, then set `PLAY_AGAINST_TRAINED_AGENT = True`
-near the top of [`src/arena_ai/viewer/game.py`](src/arena_ai/viewer/game.py).
-Leave `VIEW_OPPONENT = True`. The trained opponent uses greedy action
-selection from the latest checkpoint.
+The viewer is configured by constants near the top of
+[`src/arena_ai/viewer/game.py`](src/arena_ai/viewer/game.py):
 
-The viewer starts with a scripted opponent enabled. To run the single-fighter
-practice mode instead, set `VIEW_OPPONENT = False` near the top of
-[`src/arena_ai/viewer/game.py`](src/arena_ai/viewer/game.py). The opponent uses
-the same animated sprite frames as the learner with a light-red tint.
+- `PLAY_AGAINST_TRAINED_AGENT = True` makes the opponent use greedy action
+  selection from `checkpoints/latest.pt`, so run training first. Set it to
+  `False` to fight the scripted approach-and-attack opponent instead.
+- `VIEW_OPPONENT = False` runs the single-fighter practice mode. It cannot be
+  combined with `PLAY_AGAINST_TRAINED_AGENT = True`.
+
+The opponent uses the same animated sprite frames as the learner with a
+light-red tint.
 
 Controls:
 
@@ -60,12 +61,17 @@ Controls:
   fighter state, rules, observations, and stepping.
 - [`src/arena_ai/viewer/`](src/arena_ai/viewer/) — pygame rendering, input,
   and animation loading.
+- [`scripts/`](scripts/) — runnable entry points (currently training).
+- [`tests/`](tests/) — automated tests.
 - [`configs/viewer.yaml`](configs/viewer.yaml) — viewer display, animation,
   audio volume, normalization, and fade settings.
 - [`src/arena_ai/agents/`](src/arena_ai/agents/) — agent and policy modules.
 - [`src/arena_ai/envs/`](src/arena_ai/envs/) — environment wrappers.
 - [`src/arena_ai/training/`](src/arena_ai/training/) — rollout, PPO,
-  checkpoint, reward, and training modules.
+  checkpoint, and training-loop modules. Rewards live in
+  [`src/arena_ai/envs/reward.py`](src/arena_ai/envs/reward.py).
+- [`docs/simulation-spec.md`](docs/simulation-spec.md) — action set,
+  observation layout, rewards, and timing.
 - [`docs/training-process.md`](docs/training-process.md) — current training
   loop, PPO data flow, bootstrapping, and training metrics.
 - [`assets/sprites/fighter/`](assets/sprites/fighter/) — active animation
@@ -88,14 +94,17 @@ py scripts/run_training.py
 
 Press `Ctrl+C` to stop training. The latest in-memory model, optimizer, and
 completed training state are saved to `checkpoints/latest.pt` before the script
-exits.
+exits. A checkpoint is also saved, and a metrics line printed, every
+`checkpoint_interval` iterations.
 
 Training automatically uses CUDA when PyTorch detects a CUDA-capable GPU and
 falls back to the CPU otherwise. Set `TRAINING_DEVICE = "cpu"` or
 `TRAINING_DEVICE = "cuda"` in [`scripts/run_training.py`](scripts/run_training.py)
-to override the default. The neural-network inference, PPO tensors, and
-optimizer updates run on the selected device; the deterministic game simulation
-and pygame visualization remain CPU-bound.
+to override the default. PPO tensors and optimizer updates run on the selected
+device. Per-step action selection and value estimates during rollouts run on a
+CPU copy of the network that is synchronized after each update, because the
+network is small and per-step GPU transfers would be slower. The deterministic
+game simulation and pygame visualization are also CPU-bound.
 
 To visualize training, set `VISUALIZE_TRAINING = True` near the top of
 [`scripts/run_training.py`](scripts/run_training.py). The viewer renders every
@@ -131,7 +140,8 @@ The source audio files are not modified by normalization or fades.
 The project requires Python 3.10 or newer. The current correctness check is:
 
 ```powershell
-py -m compileall assets src tests
+py -m compileall src tests scripts
+py -m unittest discover -s tests
 ```
 
 The simulation is intentionally independent of pygame so it can be used

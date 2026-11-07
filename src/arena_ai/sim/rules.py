@@ -23,11 +23,7 @@ def step_fighter(
     if f.attack_frame:
         f.attack_frame += 1
         # Reset the attack state after the full attack animation has completed.
-        if f.attack_frame > (
-            combat.attack_windup_frames
-            + combat.attack_active_frames
-            + combat.attack_recovery_frames
-        ):
+        if f.attack_frame > combat.attack_total_frames:
             f.attack_frame = 0
             f.attack_hit = False
     elif attack:

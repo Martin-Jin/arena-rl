@@ -19,11 +19,6 @@ class RolloutBatch:
     next_values: torch.Tensor
 
     @property
-    def dones(self) -> torch.Tensor:
-        """Return natural terminal flags used to stop value bootstrapping."""
-        return self.terminated
-
-    @property
     def episode_ends(self) -> torch.Tensor:
         """Return flags for both natural ends and time-limit truncations."""
         return torch.logical_or(self.terminated, self.truncated)

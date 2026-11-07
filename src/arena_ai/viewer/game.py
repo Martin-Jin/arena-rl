@@ -5,7 +5,7 @@
 import pygame
 import torch
 
-from arena_ai.agents.action import to_fighter_action
+from arena_ai.agents.action import from_parts, to_fighter_action
 from arena_ai.agents.distribution import FactoredCategorical
 from arena_ai.agents.policy import ActorCritic
 from arena_ai.config import load_config
@@ -14,10 +14,9 @@ from arena_ai.sim.observation import get_observation
 from arena_ai.sim.observation_vector import encode_observation
 from arena_ai.sim.simulate import step_game
 from arena_ai.sim.state import FighterState, create_initial_fighters
-from arena_ai.viewer.annimation import draw_fighter
+from arena_ai.viewer.animation import draw_fighter
 from arena_ai.viewer.audio import AudioManager
 from arena_ai.training.checkpoints import load_checkpoint
-from arena_ai.agents.action import from_parts, to_fighter_action
 
 # Switch this to False to run the original single-fighter practice viewer.
 VIEW_OPPONENT = True
@@ -221,7 +220,7 @@ while running:
     #   D: move right
     #   SPACE or LEFT MOUSE: attack
     keys = pygame.key.get_pressed()
-    # -1 for right, 0 for no movement, 1 for left
+    # -1 for left, 0 for no movement, 1 for right
     move_dir = 0 if game_over else int(keys[pygame.K_d]) - int(keys[pygame.K_a])
     if move_dir and move_dir != last_move_dir:
         turn_timer = 6
@@ -238,19 +237,18 @@ while running:
             "agent": to_fighter_action(from_parts(move_dir, jump, attack)),
         }
         if VIEW_OPPONENT:
-            structured = get_observation(
-                agent,
-                {"opponent": fighters["opponent"]},
-                config,
-            )
-            opponent_action = (
-                trained_opponent_action()
-                if PLAY_AGAINST_TRAINED_AGENT
-                else approach_and_attack(
+            if PLAY_AGAINST_TRAINED_AGENT:
+                opponent_action = trained_opponent_action()
+            else:
+                structured = get_observation(
+                    agent,
+                    {"opponent": fighters["opponent"]},
+                    config,
+                )
+                opponent_action = approach_and_attack(
                     encode_observation(structured, config),
                     config,
                 )
-            )
             actions["opponent"] = to_fighter_action(opponent_action)
         was_on_ground = agent.on_ground
         previous_attack_frame = agent.attack_frame

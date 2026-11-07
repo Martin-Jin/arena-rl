@@ -7,25 +7,28 @@ from arena_ai.sim.state import FighterState
 
 
 class VectorObservation(TypedDict):
+    """Stores the position or velocity of a fighter."""
+
     x: float
     y: float
-    """Stores the position and velocity of a fighter."""
 
 
 class FighterObservation(TypedDict):
+    """Stores the observation of a single fighter."""
+
     position: VectorObservation
     velocity: VectorObservation
     on_ground: bool
     facing_dir: int
     health: int
     attack_frame: int
-    """Stores the observation of a single fighter."""
 
 
 class Observation(TypedDict):
+    """Stores the observation of the game state."""
+
     agent: FighterObservation
     opponents: dict[str, FighterObservation]
-    """Stores the observation of the game state."""
 
 
 def _fighter_observation(fighter: FighterState) -> FighterObservation:

@@ -17,7 +17,7 @@ policy:
   entropy_coef: 0.01 # coefficient for entropy in the total loss function
 
 training:
-  iterations: 600 # rollout-and-update cycles, not episodes: each collects rollout_steps steps
+  iterations: 1000 # rollout-and-update cycles, not episodes: each collects rollout_steps steps
   rollout_steps: 512 # transitions collected before each policy update
   checkpoint_interval: 100 # iterations between checkpoint saves
   seed: null # optional seed for the initial environment reset

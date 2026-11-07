@@ -17,6 +17,14 @@ defines:
 - `seed` — optional seed for the initial environment reset.
 - `num_envs` — number of independent environments collected synchronously in
   parallel. Set it to `1` for the scalar environment path.
+- `randomize_spawns` — start each episode with random fighter positions.
+
+Episodes are also truncated after `sim_hz * 10` steps (10 simulated seconds).
+
+When `num_envs` is greater than one, environment `i` uses opponent
+`i % len(OPPONENTS)` from [`scripted.py`](../src/arena_ai/agents/scripted.py)
+(approach-and-attack, idle, random). With one environment the
+approach-and-attack opponent is used.
 
 An iteration is not an episode. A rollout collects exactly `rollout_steps`
 transitions, resetting the environment whenever an episode terminates or is
@@ -54,7 +62,7 @@ flowchart TD
         K --> L["ArenaEnv.step()"]
         L --> M["Convert action to FighterAction"]
         M --> N["step_game(): advance simulation and resolve hits"]
-        N --> O["calculate_reward(): damage and terminal rewards"]
+        N --> O["calculate_reward(): damage, terminal and wall-penalty rewards"]
         O --> P["Evaluate next_value before any reset"]
         P --> Q{"terminated or truncated?"}
         Q -- "No" --> R["Store transition in Rollout"]
@@ -98,8 +106,11 @@ inference under `torch.no_grad()`. The acting interface is intentionally
 separate from the PPO forward interface:
 
 - `policy.act(observation)` returns a Python `int` action and Python `float`
-  log-probability.
-- `policy.value(observation)` returns a Python `float` critic estimate.
+  log-probability. With a batch of observations it returns lists of each.
+- `policy.value(observation)` returns a Python `float` critic estimate (a list
+  for a batch).
+- `PolicyAdapter` runs both on a CPU copy of the network and refreshes it with
+  `sync()` after every PPO update.
 - The PPO update callback can use its own callable network interface returning
   `(logits, values)` for [`train_step`](../src/arena_ai/training/ppo.py).
 
@@ -142,7 +153,8 @@ environment adds `info["winner"]` at natural episode termination:
 - `"opponent"` when the learner is defeated.
 - `None` for non-terminal steps and truncations.
 
-The loop accumulates rewards for the current episode. When an episode ends, it
+The reward is defined in [`docs/simulation-spec.md`](simulation-spec.md). The
+loop accumulates rewards for the current episode. When an episode ends, it
 records the completed return and increments the episode count. It increments
 the win count only when `info["winner"] == "agent"`. The metrics exposed after
 each update include:
@@ -150,7 +162,10 @@ each update include:
 - `episode_return` — the most recently completed episode return.
 - `win_rate` — cumulative learner wins divided by completed episodes.
 - `episodes` and `wins` — cumulative counts.
-- PPO loss metrics returned by the update callback.
+- PPO loss metrics returned by the update callback (`loss`, `policy_loss`,
+  `value_loss` and `entropy`, from the last minibatch of the update).
+
+`scripts/run_training.py` prints these metrics each time it saves a checkpoint.
 
 An iteration may end mid-episode, so an incomplete episode is not counted until
 the environment reports termination or truncation.

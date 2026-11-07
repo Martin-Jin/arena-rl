@@ -7,7 +7,7 @@ import torch
 
 from arena_ai.agents.policy import ActorCritic, PolicyAdapter
 from arena_ai.agents.scripted import OPPONENTS
-from arena_ai.config import Config, TrainingConfig, load_config
+from arena_ai.config import Config, load_config
 from arena_ai.envs.training_envs.one_v_one_env import OneVOneEnv
 from arena_ai.envs.vector_env import VectorEnv
 from arena_ai.training.checkpoints import save_checkpoint
@@ -155,16 +155,10 @@ def run_training(config: Config | None = None) -> TrainingState:
         device=device,
     )
     try:
-        state = loop.run(
-            TrainingConfig(
-                iterations=config.training.iterations,
-                rollout_steps=config.training.rollout_steps,
-                checkpoint_interval=config.training.checkpoint_interval,
-                seed=config.training.seed,
-                num_envs=config.training.num_envs,
-            )
-        )
-        checkpoint(state)
+        state = loop.run(config.training)
+        # The loop already saved this iteration if it fell on the interval.
+        if state.iteration % config.training.checkpoint_interval:
+            checkpoint(state)
     except KeyboardInterrupt:
         # Preserve the latest model even when training is stopped between
         # configured checkpoint intervals.

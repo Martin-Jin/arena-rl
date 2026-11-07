@@ -45,7 +45,7 @@ _FIGHTER_ACTIONS: dict[Action, FighterAction] = {
 
 # Head 0: index -> move_dir. The only place the move ordering is defined.
 MOVE_DIRS = (0, -1, 1)
-# Head order: move, jump, attack.
+# Head order: move (none/left/right), jump, attack.
 HEAD_SIZES = (len(MOVE_DIRS), 2, 2)
 LOGIT_COUNT = sum(HEAD_SIZES)
 # Mixed-radix strides, e.g. (3, 2, 2) -> (1, 3, 6).
@@ -70,17 +70,6 @@ assert all(
     int(a) == encode_parts((MOVE_DIRS.index(fa.move_dir), int(fa.jump), int(fa.attack)))
     for a, fa in _FIGHTER_ACTIONS.items()
 )
-# Independent heads: move (none/left/right), jump, attack.
-HEAD_SIZES = (3, 2, 2)
-LOGIT_COUNT = sum(HEAD_SIZES)
-
-# Guard: flat index must equal move + 3*jump + 6*attack.
-_MOVE_INDEX = {0: 0, -1: 1, 1: 2}
-assert all(
-    int(a) == _MOVE_INDEX[fa.move_dir] + 3 * fa.jump + 6 * fa.attack
-    for a, fa in _FIGHTER_ACTIONS.items()
-)
-
 # Reverse lookup so human input maps to the same indices the policy uses.
 _ACTION_FROM_PARTS: dict[tuple[int, bool, bool], int] = {
     (fa.move_dir, fa.jump, fa.attack): int(action)

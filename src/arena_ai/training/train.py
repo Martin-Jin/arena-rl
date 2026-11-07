@@ -10,7 +10,7 @@ from typing import Protocol
 
 import torch
 
-from arena_ai.config import TrainingConfig, load_config
+from arena_ai.config import TrainingConfig
 from arena_ai.envs.arena_env import ArenaEnv
 from arena_ai.envs.vector_env import VectorEnv
 from arena_ai.training.rollout import Rollout, RolloutBatch
@@ -41,6 +41,8 @@ class UpdatePolicy(Protocol):
         next_values: torch.Tensor,
     ) -> Mapping[str, float]:
         """Compute advantages/returns and update the actor and critic."""
+
+
 # A function that saves a checkpoint given the current training state.
 SaveCheckpoint = Callable[["TrainingState"], None]
 StepCallback = Callable[[ArenaEnv], None]
@@ -182,7 +184,7 @@ class TrainingLoop:
         observations: list[list[float]],
         steps: int,
     ) -> tuple[RolloutBatch, list[list[float]], list[float]]:
-        """Collect one rollout step from every environment in each iteration."""
+        """Collect ``steps`` synchronous steps from every environment in the batch."""
         if not isinstance(self.environment, VectorEnv):
             raise TypeError("vector rollouts require a VectorEnv")
         environment_count = self.environment.num_envs
@@ -323,23 +325,3 @@ class TrainingLoop:
                 self.save_checkpoint(self.state)
         # Return the final training state after all iterations are complete.
         return self.state
-
-
-def train(
-    environment_factory: Callable[[], ArenaEnv],
-    policy: Policy,
-    update_policy: UpdatePolicy,
-    config: TrainingConfig | None = None,
-    *,
-    save_checkpoint: SaveCheckpoint | None = None,
-    step_callback: StepCallback | None = None,
-) -> TrainingState:
-    """Build and run a training loop for one learner-versus-opponent environment."""
-    loop = TrainingLoop(
-        environment_factory(),
-        policy,
-        update_policy,
-        save_checkpoint=save_checkpoint,
-        step_callback=step_callback,
-    )
-    return loop.run(config or load_config().training)

@@ -27,7 +27,7 @@ def _fighter_vector(
     fighter: Mapping[str, object],
     config: Config,
 ) -> list[float]:
-    """Encode one fighter's position, velocity, and grounded state."""
+    """Encode one fighter's state as ``FEATURES_PER_FIGHTER`` normalized values."""
     position = fighter["position"]
     velocity = fighter["velocity"]
     if not isinstance(position, Mapping) or not isinstance(velocity, Mapping):
@@ -36,7 +36,7 @@ def _fighter_vector(
     fighter_config = config.game.fighter
     observation_config = config.game.observation
 
-    # Order: normalized x, y, vx, vy, on_ground, facing_dir, health.
+    # Order: x, y, vx, vy, on_ground, facing_dir, health, attack_frame.
     return [
         _normalize(float(position["x"]), world.arena_width_m),
         _normalize(
@@ -48,7 +48,9 @@ def _fighter_vector(
         float(bool(fighter["on_ground"])),
         float(fighter["facing_dir"]),
         _normalize(float(fighter["health"]), fighter_config.max_health),
-        _normalize(float(fighter["attack_frame"]), fighter_config.attack_max_frame),
+        _normalize(
+            float(fighter["attack_frame"]), config.game.combat.attack_total_frames
+        ),
     ]
 
 

@@ -28,5 +28,5 @@ class FactoredCategorical:
         return sum(head.log_prob(part) for head, part in zip(self.heads, parts))
 
     def entropy(self) -> torch.Tensor:
-        """Return the mean entropy of the factored distribution."""
+        """Return the joint entropy (sum over the independent heads)."""
         return sum(head.entropy() for head in self.heads)

@@ -79,6 +79,8 @@ def draw_fighter(
         animation_tick = 0
     # TODO: Use the simulation's support-contact state here once platforms
     # exist; airborne animation should depend on contact, not floor height.
+    # TODO: "falling" is not in viewer.yaml yet, so airborne fighters currently
+    # fall back to the idle animation.
     elif not fighter.on_ground:
         falling_animation = anims.get("falling")
         animation_name = (

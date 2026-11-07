@@ -26,7 +26,6 @@ class FighterConfig:
     move_speed_mps: float
     jump_velocity_mps: float
     height_m: float
-    attack_max_frame: int
     width_to_height_ratio: float
 
     @property
@@ -44,6 +43,15 @@ class CombatConfig:
     attack_range_m: float
     parry_window_frames: int
     parry_recovery_frames: int
+
+    @property
+    def attack_total_frames(self) -> int:
+        """Length of a full swing: wind-up, active and recovery frames."""
+        return (
+            self.attack_windup_frames
+            + self.attack_active_frames
+            + self.attack_recovery_frames
+        )
 
 
 @dataclass(frozen=True)
@@ -279,6 +287,8 @@ def load_config(config_dir: str | Path | None = None) -> Config:
     raw_configs = {path.stem: _load_yaml(path) for path in files}
     if "game" not in raw_configs:
         raise FileNotFoundError(f"Missing game.yaml in {config_path}")
+    if "agent" not in raw_configs:
+        raise FileNotFoundError(f"Missing agent.yaml in {config_path}")
     if "scoring" not in raw_configs:
         raise FileNotFoundError(f"Missing scoring.yaml in {config_path}")
     if "viewer" not in raw_configs:

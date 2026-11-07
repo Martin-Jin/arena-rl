@@ -60,7 +60,7 @@ def approach_and_attack(
         return int(move_toward)
 
     # In horizontal reach of the hitbox (center to front edge + range).
-    if forward <= fighter_width + attack_range:
+    if forward <= reach:
         if abs(dy) < fighter_height:
             return int(Action.ATTACK)
         if dy > 0 and self_on_ground:
