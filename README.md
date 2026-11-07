@@ -62,6 +62,20 @@ Controls:
 | `Space` or left mouse button       | Attack     |
 | `Esc` or `P`                       | Pause      |
 
+## Documentation
+
+- [`docs/setup.md`](docs/setup.md) — install the project, with CPU and NVIDIA
+  CUDA options, and run the viewer. Open it first on a new machine.
+- [`docs/simulation-spec.md`](docs/simulation-spec.md) — the action set,
+  observation layout, rewards and timing. Open it before changing the
+  simulation or anything a checkpoint depends on.
+- [`docs/training-process.md`](docs/training-process.md) — the training loop, PPO
+  data flow, bootstrapping, resuming a run and the printed training statistics.
+- [`docs/hardware.md`](docs/hardware.md) — which training steps run on the CPU or
+  GPU, and why.
+- [`docs/modules-reference.md`](docs/modules-reference.md) — what every module and
+  folder is for. Open it to find where code belongs.
+
 ## Project layout
 
 - [`src/arena_ai/sim/`](src/arena_ai/sim/) — deterministic simulation,
@@ -77,15 +91,11 @@ Controls:
 - [`src/arena_ai/training/`](src/arena_ai/training/) — rollout, PPO,
   checkpoint, and training-loop modules. Rewards live in
   [`src/arena_ai/envs/reward.py`](src/arena_ai/envs/reward.py).
-- [`docs/simulation-spec.md`](docs/simulation-spec.md) — action set,
-  observation layout, rewards, and timing.
-- [`docs/training-process.md`](docs/training-process.md) — current training
-  loop, PPO data flow, bootstrapping, and training metrics.
 - [`assets/sprites/fighter/`](assets/sprites/fighter/) — active animation
   frames.
 - [`assets/sprites/fighter/deferred/`](assets/sprites/fighter/deferred/) —
   preserved source sheets and animations not yet connected to game actions.
-- [`docs/`](docs/) — module and design reference documentation.
+- [`docs/`](docs/) — project documentation, indexed below.
 
 ## Training
 
