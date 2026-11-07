@@ -57,6 +57,10 @@ def advantage_estimation(
         episode_ends = terminated
     advantages = torch.zeros_like(rewards)
     last_advantage = torch.zeros_like(rewards[0])
+    # We iterate backwards through the rollout to compute the advantage estimates
+    # recursively. Backward iteration is necessary because the advantage at time t
+    # depends on the advantage at time t+1, which is computed in the previous iteration
+    # of the loop.
     for t in reversed(range(len(rewards))):
         not_terminated = 1 - terminated[t].to(rewards.dtype)
         not_episode_end = 1 - episode_ends[t].to(rewards.dtype)
@@ -64,13 +68,10 @@ def advantage_estimation(
         # weighted sum of deltas with discounting and GAE lambda,
         # instead of a one step advantage
         delta = (
-            rewards[t]
-            + discount_factor * next_values[t] * not_terminated
-            - values[t]
+            rewards[t] + discount_factor * next_values[t] * not_terminated - values[t]
         )
         last_advantage = (
-            delta
-            + discount_factor * gae_lambda * not_episode_end * last_advantage
+            delta + discount_factor * gae_lambda * not_episode_end * last_advantage
         )
         advantages[t] = last_advantage
     # tensor of advantages for each time step per episode in the rollout
@@ -85,7 +86,13 @@ def discounted_returns(
     episode_ends: torch.Tensor | None = None,
     next_values: torch.Tensor | None = None,
 ) -> torch.Tensor:
-    """Calculate returns for one or multiple environments.
+    """Calculate returns (critic targets) for one or multiple environments. The return is
+    the discounted sum of all future rewards.
+    This is used by the critic loss function, which is the mean squared error between the
+    predicted value function and the return.
+
+    The ``last_value`` is the value function of the last observation in the rollout,
+    which is used for bootstrapping the return.
 
     ``terminated`` controls value bootstrapping. ``episode_ends`` additionally
     cuts the recursive return at time-limit truncations. Pass ``next_values``
@@ -97,24 +104,26 @@ def discounted_returns(
     running_return = last_value
     for t in reversed(range(len(rewards))):
         not_terminated = 1 - terminated[t].to(rewards.dtype)
+        truncated_now = episode_ends[t] & ~terminated[t]
         # A terminated state has no bootstrap value. At a truncation, use the
         # value of the final observation rather than the reset episode.
-        if episode_ends[t].any() and next_values is None:
+        if truncated_now.any() and next_values is None:
             raise ValueError(
                 "next_values is required when returns include episode truncations"
             )
-        if next_values is not None and episode_ends[t].any():
+        if next_values is not None and truncated_now.any():
+            # continuation is the value to use for bootstrapping the return. If the episode
+            # was truncated, use the value of the next state. If it was terminated, use
+            # the running return (which is zero for a terminated state). If it was neither,
+            # use the running return (which is the discounted sum of future rewards).
             continuation = torch.where(
-                episode_ends[t],
+                truncated_now,
                 next_values[t],
                 running_return,
             )
         else:
             continuation = running_return
-        running_return = (
-            rewards[t]
-            + discount_factor * continuation * not_terminated
-        )
+        running_return = rewards[t] + discount_factor * continuation * not_terminated
         returns[t] = running_return
     return returns
 
