@@ -76,12 +76,12 @@ class MainMenuScene:
             "center",
         )
         self.menu.draw(screen, theme)
-        theme.text(
+        theme.fit_text(
             screen,
             self._matchup_text(),
             "small",
             theme.color("text_muted"),
-            (center_x, self._buttons_bottom + 28),
+            pygame.Rect(center_x - 300, self._buttons_bottom + 14, 600, 28),
             "center",
         )
         theme.text(

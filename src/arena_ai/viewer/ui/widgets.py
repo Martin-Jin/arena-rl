@@ -94,7 +94,9 @@ class Button(Widget):
         pygame.draw.rect(
             surface, border, self.rect, width=2 if active else 1, border_radius=ROW_RADIUS
         )
-        theme.text(surface, self.label, "body", text_color, self.rect.center, "center")
+        theme.fit_text(
+            surface, self.label, "body", text_color, self.rect.inflate(-24, 0), "center"
+        )
 
 
 class _Row(Widget):
@@ -121,14 +123,20 @@ class _Row(Widget):
             width=2 if active else 1,
             border_radius=ROW_RADIUS,
         )
-        theme.text(
+        label_area = pygame.Rect(
+            self.rect.x + 18, self.rect.y, self.label_right() - self.rect.x - 18, self.rect.height
+        )
+        theme.fit_text(
             surface,
             self.label,
             "body",
             theme.color("text" if self.enabled else "text_muted"),
-            (self.rect.x + 18, self.rect.centery),
-            "midleft",
+            label_area,
         )
+
+    def label_right(self) -> int:
+        """Right edge available to the label. Wider controls leave less room."""
+        return self.rect.right - 100
 
 
 class Slider(_Row):
@@ -153,6 +161,9 @@ class Slider(_Row):
     @property
     def track(self) -> pygame.Rect:
         return pygame.Rect(self.rect.right - 300, self.rect.centery - 3, 220, 6)
+
+    def label_right(self) -> int:
+        return self.track.x - 14
 
     def _set_from_x(self, x: float) -> None:
         track = self.track
@@ -264,6 +275,9 @@ class Selector(_Row):
     def control(self) -> pygame.Rect:
         return pygame.Rect(self.rect.right - 320, self.rect.y, 304, self.rect.height)
 
+    def label_right(self) -> int:
+        return self.control.x - 14
+
     def _cycle(self, step: int) -> None:
         values = [value for value, _ in self.options]
         index = values.index(self._get()) if self._get() in values else 0
@@ -290,12 +304,12 @@ class Selector(_Row):
         muted = theme.color("text_muted")
         _draw_chevron(surface, muted, (control.x + 12, control.centery), -1)
         _draw_chevron(surface, muted, (control.right - 12, control.centery), 1)
-        theme.text(
+        theme.fit_text(
             surface,
             current,
             "small",
             theme.color("text" if self.enabled else "text_muted"),
-            control.center,
+            pygame.Rect(control.x + 28, control.y, control.width - 56, control.height),
             "center",
         )
 
@@ -328,6 +342,9 @@ class Dropdown(_Row):
     @property
     def control(self) -> pygame.Rect:
         return pygame.Rect(self.rect.right - 320, self.rect.y, 304, self.rect.height)
+
+    def label_right(self) -> int:
+        return self.control.x - 14
 
     @property
     def captures_input(self) -> bool:
@@ -400,13 +417,12 @@ class Dropdown(_Row):
         self.draw_row(surface, theme, focused)
         control = self.control
         current = dict(self.options).get(self._get(), "")
-        theme.text(
+        theme.fit_text(
             surface,
             current,
             "small",
             theme.color("text" if self.enabled else "text_muted"),
-            (control.x + 14, control.centery),
-            "midleft",
+            pygame.Rect(control.x + 14, control.y, control.width - 50, control.height),
         )
         x, y = control.right - 16, control.centery
         # A chevron pointing down, or up while the list is open.
@@ -430,7 +446,8 @@ class Dropdown(_Row):
                 pygame.draw.rect(surface, theme.color("button_hover"), item, border_radius=8)
             selected = value == self._get()
             color = theme.color("accent" if selected else "text" if enabled else "text_muted")
-            theme.text(surface, label, "small", color, (item.x + 10, item.centery), "midleft")
+            text_area = pygame.Rect(item.x + 10, item.y, item.width - 20, item.height)
+            theme.fit_text(surface, label, "small", color, text_area)
 
 
 class Menu:

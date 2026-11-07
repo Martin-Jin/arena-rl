@@ -5,7 +5,12 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from arena_ai.config import Config
-from arena_ai.viewer.controllers import REPO_ROOT, TRAINED, trained_available
+from arena_ai.viewer.controllers import (
+    REPO_ROOT,
+    TRAINED,
+    list_checkpoints,
+    trained_available,
+)
 
 # (stored value, label shown in the menu)
 PLAYER_OPTIONS = (("human", "You"), (TRAINED, "Trained agent"))
@@ -35,11 +40,14 @@ class ViewerSettings:
     player: str = "human"  # "human" or "trained" (watch the agent play)
     opponent: str = "approach"
     trained_greedy: bool = True  # False samples from the policy for variety
+    checkpoint: str = ""  # File the trained agent loads. "" means automatic.
     random_spawns: bool = False
     show_controls_hint: bool = True
 
 
-def _valid(settings: ViewerSettings, trained_ok: bool) -> ViewerSettings:
+def _valid(
+    settings: ViewerSettings, trained_ok: bool, checkpoints: list[str]
+) -> ViewerSettings:
     """Clamp loaded values and replace choices that cannot be used."""
     settings.music_volume = min(1.0, max(0.0, float(settings.music_volume)))
     settings.effects_volume = min(1.0, max(0.0, float(settings.effects_volume)))
@@ -51,6 +59,8 @@ def _valid(settings: ViewerSettings, trained_ok: bool) -> ViewerSettings:
         settings.opponent == TRAINED and not trained_ok
     ):
         settings.opponent = "approach"
+    if settings.checkpoint and settings.checkpoint not in checkpoints:
+        settings.checkpoint = ""  # The file was renamed or deleted: choose automatically.
     if settings.player != "human" and settings.opponent == "none":
         settings.opponent = "approach"  # an AI needs someone to fight
     return settings
@@ -71,7 +81,8 @@ def load_settings(config: Config, path: Path = SETTINGS_PATH) -> ViewerSettings:
                 setattr(settings, name, value)
     except (OSError, ValueError, AttributeError):
         pass  # No saved file, or an unreadable one: keep the defaults.
-    return _valid(settings, trained_ok)
+    names = [path.name for path in list_checkpoints(config)]
+    return _valid(settings, trained_ok, names)
 
 
 def save_settings(settings: ViewerSettings, path: Path = SETTINGS_PATH) -> None:

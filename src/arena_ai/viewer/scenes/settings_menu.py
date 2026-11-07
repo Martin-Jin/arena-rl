@@ -6,7 +6,12 @@ from typing import TYPE_CHECKING
 
 import pygame
 
-from arena_ai.viewer.controllers import TRAINED, trained_available
+from arena_ai.viewer.controllers import (
+    TRAINED,
+    list_checkpoints,
+    resolve_checkpoint,
+    trained_available,
+)
 from arena_ai.viewer.settings import OPPONENT_OPTIONS, PLAYER_OPTIONS, save_settings
 from arena_ai.viewer.ui.widgets import (
     Button,
@@ -21,10 +26,11 @@ if TYPE_CHECKING:
     from arena_ai.viewer.app import App
 
 PANEL_WIDTH = 640
-ROW_HEIGHT = 44
-ROW_GAP = 8
-SECTION_HEIGHT = 34
-SECTION_GAP = 10
+ROW_HEIGHT = 40
+ROW_GAP = 6
+SECTION_HEIGHT = 30
+SECTION_GAP = 8
+MAX_CHECKPOINTS_SHOWN = 8  # Keeps the dropdown list on the screen.
 
 
 class SettingsScene:
@@ -65,6 +71,15 @@ class SettingsScene:
 
         def trained_plays() -> bool:
             return trained_ok and TRAINED in (settings.player, settings.opponent)
+
+        automatic = resolve_checkpoint(app.config)
+        shown = [path.name for path in list_checkpoints(app.config)[:MAX_CHECKPOINTS_SHOWN]]
+        if settings.checkpoint and settings.checkpoint not in shown:
+            shown.append(settings.checkpoint)  # Always list the file in use.
+        checkpoint_options = [
+            ("", f"Automatic ({automatic.name})" if automatic else "Automatic"),
+            *[(name, name) for name in shown],
+        ]
         rows = [
             Slider("Music", lambda: settings.music_volume, set_music),
             Slider(
@@ -88,6 +103,13 @@ class SettingsScene:
                 option_enabled=lambda value: (value != TRAINED or trained_ok)
                 and not (value == "none" and settings.player != "human"),
             ),
+            Dropdown(
+                "Checkpoint",
+                checkpoint_options,
+                lambda: settings.checkpoint,
+                set_attr("checkpoint"),
+                enabled_fn=trained_plays,
+            ),
             Selector(
                 "Trained agent plays",
                 (("greedy", "Best move"), ("sampled", "Varied")),
@@ -108,7 +130,7 @@ class SettingsScene:
         ]
         self.back = Button("Back", self.close, primary=True)
         self.menu = Menu([*rows, self.back])
-        self._sections = [("Audio", rows[0:2]), ("Match", rows[2:6]), ("Display", rows[6:7])]
+        self._sections = [("Audio", rows[0:2]), ("Match", rows[2:7]), ("Display", rows[7:8])]
         self._layout()
 
     def _layout(self) -> None:

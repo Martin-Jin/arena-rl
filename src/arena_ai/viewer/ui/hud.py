@@ -119,9 +119,15 @@ class Hud:
 
         # Name on the outer edge side of the bar, health value on the inner side.
         top = self.config.viewer.ui.health_bar_y
-        name_pos, name_anchor = (rect.right, "topright") if mirrored else (rect.x, "topleft")
         value_pos, value_anchor = (rect.x, "topleft") if mirrored else (rect.right, "topright")
-        theme.text(screen, label, "small", theme.color("text"), (name_pos, top), name_anchor)
+        # The name gets the bar's width minus room for the health value opposite it.
+        name_width = rect.width - 70
+        name_area = pygame.Rect(
+            rect.right - name_width if mirrored else rect.x, top, name_width, 24
+        )
+        theme.fit_text(
+            screen, label, "small", theme.color("text"), name_area, "right" if mirrored else "left"
+        )
         theme.text(
             screen,
             str(fighter.health),
@@ -218,12 +224,12 @@ class Hud:
         """Draw a faint one-line hint on the floor strip."""
         rendering = self.config.viewer.rendering
         y = (rendering.floor_y_px + rendering.screen_height) / 2
-        self.theme.text(
+        self.theme.fit_text(
             screen,
             text,
             "small",
             self.theme.color("text_muted"),
-            (screen.get_width() / 2, y),
+            pygame.Rect(40, round(y) - 14, screen.get_width() - 80, 28),
             "center",
             alpha=alpha,
         )

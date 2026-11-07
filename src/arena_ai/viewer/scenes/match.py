@@ -68,7 +68,7 @@ class MatchScene:
         if self.player_kind != "human":
             try:
                 self.controllers["agent"] = make_controller(
-                    self.player_kind, self.config, greedy, "agent"
+                    self.player_kind, self.config, greedy, "agent", settings.checkpoint
                 )
             except Exception as error:  # Missing checkpoint, torch not installed...
                 self.notice = f"Could not load the trained agent ({error}). You play instead."
@@ -76,7 +76,7 @@ class MatchScene:
         if self.opponent_kind != "none":
             try:
                 self.controllers["opponent"] = make_controller(
-                    self.opponent_kind, self.config, greedy, "opponent"
+                    self.opponent_kind, self.config, greedy, "opponent", settings.checkpoint
                 )
             except Exception as error:
                 self.notice = f"Could not load the trained agent ({error}). Using scripted."
@@ -306,12 +306,12 @@ class MatchScene:
             text = WATCH_HINT if self.watching else HUMAN_HINT
             self.hud.draw_hint(screen, text, round(255 * fade))
         if self.notice and self.age < NOTICE_SECONDS:
-            self.app.theme.text(
+            self.app.theme.fit_text(
                 screen,
                 self.notice,
                 "small",
                 self.app.theme.color("damage_taken"),
-                (screen.get_width() / 2, 96),
+                pygame.Rect(80, 84, screen.get_width() - 160, 24),
                 "center",
             )
 
@@ -337,14 +337,22 @@ class MatchScene:
             title_color = theme.color("text")
         else:
             title_color = theme.color("victory" if self.outcome == "agent" else "defeat")
-        theme.text(screen, self.winner, "heading", title_color, (center_x, 200), "center")
+        inner = panel.inflate(-48, 0)  # Text stays inside the panel's padding.
+        theme.fit_text(
+            screen,
+            self.winner,
+            "heading",
+            title_color,
+            pygame.Rect(inner.x, 176, inner.width, 48),
+            "center",
+        )
         if self.subtitle:
-            theme.text(
+            theme.fit_text(
                 screen,
                 self.subtitle,
                 "small",
                 theme.color("text_muted"),
-                (center_x, 240),
+                pygame.Rect(inner.x, 228, inner.width, 24),
                 "center",
             )
 
@@ -360,7 +368,9 @@ class MatchScene:
         )
         for index, (label, value) in enumerate(stats):
             x = center_x + (index - 1) * 150
-            theme.text(screen, value, "heading", theme.color("text"), (x, 290), "center")
-            theme.text(screen, label, "small", theme.color("text_muted"), (x, 328), "center")
+            value_area = pygame.Rect(x - 70, 266, 140, 48)
+            theme.fit_text(screen, value, "heading", theme.color("text"), value_area, "center")
+            label_area = pygame.Rect(x - 70, 316, 140, 24)
+            theme.fit_text(screen, label, "small", theme.color("text_muted"), label_area, "center")
         if self.menu:
             self.menu.draw(screen, theme)

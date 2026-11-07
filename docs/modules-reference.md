@@ -122,7 +122,9 @@ The viewer layer is the only layer intended to depend on `pygame`.
   spawns, hints), their labels, and loading/saving them to
   `data/viewer_settings.json`.
 - `src/arena_ai/viewer/controllers.py` — AI controllers for scripted and trained
-  fighters, on either side. Torch is imported only when the trained agent is used.
+  fighters, on either side, and the discovery of checkpoints in the checkpoint
+  folder (`latest.pt` first, then the newest). Torch is imported only when the
+  trained agent is used.
 - `src/arena_ai/viewer/audio.py` — Loads configured music and sound effects
   and plays them from viewer state transitions. Effects are normalized in
   memory using configurable RMS and peak targets. It plays sounds for every
@@ -135,8 +137,9 @@ The viewer layer is the only layer intended to depend on `pygame`.
 - `src/arena_ai/viewer/scenes/` — Full-screen scenes sharing a small `Scene`
   interface: `main_menu.py` (start menu), `settings_menu.py` and `match.py` (intro,
   fight, pause and result screens).
-- `src/arena_ai/viewer/ui/` — Reusable UI pieces: `theme.py` (colors, fonts and
-  text/panel drawing), `widgets.py` (buttons, sliders, toggles, selectors, dropdowns and the
+- `src/arena_ai/viewer/ui/` — Reusable UI pieces: `theme.py` (colors, fonts,
+  text and panel drawing, and `fit_text`, which scrolls text that is too wide for
+  its box), `widgets.py` (buttons, sliders, toggles, selectors, dropdowns and the
   focus-handling `Menu`) and `hud.py` (health bars, swing meters and damage
   numbers).
 - `src/arena_ai/viewer/render/` — Drawing helpers: `layout.py` (meters to pixels),

@@ -30,9 +30,37 @@ def checkpoint_path(config: Config) -> Path:
     return REPO_ROOT / config.viewer.opponent.checkpoint_path
 
 
+def list_checkpoints(config: Config) -> list[Path]:
+    """Return the ``.pt`` files next to the default checkpoint.
+
+    The configured default comes first, then the most recently saved, so a
+    checkpoint renamed to keep it (for example ``best.pt``) is still found.
+    """
+    default = checkpoint_path(config)
+    if not default.parent.is_dir():
+        return []
+    files = [path for path in default.parent.glob("*.pt") if path.is_file()]
+    return sorted(files, key=lambda path: (path != default, -path.stat().st_mtime))
+
+
+def resolve_checkpoint(config: Config, name: str = "") -> Path | None:
+    """Return the checkpoint to load, or None when there is none.
+
+    ``name`` is a file in the checkpoint folder. An empty or unknown name means
+    automatic: the configured default if it exists, else the newest ``.pt`` file.
+    """
+    default = checkpoint_path(config)
+    if name and Path(name).name == name:  # A bare file name, never a path.
+        chosen = default.parent / name
+        if chosen.is_file():
+            return chosen
+    files = list_checkpoints(config)
+    return files[0] if files else None
+
+
 def trained_available(config: Config) -> bool:
-    """Return whether a trained-agent checkpoint exists."""
-    return checkpoint_path(config).is_file()
+    """Return whether any trained-agent checkpoint exists."""
+    return resolve_checkpoint(config) is not None
 
 
 class ScriptedController:
@@ -53,7 +81,9 @@ class ScriptedController:
 class TrainedController:
     """The trained network playing either side, seeing the game from that side."""
 
-    def __init__(self, config: Config, greedy: bool, fighter_id: str) -> None:
+    def __init__(
+        self, config: Config, greedy: bool, fighter_id: str, checkpoint: str = ""
+    ) -> None:
         import torch
 
         from arena_ai.agents.distribution import (
@@ -72,7 +102,10 @@ class TrainedController:
         self.greedy = greedy
         self.fighter_id = fighter_id
         self.model = ActorCritic(config)
-        load_checkpoint(checkpoint_path(config), self.model)
+        path = resolve_checkpoint(config, checkpoint)
+        if path is None:
+            raise FileNotFoundError(f"no checkpoint in {checkpoint_path(config).parent}")
+        load_checkpoint(path, self.model)
         self.model.eval()
 
     def action(self, fighters: Mapping[str, FighterState]) -> int:
@@ -89,11 +122,14 @@ class TrainedController:
 
 
 def make_controller(
-    kind: str, config: Config, greedy: bool, fighter_id: str
+    kind: str, config: Config, greedy: bool, fighter_id: str, checkpoint: str = ""
 ) -> Controller:
-    """Build the controller for a scripted opponent name or ``"trained"``."""
+    """Build the controller for a scripted opponent name or ``"trained"``.
+
+    ``checkpoint`` names the file the trained agent loads ("" for automatic).
+    """
     if kind == TRAINED:
-        return TrainedController(config, greedy, fighter_id)
+        return TrainedController(config, greedy, fighter_id, checkpoint)
     if kind in OPPONENTS:
         if fighter_id != "opponent":
             raise ValueError("scripted policies can only control the opponent")

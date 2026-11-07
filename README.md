@@ -42,13 +42,17 @@ mouse, or the arrow keys with `Enter`. The settings menu has:
   and you spectate the agent fight the chosen opponent).
 - **Opponent** — a dropdown with the trained agent, the scripted
   approach-and-attack fighter, an idle dummy, a random fighter, or solo practice
-  (not available while watching). The trained agent needs
-  `checkpoints/latest.pt`, so run training first. It can play its best move or
-  sample varied moves.
+  (not available while watching). The trained agent needs a checkpoint, so run
+  training first. It can play its best move or sample varied moves.
+- **Checkpoint** — which file in `checkpoints/` the trained agent loads. Automatic
+  uses `latest.pt` if it exists, otherwise the newest `.pt` file, so a checkpoint
+  you renamed to keep it (for example `best.pt`) is found. The list shows up to 8
+  files.
 - **Random starting positions** and whether to show the controls hint.
 
 Choices are saved to `data/viewer_settings.json` (gitignored) and restored on the
-next launch. In a match, `Esc` opens a pause menu with a way back to Settings,
+next launch. Text that is too long for its box, such as a long checkpoint name,
+scrolls sideways by itself instead of running outside it. In a match, `Esc` opens a pause menu with a way back to Settings,
 and the result screen offers to play again. The opponent uses the same animated
 sprites as the player with a light-red tint.
 
