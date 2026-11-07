@@ -99,16 +99,20 @@ def discounted_returns(
         episode_ends = terminated
     returns = torch.zeros_like(rewards)
     running_return = last_value
+    truncated = episode_ends & ~terminated
+    # Checked once up front: calling .any() inside the loop forces a device sync
+    # on every step when the tensors live on the GPU.
+    has_truncation = bool(truncated.any())
+    if has_truncation and next_values is None:
+        raise ValueError(
+            "next_values is required when returns include episode truncations"
+        )
     for t in reversed(range(len(rewards))):
         not_terminated = 1 - terminated[t].to(rewards.dtype)
-        truncated_now = episode_ends[t] & ~terminated[t]
+        truncated_now = truncated[t]
         # A terminated state has no bootstrap value. At a truncation, use the
         # value of the final observation rather than the reset episode.
-        if truncated_now.any() and next_values is None:
-            raise ValueError(
-                "next_values is required when returns include episode truncations"
-            )
-        if next_values is not None and truncated_now.any():
+        if has_truncation:
             # continuation is the value to use for bootstrapping the return. If the episode
             # was truncated, use the value of the next state. If it was terminated, use
             # the running return (which is zero for a terminated state). If it was neither,

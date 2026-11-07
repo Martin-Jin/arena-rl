@@ -51,24 +51,28 @@ def build_update_callback(
         next_values: torch.Tensor,
     ) -> dict[str, float]:
         values = batch.values
+        device = values.device
         # 1. Compute advantages and returns for the batch, using GAE and discounting.
+        # These loops run one tiny operation per step, which is much faster on the
+        # CPU than on a GPU, so compute them there and move the results back.
+        cpu_values = values.cpu()
         advantages = advantage_estimation(
-            batch.rewards,
-            values,
-            next_values,
-            terminated,
+            batch.rewards.cpu(),
+            cpu_values,
+            next_values.cpu(),
+            terminated.cpu(),
             policy_config.discount_factor,
             policy_config.gae_lambda,
-            episode_ends,
-        )
+            episode_ends.cpu(),
+        ).to(device)
         returns = discounted_returns(
-            batch.rewards,
-            terminated,
-            torch.as_tensor(last_value, dtype=values.dtype, device=values.device),
+            batch.rewards.cpu(),
+            terminated.cpu(),
+            torch.as_tensor(last_value, dtype=cpu_values.dtype),
             policy_config.discount_factor,
-            episode_ends,
-            next_values,
-        )
+            episode_ends.cpu(),
+            next_values.cpu(),
+        ).to(device)
         # 2. Normalize advantages to stabilize training.
         advantages = normalize_advantages(advantages)
         # 3. Flatten the batch to prepare for mini-batch training.
