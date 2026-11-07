@@ -134,6 +134,13 @@ def run_training(config: Config | None = None) -> TrainingState:
             f"value_loss={m.get('value_loss', 0.0):.4f} "
             f"entropy={m.get('entropy', 0.0):.3f}"
         )
+        for name, stats in state.opponent_stats.items():
+            print(
+                f"    vs {name}: episodes={int(stats['episodes'])} "
+                f"win_rate={stats['win_rate']:.0%} "
+                f"truncation_rate={stats['truncation_rate']:.0%} "
+                f"mean_length={stats['mean_length']:.0f}"
+            )
 
     visualizer = None
     if VISUALIZE_TRAINING:
@@ -153,6 +160,7 @@ def run_training(config: Config | None = None) -> TrainingState:
         save_checkpoint=checkpoint,
         step_callback=visualizer,
         device=device,
+        stats_window=config.training.stats_window,
     )
     try:
         state = loop.run(config.training)
@@ -176,14 +184,18 @@ def run_training(config: Config | None = None) -> TrainingState:
 
 def make_factories(config: Config):
     """Create a list of environment factories for the training loop."""
-    policies = list(OPPONENTS.values())
+    opponents = list(OPPONENTS.items())
     return [
         partial(
             OneVOneEnv,
             config,
-            opponent_policy=partial(policies[i % len(policies)], config=config),
+            opponent_policy=partial(policy, config=config),
+            opponent_name=name,
+            max_episode_steps=config.training.max_episode_steps,
         )
-        for i in range(config.training.num_envs)
+        for name, policy in (
+            opponents[i % len(opponents)] for i in range(config.training.num_envs)
+        )
     ]
 
 

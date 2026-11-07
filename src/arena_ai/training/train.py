@@ -14,6 +14,7 @@ from arena_ai.config import TrainingConfig
 from arena_ai.envs.arena_env import ArenaEnv
 from arena_ai.envs.vector_env import VectorEnv
 from arena_ai.training.rollout import Rollout, RolloutBatch
+from arena_ai.training.stats import OpponentStats
 
 
 class Policy(Protocol):
@@ -70,6 +71,8 @@ class TrainingState:
     wins: int = 0
     episode_return: float = 0.0
     metrics: dict[str, float] = field(default_factory=dict)
+    # Rolling per-opponent statistics over the most recent episodes.
+    opponent_stats: dict[str, dict[str, float]] = field(default_factory=dict)
 
 
 class TrainingLoop:
@@ -84,6 +87,7 @@ class TrainingLoop:
         save_checkpoint: SaveCheckpoint | None = None,
         step_callback: StepCallback | None = None,
         device: torch.device | str | None = None,
+        stats_window: int = 100,
     ) -> None:
         # One training loop consists of the:
         # - the environment in which the agent is learning
@@ -98,8 +102,19 @@ class TrainingLoop:
         self.step_callback = step_callback
         self.device = device
         self.state = TrainingState()
+        self._opponent_stats = OpponentStats(stats_window)
         self._current_episode_return = 0.0
         self._vector_episode_returns: list[float] = []
+
+    def _record_episode(self, info: Mapping[str, object], truncated: bool) -> None:
+        """Add a finished episode to the rolling per-opponent statistics."""
+        length = info.get("step_count")
+        self._opponent_stats.record(
+            str(info.get("opponent", "unknown")),
+            won=info.get("winner") == "agent",
+            truncated=truncated,
+            length=length if isinstance(length, int) else 0,
+        )
 
     def collect_rollout(
         self,
@@ -162,6 +177,7 @@ class TrainingLoop:
                     self.state.episode_return = self._current_episode_return
                     if info.get("winner") == "agent":
                         self.state.wins += 1
+                    self._record_episode(info, truncated)
                     self._current_episode_return = 0.0
                     observation, _ = self.environment.reset()
         batch = rollout.as_batch(device=self.device)
@@ -236,6 +252,7 @@ class TrainingLoop:
                         self.state.episode_return = self._vector_episode_returns[index]
                         if info.get("winner") == "agent":
                             self.state.wins += 1
+                        self._record_episode(info, timed_out)
                         self._vector_episode_returns[index] = 0.0
                 if self.step_callback is not None:
                     best_index = max(
@@ -314,6 +331,7 @@ class TrainingLoop:
                     "wins": float(self.state.wins),
                 }
             )
+            self.state.opponent_stats = self._opponent_stats.summary()
             # update the iteration count in the training state after each iteration
             self.state.iteration = iteration
             # Save a checkpoint if the save_checkpoint callback is provided and

@@ -20,10 +20,13 @@ class OneVOneEnv(ArenaEnv):
         config: Config,
         opponent_policy: Callable[[list[float]], int] | None = None,
         max_episode_steps: int | None = None,
+        opponent_name: str = "approach",
     ) -> None:
         """Initialize the one-versus-one scenario and its optional opponent."""
         super().__init__(config, max_episode_steps)
         self.rng = random.Random()
+        # Reported in info["opponent"] so training can track stats per opponent.
+        self.opponent_name = opponent_name
         self.opponent_policy: Callable[[list[float]], int] = opponent_policy or partial(
             approach_and_attack, config=config
         )
@@ -34,6 +37,12 @@ class OneVOneEnv(ArenaEnv):
         if seed is not None:
             self.rng = random.Random(seed)
         return super().reset(seed)
+
+    def step(self, action: int):
+        """Advance one step and tag the info mapping with the opponent's name."""
+        observation, reward, terminated, truncated, info = super().step(action)
+        info["opponent"] = self.opponent_name
+        return observation, reward, terminated, truncated, info
 
     def create_initial_fighters(self) -> dict[str, FighterState]:
         """Create the one-versus-one starting state, optionally randomized."""

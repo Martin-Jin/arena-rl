@@ -12,8 +12,10 @@ here as the current defaults.
   default). Rendering speed never changes simulation results.
 - One call to `step_game` advances every fighter by one step, then resolves
   hits.
-- A training episode is truncated after `sim_hz * 10` steps (600 steps) unless a
-  fighter reaches 0 health first.
+- A training episode is truncated after `max_episode_steps` steps unless a
+  fighter reaches 0 health first. `training.max_episode_steps` in
+  `agent.yaml` sets it (1500 steps, 25 s); if unset, the environment defaults to
+  `sim_hz * 10` steps.
 
 ## Actions
 

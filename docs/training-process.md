@@ -18,8 +18,11 @@ defines:
 - `num_envs` — number of independent environments collected synchronously in
   parallel. Set it to `1` for the scalar environment path.
 - `randomize_spawns` — start each episode with random fighter positions.
-
-Episodes are also truncated after `sim_hz * 10` steps (10 simulated seconds).
+- `max_episode_steps` — episode time limit in simulation steps (1500 is 25
+  simulated seconds at 60 Hz). `null` uses the environment default of
+  `sim_hz * 10` steps. A fight that reaches the limit is truncated, not won.
+- `stats_window` — number of recent episodes per opponent used for rolling
+  statistics.
 
 When `num_envs` is greater than one, environment `i` uses opponent
 `i % len(OPPONENTS)` from [`scripted.py`](../src/arena_ai/agents/scripted.py)
@@ -166,6 +169,17 @@ each update include:
   `value_loss` and `entropy`, from the last minibatch of the update).
 
 `scripts/run_training.py` prints these metrics each time it saves a checkpoint.
+
+### Per-opponent statistics
+
+`OneVOneEnv` adds `info["opponent"]` (the opponent's name in `OPPONENTS`). The
+loop records every finished episode in
+[`OpponentStats`](../src/arena_ai/training/stats.py) and exposes
+`TrainingState.opponent_stats`: for each opponent, over its last `stats_window`
+episodes, the `win_rate`, `truncation_rate`, `mean_length` (in steps) and
+`episodes` count. These are printed under each checkpoint line. A high
+truncation rate against an opponent, such as `idle`, means the time limit is
+ending episodes before the fight is decided, so raise `max_episode_steps`.
 
 An iteration may end mid-episode, so an incomplete episode is not counted until
 the environment reports termination or truncation.

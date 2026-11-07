@@ -102,6 +102,10 @@ class TrainingConfig:
     seed: int | None
     num_envs: int = 1
     randomize_spawns: bool = False
+    # None keeps the environment default of ten simulated seconds.
+    max_episode_steps: int | None = None
+    # Number of recent episodes per opponent used for rolling statistics.
+    stats_window: int = 100
 
 
 @dataclass(frozen=True)
