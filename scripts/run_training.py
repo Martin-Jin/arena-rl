@@ -19,7 +19,7 @@ from arena_ai.training.ppo import (
 from arena_ai.training.train import TrainingLoop, TrainingState
 
 # Switch this to True to render every simulation step during training.
-VISUALIZE_TRAINING = True
+VISUALIZE_TRAINING = False
 TRAINING_DEVICE = "auto"
 
 
@@ -110,13 +110,22 @@ def run_training(config: Config | None = None) -> TrainingState:
     environment_factory = partial(OneVOneEnv, config)
     update_policy = build_update_callback(policy, optimizer, config)
     checkpoint_path = Path("checkpoints") / "latest.pt"
-    checkpoint = partial(
-        save_checkpoint,
-        checkpoint_path,
-        model,
-        optimizer,
-        config,
-    )
+
+    def checkpoint(state: TrainingState) -> None:
+        """Save a checkpoint, then print the latest training metrics."""
+        save_checkpoint(checkpoint_path, model, optimizer, config, state)
+        m = state.metrics
+        print(
+            f"[iter {state.iteration}] steps={state.environment_steps} "
+            f"episodes={int(m.get('episodes', 0))} "
+            f"win_rate={m.get('win_rate', 0.0):.2%} "
+            f"episode_return={m.get('episode_return', 0.0):.3f} "
+            f"loss={m.get('loss', 0.0):.4f} "
+            f"policy_loss={m.get('policy_loss', 0.0):.4f} "
+            f"value_loss={m.get('value_loss', 0.0):.4f} "
+            f"entropy={m.get('entropy', 0.0):.3f}"
+        )
+
     visualizer = None
     if VISUALIZE_TRAINING:
         from arena_ai.viewer.training import TrainingVisualizer
