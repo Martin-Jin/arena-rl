@@ -32,6 +32,56 @@ middle of an episode.
 5. Save a checkpoint when the configured interval is reached.
 6. Repeat for the configured number of iterations.
 
+```mermaid
+flowchart TD
+    A["py scripts/run_training.py"] --> B["load_config()"]
+    B --> C["Create ActorCritic, Adam optimizer, OneVOneEnv, and TrainingLoop"]
+    C --> D["TrainingLoop.run()"]
+    D --> E["Validate iterations, rollout_steps, and checkpoint_interval"]
+    E --> F["environment.reset(seed)"]
+    F --> G{"More training iterations?"}
+    G -- "No" --> Z["Return final TrainingState"]
+    G -- "Yes" --> H["collect_rollout(observation, rollout_steps)"]
+
+    subgraph Rollout["Fixed-size on-policy rollout"]
+        H --> I["policy.act(observation)"]
+        I --> J["policy.value(observation)"]
+        J --> K["environment.step(action)"]
+        K --> L["ArenaEnv.step()"]
+        L --> M["Convert action to FighterAction"]
+        M --> N["step_game(): advance simulation and resolve hits"]
+        N --> O["calculate_reward(): damage and terminal rewards"]
+        O --> P["Evaluate next_value before any reset"]
+        P --> Q{"terminated or truncated?"}
+        Q -- "No" --> R["Store transition in Rollout"]
+        Q -- "Yes" --> S["Store final observation/value and episode metrics"]
+        S --> T["Reset environment"]
+        T --> R
+        R --> U{"rollout_steps reached?"}
+        U -- "No" --> I
+        U -- "Yes" --> V["Evaluate last_value for carried observation"]
+    end
+
+    V --> W["Convert Rollout to RolloutBatch"]
+    W --> X["Compute GAE advantages"]
+    X --> Y["Compute discounted returns"]
+    Y --> AA["Normalize advantages"]
+    AA --> AB["Shuffle rollout into PPO minibatches"]
+    AB --> AC["train_step(): logits, values, PPO loss"]
+    AC --> AD["Backpropagate, clip gradients, optimizer.step()"]
+    AD --> AE["Record PPO and episode metrics"]
+    AE --> AF{"Checkpoint interval reached?"}
+    AF -- "Yes" --> AG["Save model, optimizer, config, and TrainingState"]
+    AF -- "No" --> G
+    AG --> G
+```
+
+The rollout boundary is a step budget, not an episode boundary. If an episode
+ends during collection, the final observation is valued before reset, then the
+environment is reset and collection continues until `rollout_steps` transitions
+have been stored. PPO updates use only that fixed batch before the next rollout
+is collected.
+
 [`TrainingLoop.collect_rollout`](../src/arena_ai/training/train.py) runs policy
 inference under `torch.no_grad()`. The acting interface is intentionally
 separate from the PPO forward interface:
