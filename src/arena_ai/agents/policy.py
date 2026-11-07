@@ -6,6 +6,8 @@ from torch import nn
 from arena_ai.agents.action import ACTION_COUNT
 from arena_ai.config import Config
 from arena_ai.sim.observation_vector import observation_size
+from arena_ai.agents.action import LOGIT_COUNT
+from arena_ai.agents.distribution import FactoredCategorical
 
 
 class ActorCritic(nn.Module):
@@ -45,7 +47,7 @@ class ActorCritic(nn.Module):
             return nn.Sequential(*layers)
 
         # Build both the policy network (for action selection) and the value network (for state value estimation).
-        self.policy_network = build_network(ACTION_COUNT)
+        self.policy_network = build_network(LOGIT_COUNT)
         self.value_network = build_network(1)
         policy_output = self.policy_network[-2]
         value_output = self.value_network[-2]
@@ -82,7 +84,7 @@ class PolicyAdapter:
         with torch.no_grad():
             # use the policy network to compute the action logits for the given observation.
             logits = self.model.policy_network(observation_tensor)
-        distribution = torch.distributions.Categorical(logits=logits)
+        distribution = FactoredCategorical(logits=logits)
         action = distribution.sample()
         if batched:
             return (
@@ -91,7 +93,9 @@ class PolicyAdapter:
             )
         return int(action.item()), float(distribution.log_prob(action).item())
 
-    def value(self, observation: list[float] | list[list[float]]) -> float | list[float]:
+    def value(
+        self, observation: list[float] | list[list[float]]
+    ) -> float | list[float]:
         """Estimate one observation or a batch of observations."""
         batched = bool(observation) and isinstance(observation[0], list)
         observation_tensor = torch.tensor(

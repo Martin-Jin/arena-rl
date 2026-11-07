@@ -6,6 +6,7 @@ import pygame
 import torch
 
 from arena_ai.agents.action import to_fighter_action
+from arena_ai.agents.distribution import FactoredCategorical
 from arena_ai.agents.policy import ActorCritic
 from arena_ai.config import load_config
 from arena_ai.agents.scripted import approach_and_attack
@@ -59,7 +60,7 @@ def trained_opponent_action() -> int:
     ).unsqueeze(0)
     with torch.no_grad():
         logits, _ = trained_model(observation)
-    return int(torch.argmax(logits, dim=-1).item())
+    return int(FactoredCategorical(logits).mode().item())
 
 
 def render(

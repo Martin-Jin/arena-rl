@@ -1,6 +1,7 @@
 """Define the discrete action encoding used by the learning agent."""
 
 from enum import IntEnum
+import math
 
 from arena_ai.sim.simulate import FighterAction
 
@@ -41,6 +42,44 @@ _FIGHTER_ACTIONS: dict[Action, FighterAction] = {
     Action.MOVE_LEFT_JUMP_ATTACK: FighterAction(move_dir=-1, jump=True, attack=True),
     Action.MOVE_RIGHT_JUMP_ATTACK: FighterAction(move_dir=1, jump=True, attack=True),
 }
+
+# Head 0: index -> move_dir. The only place the move ordering is defined.
+MOVE_DIRS = (0, -1, 1)
+# Head order: move, jump, attack.
+HEAD_SIZES = (len(MOVE_DIRS), 2, 2)
+LOGIT_COUNT = sum(HEAD_SIZES)
+# Mixed-radix strides, e.g. (3, 2, 2) -> (1, 3, 6).
+HEAD_STRIDES = tuple(math.prod(HEAD_SIZES[:i]) for i in range(len(HEAD_SIZES)))
+
+
+def encode_parts(parts):
+    """Pack per-head indices into the flat action index."""
+    return sum(part * stride for part, stride in zip(parts, HEAD_STRIDES))
+
+
+def decode_parts(action):
+    """Unpack a flat action index into per-head indices (ints or tensors)."""
+    return tuple(
+        (action // stride) % size for stride, size in zip(HEAD_STRIDES, HEAD_SIZES)
+    )
+
+
+# Guard: the enum must match the factored encoding.
+assert ACTION_COUNT == math.prod(HEAD_SIZES)
+assert all(
+    int(a) == encode_parts((MOVE_DIRS.index(fa.move_dir), int(fa.jump), int(fa.attack)))
+    for a, fa in _FIGHTER_ACTIONS.items()
+)
+# Independent heads: move (none/left/right), jump, attack.
+HEAD_SIZES = (3, 2, 2)
+LOGIT_COUNT = sum(HEAD_SIZES)
+
+# Guard: flat index must equal move + 3*jump + 6*attack.
+_MOVE_INDEX = {0: 0, -1: 1, 1: 2}
+assert all(
+    int(a) == _MOVE_INDEX[fa.move_dir] + 3 * fa.jump + 6 * fa.attack
+    for a, fa in _FIGHTER_ACTIONS.items()
+)
 
 # Reverse lookup so human input maps to the same indices the policy uses.
 _ACTION_FROM_PARTS: dict[tuple[int, bool, bool], int] = {

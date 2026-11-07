@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 import torch
 from torch import nn
+from arena_ai.agents.distribution import FactoredCategorical
 
 
 def probability_ratio(
@@ -139,8 +140,7 @@ def normalize_advantages(advantages: torch.Tensor) -> torch.Tensor:
 def entropy_from_logits(logits: torch.Tensor) -> torch.Tensor:
     """Return mean categorical entropy for a batch of action logits.
     Measures how spread out the action distribution is, which encourages exploration."""
-    distribution = torch.distributions.Categorical(logits=logits)
-    return distribution.entropy().mean()
+    return FactoredCategorical(logits).entropy().mean()
 
 
 def entropy_loss(logits: torch.Tensor) -> torch.Tensor:
@@ -205,7 +205,7 @@ def train_step(
     the loss functions and the optimizer step. Returns a dictionary of loss values
     for logging."""
     logits, value_preds = policy(observations)
-    distribution = torch.distributions.Categorical(logits=logits)
+    distribution = FactoredCategorical(logits)
     new_log_probs = distribution.log_prob(actions)
     prob_ratio = probability_ratio(new_log_probs, old_log_probs)
     loss = total_loss(
