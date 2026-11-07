@@ -11,6 +11,7 @@ import pygame
 from arena_ai.agents.action import from_parts, to_fighter_action
 from arena_ai.sim.simulate import FighterAction, step_game
 from arena_ai.sim.state import FighterState, create_initial_fighters
+from arena_ai.viewer.audio import FighterSnapshot
 from arena_ai.viewer.controllers import Controller, make_controller
 from arena_ai.viewer.render.scene import draw_scene
 from arena_ai.viewer.scenes.settings_menu import SettingsScene
@@ -225,8 +226,10 @@ class MatchScene:
                 else human_action
                 for fighter_id in self.fighters
             }
-            agent = self.fighters["agent"]
-            was_on_ground, previous_attack_frame = agent.on_ground, agent.attack_frame
+            before = {
+                fighter_id: FighterSnapshot.of(fighter)
+                for fighter_id, fighter in self.fighters.items()
+            }
             step_game(self.fighters, actions, self.config)
             self.steps += 1
             move_dir = actions["agent"].move_dir
@@ -234,9 +237,10 @@ class MatchScene:
                 self.turn_timer = TURN_FRAMES
             if move_dir:
                 self.last_move_dir = move_dir
-            self.app.audio.update_fighter(
-                agent, move_dir, was_on_ground, previous_attack_frame
-            )
+            for fighter_id, fighter in self.fighters.items():
+                self.app.audio.update_fighter(
+                    fighter_id, fighter, actions[fighter_id].move_dir, before[fighter_id]
+                )
             self.accumulator -= self.dt
             if self.opponent_kind == "none":
                 continue  # Practice has no opponent to defeat and no time limit.

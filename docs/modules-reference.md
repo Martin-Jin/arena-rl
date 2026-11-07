@@ -125,9 +125,11 @@ The viewer layer is the only layer intended to depend on `pygame`.
   fighters, on either side. Torch is imported only when the trained agent is used.
 - `src/arena_ai/viewer/audio.py` — Loads configured music and sound effects
   and plays them from viewer state transitions. Effects are normalized in
-  memory using configurable RMS and peak targets. Running audio fades on
-  start, stop, and direction changes and is gated by support state. Volumes
-  can be changed while running.
+  memory using configurable RMS and peak targets. It plays sounds for every
+  fighter, including the opponent: attack, jump, landing, running and a hit
+  sound when a fighter loses health. Each fighter has its own running loop,
+  which fades on start, stop, and direction changes and is gated by support
+  state. Volumes can be changed while running.
 - `src/arena_ai/viewer/training.py` — Renders accelerated training simulation
   steps when training visualization is enabled.
 - `src/arena_ai/viewer/scenes/` — Full-screen scenes sharing a small `Scene`

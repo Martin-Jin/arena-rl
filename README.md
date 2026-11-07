@@ -168,9 +168,11 @@ Soundtrack*. Attribution is required. Source:
 [official YouTube Music track](https://www.youtube.com/watch?v=qpElSu-nRRk).
 
 Sound effects are normalized in memory using configurable RMS and peak targets
-before the master effects volume is applied. Running audio fades on start,
-stop, and direction changes, and is only active while the fighter is supported.
-The source audio files are not modified by normalization or fades.
+before the master effects volume is applied. Every fighter, including the
+opponent, plays attack, jump, landing and running sounds, and a hit sound when it
+takes damage. Each fighter's running audio fades on start, stop, and direction
+changes, and is only active while that fighter is supported. The source audio
+files are not modified by normalization or fades.
 
 ## Development
 

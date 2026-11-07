@@ -1,6 +1,7 @@
 """Sound effect and music loading for the pygame viewer."""
 
 from array import array
+from dataclasses import dataclass
 import math
 from pathlib import Path
 
@@ -13,6 +14,9 @@ from arena_ai.sim.state import FighterState
 ASSET_ROOT = Path(__file__).resolve().parents[3] / "assets" / "audio"
 EFFECT_ROOT = ASSET_ROOT / "effects"
 MUSIC_ROOT = ASSET_ROOT / "music"
+# Each fighter gets its own pair of channels for its looping footsteps.
+MAX_FIGHTERS = 2
+MIXER_CHANNELS = 16
 
 
 def _normalize_sound(
@@ -56,8 +60,71 @@ def _normalize_sound(
     return pygame.mixer.Sound(buffer=normalized.tobytes())
 
 
+@dataclass(frozen=True)
+class FighterSnapshot:
+    """The parts of a fighter's state that sound effects react to changing."""
+
+    on_ground: bool
+    attack_frame: int
+    health: int
+
+    @classmethod
+    def of(cls, fighter: FighterState) -> "FighterSnapshot":
+        return cls(fighter.on_ground, fighter.attack_frame, fighter.health)
+
+
+class _RunningLoop:
+    """One fighter's looping footsteps, faded across two channels.
+
+    Starting on the idle channel while the other fades out is what makes a
+    direction change sound smooth instead of cutting off.
+    """
+
+    def __init__(
+        self,
+        sound: pygame.mixer.Sound,
+        channels: tuple[pygame.mixer.Channel, pygame.mixer.Channel],
+        fade_ms: int,
+    ) -> None:
+        self._sound = sound
+        self._channels = channels
+        self._fade_ms = fade_ms
+        self._index = 0
+        self.running = False
+        self.direction = 0
+
+    def update(self, moving: bool, move_dir: int) -> None:
+        """Start, restart or fade out the loop to match the fighter's movement."""
+        if moving and (not self.running or move_dir != self.direction):
+            if self.running:
+                self.stop()
+            self._start(move_dir)
+        elif not moving and self.running:
+            self.stop()
+
+    def _start(self, move_dir: int) -> None:
+        inactive_index = 1 - self._index
+        channel = self._channels[inactive_index]
+        channel.stop()
+        channel.play(self._sound, loops=-1, fade_ms=self._fade_ms)
+        self._index = inactive_index
+        self.running = True
+        self.direction = move_dir
+
+    def stop(self) -> None:
+        """Fade the loop out."""
+        self._channels[self._index].fadeout(self._fade_ms)
+        self.running = False
+        self.direction = 0
+
+    def halt(self) -> None:
+        """Cut the loop off immediately."""
+        for channel in self._channels:
+            channel.stop()
+
+
 class AudioManager:
-    """Load and play the viewer's music and fighter sound effects."""
+    """Load and play the viewer's music and sound effects for every fighter."""
 
     def __init__(self, config: AudioConfig) -> None:
         self.effects = {
@@ -69,15 +136,10 @@ class AudioManager:
             for name, filename in config.effects.items()
         }
         self.set_effects_volume(config.effects_volume)
-        pygame.mixer.set_reserved(2)
-        self.running_channels = (
-            pygame.mixer.Channel(0),
-            pygame.mixer.Channel(1),
-        )
-        self.running_channel_index = 0
+        pygame.mixer.set_num_channels(MIXER_CHANNELS)
+        pygame.mixer.set_reserved(2 * MAX_FIGHTERS)
         self.running_fade_ms = config.running_fade_ms
-        self._running = False
-        self._running_direction = 0
+        self._loops: dict[str, _RunningLoop] = {}
         self.music_volume = config.music_volume
         self.music_filename = config.music
 
@@ -93,9 +155,10 @@ class AudioManager:
         pygame.mixer.music.set_volume(volume)
 
     def silence(self) -> None:
-        """Fade out the running loop, for example when the game is paused."""
-        if self._running:
-            self._stop_running()
+        """Fade out every running loop, for example when the game is paused."""
+        for loop in self._loops.values():
+            if loop.running:
+                loop.stop()
 
     def start_music(self) -> None:
         """Start the battle music and loop it until stopped."""
@@ -111,57 +174,49 @@ class AudioManager:
         """Play a one-shot effect by name."""
         self.effects[effect].play()
 
-    def _start_running(self, move_dir: int) -> None:
-        """Start the running loop with a short fade-in."""
-        inactive_index = 1 - self.running_channel_index
-        inactive_channel = self.running_channels[inactive_index]
-        inactive_channel.stop()
-        inactive_channel.play(
-            self.effects["running"],
-            loops=-1,
-            fade_ms=self.running_fade_ms,
-        )
-        self.running_channel_index = inactive_index
-        self._running = True
-        self._running_direction = move_dir
-
-    def _stop_running(self) -> None:
-        """Fade out the active running loop."""
-        self.running_channels[self.running_channel_index].fadeout(
-            self.running_fade_ms
-        )
-        self._running = False
-        self._running_direction = 0
+    def _loop_for(self, fighter_id: str) -> _RunningLoop:
+        """Return the footstep loop for a fighter, giving it channels on first use."""
+        if fighter_id not in self._loops:
+            pair = len(self._loops)
+            if pair >= MAX_FIGHTERS:
+                raise ValueError(f"At most {MAX_FIGHTERS} fighters can have sound")
+            channels = (
+                pygame.mixer.Channel(2 * pair),
+                pygame.mixer.Channel(2 * pair + 1),
+            )
+            self._loops[fighter_id] = _RunningLoop(
+                self.effects["running"], channels, self.running_fade_ms
+            )
+        return self._loops[fighter_id]
 
     def update_fighter(
         self,
+        fighter_id: str,
         fighter: FighterState,
         move_dir: int,
-        was_on_ground: bool,
-        previous_attack_frame: int,
+        previous: FighterSnapshot,
     ) -> None:
-        """Play effects for transitions observed during one simulation step."""
+        """Play the effects for what one fighter did during one simulation step.
+
+        Call it for every fighter each step, with ``previous`` taken before the
+        step, so the opponent's sounds play as well as the player's.
+        """
         # TODO: Gate running audio on walkable support contact, not a
         # floor-specific flag, when platform collision state is available.
         moving = move_dir != 0 and fighter.on_ground
-        if moving and (
-            not self._running or move_dir != self._running_direction
-        ):
-            if self._running:
-                self._stop_running()
-            self._start_running(move_dir)
-        elif not moving and self._running:
-            self._stop_running()
+        self._loop_for(fighter_id).update(moving, move_dir)
 
-        if previous_attack_frame == 0 and fighter.attack_frame > 0:
+        if previous.attack_frame == 0 and fighter.attack_frame > 0:
             self.play("attack")
-        if was_on_ground and not fighter.on_ground:
+        if previous.on_ground and not fighter.on_ground:
             self.play("jump")
-        elif not was_on_ground and fighter.on_ground:
+        elif not previous.on_ground and fighter.on_ground:
             self.play("landing")
+        if fighter.health < previous.health:
+            self.play("hit")
 
     def close(self) -> None:
         """Stop active audio channels."""
-        for channel in self.running_channels:
-            channel.stop()
+        for loop in self._loops.values():
+            loop.halt()
         self.stop_music()
