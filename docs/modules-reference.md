@@ -84,29 +84,9 @@ The simulation layer is deterministic and independent of rendering. It must not 
 - `src/arena_ai/training/checkpoints.py` — Saves and restores the policy,
   optimizer, configuration, and training progress.
 - `src/arena_ai/training/train.py` — Owns rollout collection across episodes,
-  scripted-opponent selection, updates, checkpointing, and evaluation.
-
-#### PPO iteration order
-
-Training is an alternating loop: simulation data collection and gradient
-updates are separate phases. Each iteration must:
-
-1. collect `N` timesteps with the unchanged current policy, storing states,
-   actions, rewards, termination flags, and old-policy log-probabilities;
-2. compute critic values, GAE advantages, and critic target returns from that
-   stored rollout;
-3. run several minibatch epochs that update the actor and critic from the
-   rollout, using the PPO surrogate objective, entropy bonus, and value loss;
-4. discard the rollout before collecting the next one with the updated policy.
-
-An iteration is not an episode. The `N` steps are a fixed budget, so one
-rollout spans as many episodes as it takes and can end mid-episode; that is why
-the final state is bootstrapped. Terminated and truncated steps only reset the
-environment and collection continues until the step budget is reached.
-
-This discard-and-recollect step is required by PPO's on-policy design. The
-stored batch belongs to the old policy and should not be reused after the
-short update window, because the policy may have drifted too far.
+  updates, checkpoint callbacks, and training metrics. See
+  [`docs/training-process.md`](training-process.md) for the complete current
+  process and data flow.
 
 ### Viewer
 

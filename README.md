@@ -51,33 +51,19 @@ Controls:
 - [`src/arena_ai/envs/`](src/arena_ai/envs/) — environment wrappers.
 - [`src/arena_ai/training/`](src/arena_ai/training/) — rollout, PPO,
   checkpoint, reward, and training modules.
+- [`docs/training-process.md`](docs/training-process.md) — current training
+  loop, PPO data flow, bootstrapping, and training metrics.
 - [`assets/sprites/fighter/`](assets/sprites/fighter/) — active animation
   frames.
 - [`assets/sprites/fighter/deferred/`](assets/sprites/fighter/deferred/) —
   preserved source sheets and animations not yet connected to game actions.
 - [`docs/`](docs/) — module and design reference documentation.
 
-## PPO training cycle
+## Training
 
-PPO training alternates simulation and optimization; they do not run at the
-same time. One PPO iteration follows this cycle:
-
-1. **Collect:** run the simulation with the current (old) policy for `N`
-   timesteps. Store the observations/states, actions, rewards, termination
-   flags, and the old policy's log-probabilities. Do not change model weights
-   during collection.
-2. **Compute:** evaluate the critic on the stored states, then calculate
-   generalized advantage estimates (GAE) and the critic's target returns.
-3. **Train:** perform several epochs of minibatch updates on that stored
-   rollout. Update the actor with the clipped surrogate objective and entropy
-   bonus, and update the critic with its value loss.
-4. **Discard:** discard the rollout after those updates and return to step 1
-   with the updated policy.
-
-The rollout is on-policy: it was collected by the old policy and is only
-useful for a limited number of update epochs before the policy has drifted too
-far. PPO therefore collects fresh data for every iteration instead of
-reusing an old batch indefinitely.
+See the [training process guide](docs/training-process.md) for the current
+rollout/update loop, PPO bootstrapping and episode-boundary handling, policy
+interfaces, and progress metrics.
 
 ## Animation assets
 
