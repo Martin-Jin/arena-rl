@@ -6,7 +6,7 @@ import torch
 from torch import nn
 
 from arena_ai.agents.action import LOGIT_COUNT
-from arena_ai.agents.distribution import FactoredCategorical
+from arena_ai.agents.distribution import sample_with_log_prob
 from arena_ai.config import Config
 from arena_ai.sim.observation_vector import observation_size
 
@@ -96,14 +96,13 @@ class PolicyAdapter:
         with torch.no_grad():
             # use the policy network to compute the action logits for the given observation.
             logits = self.actor.policy_network(observation_tensor)
-        distribution = FactoredCategorical(logits=logits)
-        action = distribution.sample()
+            action, log_prob = sample_with_log_prob(logits)
         if batched:
             return (
                 [int(item) for item in action.tolist()],
-                [float(item) for item in distribution.log_prob(action).tolist()],
+                [float(item) for item in log_prob.tolist()],
             )
-        return int(action.item()), float(distribution.log_prob(action).item())
+        return int(action.item()), float(log_prob.item())
 
     def value(
         self, observation: list[float] | list[list[float]]

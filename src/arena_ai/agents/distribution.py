@@ -3,7 +3,12 @@
 import torch
 from torch.distributions import Categorical
 
-from arena_ai.agents.action import HEAD_SIZES, decode_parts, encode_parts
+from arena_ai.agents.action import (
+    HEAD_SIZES,
+    HEAD_STRIDES,
+    decode_parts,
+    encode_parts,
+)
 
 
 class FactoredCategorical:
@@ -30,3 +35,24 @@ class FactoredCategorical:
     def entropy(self) -> torch.Tensor:
         """Return the joint entropy (sum over the independent heads)."""
         return sum(head.entropy() for head in self.heads)
+
+
+def sample_with_log_prob(logits: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """Sample flat actions and their log-probabilities from ``[batch, logits]``.
+
+    Equivalent to ``FactoredCategorical.sample`` followed by ``log_prob``, but
+    without building ``Categorical`` objects. For the tiny batches used during
+    rollouts, the per-operation overhead of those objects (argument validation,
+    repeated normalization) costs more than the sampling itself. Gradients are
+    not tracked, so use ``FactoredCategorical`` for the PPO update.
+    """
+    action = torch.zeros(logits.shape[0], dtype=torch.long, device=logits.device)
+    log_prob = torch.zeros(logits.shape[0], dtype=logits.dtype, device=logits.device)
+    start = 0
+    for size, stride in zip(HEAD_SIZES, HEAD_STRIDES):
+        head_log_probs = torch.log_softmax(logits[:, start : start + size], dim=-1)
+        part = torch.multinomial(head_log_probs.exp(), 1)
+        log_prob += head_log_probs.gather(-1, part).squeeze(-1)
+        action += part.squeeze(-1) * stride
+        start += size
+    return action, log_prob

@@ -74,7 +74,8 @@ The simulation layer is deterministic and independent of rendering. It must not 
   network.
 - `src/arena_ai/agents/distribution.py` — Implements `FactoredCategorical`,
   independent move, jump and attack distributions that sample, score and
-  report the entropy of a flat action index.
+  report the entropy of a flat action index. `sample_with_log_prob` is a
+  faster no-gradient version of sampling plus `log_prob` used for rollouts.
 - `src/arena_ai/agents/scripted.py` — Provides the non-learning opponents in
   the `OPPONENTS` registry: a deterministic approach-and-attack policy, an idle
   policy and a uniformly random policy.
