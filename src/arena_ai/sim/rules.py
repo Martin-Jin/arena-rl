@@ -15,7 +15,7 @@ def step_fighter(
     w, fc = config.world, config.fighter
     dt = w.dt_seconds
 
-    if move_dir:
+    if move_dir and not f.attack_frame:
         f.facing_dir = move_dir
 
     combat = config.combat

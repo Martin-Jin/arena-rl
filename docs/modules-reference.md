@@ -56,7 +56,9 @@ The simulation layer is deterministic and independent of rendering. It must not 
 ### Agents
 
 - `src/arena_ai/agents/` — Contains agent implementations and shared agent interfaces.
-- `src/arena_ai/agents/action.py` — Defines the fixed discrete action encoding,
+- `src/arena_ai/agents/action.py` — Defines the fixed discrete action encoding
+  (movement, jump, and attack combinations), derives its action count, converts
+  a policy index into a `FighterAction`, and maps input parts back to an index.
   including `ATTACK`, derives its action count, and converts a policy index
   into a `FighterAction`.
 - `src/arena_ai/agents/scripted.py` — Controls the non-learning opponent with a

@@ -7,14 +7,15 @@ from arena_ai.config import load_config
 
 config = load_config()
 PIXELS_PER_METER = config.viewer.rendering.pixels_per_meter
-TARGET_FIGHTER_HEIGHT_PX = (
-    config.game.fighter.height_m * PIXELS_PER_METER
-)
+TARGET_FIGHTER_HEIGHT_PX = config.game.fighter.height_m * PIXELS_PER_METER
+
 
 class Animation:
     """A simple animation class that cycles through a list of frames."""
 
-    def __init__(self, frames: list[pygame.Surface], frame_duration: int = 3, loop: bool = True):
+    def __init__(
+        self, frames: list[pygame.Surface], frame_duration: int = 3, loop: bool = True
+    ):
         self.frames = frames
         self.frame_duration = frame_duration  # sim ticks per image
         self.loop = loop
@@ -51,7 +52,9 @@ ASSET_ROOT = Path(__file__).resolve().parents[3] / "assets" / "sprites" / "fight
 
 anims = {
     name: Animation(
-        load_frames(ASSET_ROOT / name, config.viewer.animation.source_body_height_px[name]),
+        load_frames(
+            ASSET_ROOT / name, config.viewer.animation.source_body_height_px[name]
+        ),
         config.viewer.animation.frame_duration[name],
         loop=config.viewer.animation.loop[name],
     )
@@ -68,18 +71,20 @@ def draw_fighter(
     shade: tuple[int, int, int] | None = None,
 ):
     """Draw a fighter animation and return whether sprite frames were available."""
-    if turning:
-        animation_name = "turn"
-        animation_tick = 0
-    elif fighter.attack_frame:
+    if fighter.attack_frame:
         animation_name = "attack"
         animation_tick = fighter.attack_frame
+    elif turning:
+        animation_name = "turn"
+        animation_tick = 0
     # TODO: Use the simulation's support-contact state here once platforms
     # exist; airborne animation should depend on contact, not floor height.
     elif not fighter.on_ground:
         falling_animation = anims.get("falling")
         animation_name = (
-            "falling" if falling_animation is not None and falling_animation.frames else "idle"
+            "falling"
+            if falling_animation is not None and falling_animation.frames
+            else "idle"
         )
         animation_tick = tick
     elif fighter.vx:
@@ -94,7 +99,9 @@ def draw_fighter(
         return False
 
     if animation_name == "run" and fighter.vx < 0:
-        frame_index = (animation_tick // animation.frame_duration) % len(animation.frames)
+        frame_index = (animation_tick // animation.frame_duration) % len(
+            animation.frames
+        )
         frame_index = len(animation.frames) - 1 - frame_index
         img = animation.frames[frame_index]
     else:

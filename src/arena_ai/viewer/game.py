@@ -16,6 +16,7 @@ from arena_ai.sim.state import FighterState, create_initial_fighters
 from arena_ai.viewer.annimation import draw_fighter
 from arena_ai.viewer.audio import AudioManager
 from arena_ai.training.checkpoints import load_checkpoint
+from arena_ai.agents.action import from_parts, to_fighter_action
 
 # Switch this to False to run the original single-fighter practice viewer.
 VIEW_OPPONENT = True
@@ -232,21 +233,7 @@ while running:
     while accumulator >= DT and not game_over:
         agent = fighters["agent"]
         actions = {
-            "agent": to_fighter_action(
-                3
-                if jump and move_dir == 0
-                else 4
-                if jump and move_dir < 0
-                else 5
-                if jump and move_dir > 0
-                else 1
-                if move_dir < 0
-                else 2
-                if move_dir > 0
-                else 6
-                if attack
-                else 0
-            )
+            "agent": to_fighter_action(from_parts(move_dir, jump, attack)),
         }
         if VIEW_OPPONENT:
             structured = get_observation(
