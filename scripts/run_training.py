@@ -6,6 +6,7 @@ from pathlib import Path
 import torch
 
 from arena_ai.agents.policy import ActorCritic, PolicyAdapter
+from arena_ai.agents.scripted import OPPONENTS
 from arena_ai.config import Config, TrainingConfig, load_config
 from arena_ai.envs.training_envs.one_v_one_env import OneVOneEnv
 from arena_ai.envs.vector_env import VectorEnv
@@ -50,6 +51,7 @@ def build_update_callback(
         next_values: torch.Tensor,
     ) -> dict[str, float]:
         values = batch.values
+        # 1. Compute advantages and returns for the batch, using GAE and discounting.
         advantages = advantage_estimation(
             batch.rewards,
             values,
@@ -67,13 +69,17 @@ def build_update_callback(
             episode_ends,
             next_values,
         )
+        # 2. Normalize advantages to stabilize training.
         advantages = normalize_advantages(advantages)
+        # 3. Flatten the batch to prepare for mini-batch training.
         flat = batch.flattened()
         flat_advantages = advantages.reshape(-1)
         flat_returns = returns.reshape(-1)
+        # 4. Split the batch into mini-batches and perform multiple epochs of training.
         batch_size = min(policy_config.batch_size, len(flat.actions))
         metrics: dict[str, float] = {}
         for _ in range(policy_config.num_epochs):
+            # Randomly permute the batch indices to create mini-batches for training.
             permutation = torch.randperm(len(flat.actions), device=flat.actions.device)
             for indices in permutation.split(batch_size):
                 metrics = train_step(
@@ -96,12 +102,14 @@ def build_update_callback(
 def run_training(config: Config | None = None) -> TrainingState:
     """Construct all training components and run the configured workflow."""
     config = config or load_config()
+    # Set the random seed for reproducibility if specified in the config.
     if config.training.seed is not None:
         torch.manual_seed(config.training.seed)
     device = select_training_device()
     if device.type == "cuda":
         torch.set_float32_matmul_precision("high")
     print(f"Training device: {device}")
+    # Build the model, optimizer, policy, environment, and training loop.
     model = ActorCritic(config).to(device)
     optimizer = torch.optim.Adam(
         model.parameters(), lr=config.agent.policy.learning_rate
@@ -131,10 +139,11 @@ def run_training(config: Config | None = None) -> TrainingState:
         from arena_ai.viewer.training import TrainingVisualizer
 
         visualizer = TrainingVisualizer(config)
+
+    # Build the environment(s) and run the training loop.
+    factories = make_factories(config)
     environment = (
-        VectorEnv([environment_factory] * config.training.num_envs)
-        if config.training.num_envs > 1
-        else environment_factory()
+        VectorEnv(factories) if config.training.num_envs > 1 else factories[0]()
     )
     loop = TrainingLoop(
         environment,
@@ -168,6 +177,19 @@ def run_training(config: Config | None = None) -> TrainingState:
         if visualizer is not None:
             visualizer.close()
     return state
+
+
+def make_factories(config: Config):
+    """Create a list of environment factories for the training loop."""
+    policies = list(OPPONENTS.values())
+    return [
+        partial(
+            OneVOneEnv,
+            config,
+            opponent_policy=partial(policies[i % len(policies)], config=config),
+        )
+        for i in range(config.training.num_envs)
+    ]
 
 
 if __name__ == "__main__":

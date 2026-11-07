@@ -1,6 +1,8 @@
 """Provide a deterministic opponent policy for the first training prototype."""
 
-from arena_ai.agents.action import Action
+import random
+
+from arena_ai.agents.action import ACTION_COUNT, Action
 from arena_ai.config import Config, load_config
 
 # Observation layout (learner-perspective vector from encode_observation):
@@ -66,3 +68,18 @@ def approach_and_attack(
         return int(Action.IDLE)
 
     return int(move_toward)
+
+
+def idle(observation, config=None) -> int:
+    return int(Action.IDLE)
+
+
+def random_action(observation, config=None) -> int:
+    return random.randrange(ACTION_COUNT)
+
+
+OPPONENTS = {
+    "approach": approach_and_attack,
+    "idle": idle,
+    "random": random_action,
+}
