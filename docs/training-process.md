@@ -82,6 +82,11 @@ environment is reset and collection continues until `rollout_steps` transitions
 have been stored. PPO updates use only that fixed batch before the next rollout
 is collected.
 
+When training visualization is enabled, the visualizer receives the terminal
+frame for one simulation step only. `TrainingLoop` then resets the environment
+within the same rollout, so visualization never waits for a training episode's
+end screen or restart button.
+
 [`TrainingLoop.collect_rollout`](../src/arena_ai/training/train.py) runs policy
 inference under `torch.no_grad()`. The acting interface is intentionally
 separate from the PPO forward interface:

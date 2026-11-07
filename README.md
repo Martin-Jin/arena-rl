@@ -30,6 +30,11 @@ Start the manual viewer from the repository root:
 py -m arena_ai.viewer.game
 ```
 
+The viewer starts with a scripted opponent enabled. To run the single-fighter
+practice mode instead, set `VIEW_OPPONENT = False` near the top of
+[`src/arena_ai/viewer/game.py`](src/arena_ai/viewer/game.py). The opponent uses
+the same animated sprite frames as the learner with a light-red tint.
+
 Controls:
 
 | Key | Action |
@@ -70,6 +75,12 @@ Run training from the repository root with:
 ```powershell
 py scripts/run_training.py
 ```
+
+To visualize training, set `VISUALIZE_TRAINING = True` near the top of
+[`scripts/run_training.py`](scripts/run_training.py). The viewer renders every
+fixed simulation step during every rollout without adding a real-time delay, so
+training runs at the simulation stepping rate. Close the window to stop the
+training run.
 
 ## Animation assets
 

@@ -137,12 +137,48 @@ class AudioConfig:
 
 
 @dataclass(frozen=True)
+class ViewerUiConfig:
+    """Health and end-screen settings used by the pygame viewer."""
+
+    font_size: int
+    button_font_size: int
+    health_bar_width: int
+    health_bar_height: int
+    health_bar_margin: int
+    health_bar_y: int
+    health_border_width: int
+    health_background_color: tuple[int, int, int]
+    agent_health_color: tuple[int, int, int]
+    opponent_health_color: tuple[int, int, int]
+    text_color: tuple[int, int, int]
+    opponent_tint: tuple[int, int, int]
+    background_color: tuple[int, int, int]
+    fallback_agent_color: tuple[int, int, int]
+    fallback_opponent_color: tuple[int, int, int]
+    overlay_color: tuple[int, int, int]
+    overlay_alpha: int
+    restart_button_width: int
+    restart_button_height: int
+    restart_button_color: tuple[int, int, int]
+    restart_button_border_color: tuple[int, int, int]
+    restart_button_border_width: int
+    restart_button_radius: int
+    end_title_y_offset: int
+    health_label: str
+    opponent_health_label: str
+    restart_label: str
+    win_message: str
+    loss_message: str
+
+
+@dataclass(frozen=True)
 class ViewerConfig:
     """Configuration for pygame rendering and audio."""
 
     rendering: RenderingConfig
     animation: AnimationConfig
     audio: AudioConfig
+    ui: ViewerUiConfig
 
 
 # CONFIGURATION FOR THE APPLICATION
@@ -191,10 +227,27 @@ def _build_scoring_config(raw: dict[str, Any]) -> ScoringConfig:
 
 
 def _build_viewer_config(raw: dict[str, Any]) -> ViewerConfig:
+    ui = dict(raw["ui"])
+    color_keys = (
+        "health_background_color",
+        "agent_health_color",
+        "opponent_health_color",
+        "text_color",
+        "opponent_tint",
+        "background_color",
+        "fallback_agent_color",
+        "fallback_opponent_color",
+        "overlay_color",
+        "restart_button_color",
+        "restart_button_border_color",
+    )
+    for key in color_keys:
+        ui[key] = tuple(ui[key])
     return ViewerConfig(
         rendering=RenderingConfig(**raw["rendering"]),
         animation=AnimationConfig(**raw["animation"]),
         audio=AudioConfig(**raw["audio"]),
+        ui=ViewerUiConfig(**ui),
     )
 
 

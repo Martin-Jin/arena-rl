@@ -32,6 +32,11 @@ class ArenaEnv(ABC):
         self.step_count = 0
         self._episode_done = False
 
+    @property
+    def episode_done(self) -> bool:
+        """Return whether the current episode must be reset."""
+        return self._episode_done
+
     def reset(self, seed: int | None = None) -> tuple[list[float], dict[str, Any]]:
         """Reset the scenario and return its initial observation."""
         del seed  # Randomized starts can be added by concrete scenarios later.

@@ -38,3 +38,34 @@ audio:
     landing: jump_landing.mp3
     running: running.mp3
   music: battle_music.mp3
+
+ui:
+  font_size: 32
+  button_font_size: 40
+  health_bar_width: 360
+  health_bar_height: 28
+  health_bar_margin: 24
+  health_bar_y: 24
+  health_border_width: 2
+  health_background_color: [55, 55, 55]
+  agent_health_color: [55, 170, 75]
+  opponent_health_color: [210, 65, 65]
+  text_color: [0, 0, 0]
+  opponent_tint: [255, 140, 140]
+  background_color: [255, 255, 255]
+  fallback_agent_color: [255, 0, 0]
+  fallback_opponent_color: [139, 0, 0]
+  overlay_color: [0, 0, 0]
+  overlay_alpha: 150
+  restart_button_width: 220
+  restart_button_height: 64
+  restart_button_color: [70, 120, 210]
+  restart_button_border_color: [255, 255, 255]
+  restart_button_border_width: 2
+  restart_button_radius: 8
+  end_title_y_offset: 70
+  health_label: "Your health"
+  opponent_health_label: "Opponent health"
+  restart_label: "Restart"
+  win_message: "You win!"
+  loss_message: "Opponent wins"

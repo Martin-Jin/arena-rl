@@ -43,6 +43,15 @@ py -m arena_ai.viewer.game
 
 The viewer controls are documented in the [project README](../README.md).
 
+The default viewer includes the scripted opponent. Set `VIEW_OPPONENT = False`
+in [`src/arena_ai/viewer/game.py`](../src/arena_ai/viewer/game.py) to switch to
+single-fighter practice mode.
+
+To watch training rollouts, set `VISUALIZE_TRAINING = True` in
+[`scripts/run_training.py`](../scripts/run_training.py) before running the
+training command. It renders every fixed simulation step without a real-time
+delay.
+
 ## Verify the checkout
 
 Run the current repository correctness check:

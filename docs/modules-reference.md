@@ -101,6 +101,8 @@ The viewer layer is the only layer intended to depend on `pygame`.
 
 - `src/arena_ai/viewer/` — Provides rendering and interactive display functionality.
 - `src/arena_ai/viewer/game.py` — Runs the interactive pygame game loop.
+- `src/arena_ai/viewer/training.py` — Renders accelerated training simulation
+  steps when training visualization is enabled.
 - `src/arena_ai/viewer/audio.py` — Loads configured music and sound effects
   and plays them from viewer state transitions. Effects are normalized in
   memory using configurable RMS and peak targets. Running audio fades on
@@ -125,8 +127,8 @@ The viewer layer is the only layer intended to depend on `pygame`.
 - `assets/audio/effects/` — Stores one-shot and looping fighter sound effects
   for attacks, movement, jumping, landing, and hits.
 - `assets/audio/music/` — Stores looping battle music.
-- `configs/viewer.yaml` — Defines viewer display, animation timing, and audio
-  volume and asset settings.
+- `configs/viewer.yaml` — Defines viewer display, animation timing, audio,
+  health UI, end-screen, and asset settings.
 - `assets/fonts/` — Stores fonts used by the user interface.
 
 ## Entry points

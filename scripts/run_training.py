@@ -17,6 +17,9 @@ from arena_ai.training.ppo import (
 )
 from arena_ai.training.train import TrainingLoop, TrainingState
 
+# Switch this to True to render every simulation step during training.
+VISUALIZE_TRAINING = True
+
 
 def build_update_callback(
     policy: PolicyAdapter,
@@ -59,9 +62,7 @@ def build_update_callback(
         batch_size = min(policy_config.batch_size, len(flat.actions))
         metrics: dict[str, float] = {}
         for _ in range(policy_config.num_epochs):
-            permutation = torch.randperm(
-                len(flat.actions), device=flat.actions.device
-            )
+            permutation = torch.randperm(len(flat.actions), device=flat.actions.device)
             for indices in permutation.split(batch_size):
                 metrics = train_step(
                     policy.forward,
@@ -101,21 +102,31 @@ def run_training(config: Config | None = None) -> TrainingState:
         optimizer,
         config,
     )
+    visualizer = None
+    if VISUALIZE_TRAINING:
+        from arena_ai.viewer.training import TrainingVisualizer
+
+        visualizer = TrainingVisualizer(config)
     loop = TrainingLoop(
         environment_factory(),
         policy,
         update_policy,
         save_checkpoint=checkpoint,
+        step_callback=visualizer,
     )
-    state = loop.run(
-        TrainingConfig(
-            iterations=config.training.iterations,
-            rollout_steps=config.training.rollout_steps,
-            checkpoint_interval=config.training.checkpoint_interval,
-            seed=config.training.seed,
+    try:
+        state = loop.run(
+            TrainingConfig(
+                iterations=config.training.iterations,
+                rollout_steps=config.training.rollout_steps,
+                checkpoint_interval=config.training.checkpoint_interval,
+                seed=config.training.seed,
+            )
         )
-    )
-    checkpoint(state)
+        checkpoint(state)
+    finally:
+        if visualizer is not None:
+            visualizer.close()
     return state
 
 

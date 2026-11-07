@@ -40,6 +40,7 @@ class UpdatePolicy(Protocol):
         """Compute advantages/returns and update the actor and critic."""
 # A function that saves a checkpoint given the current training state.
 SaveCheckpoint = Callable[["TrainingState"], None]
+StepCallback = Callable[[ArenaEnv], None]
 
 
 def _require_python_int(value: object, name: str) -> int:
@@ -76,6 +77,7 @@ class TrainingLoop:
         update_policy: UpdatePolicy,
         *,
         save_checkpoint: SaveCheckpoint | None = None,
+        step_callback: StepCallback | None = None,
     ) -> None:
         # One training loop consists of the:
         # - the environment in which the agent is learning
@@ -87,6 +89,7 @@ class TrainingLoop:
         self.policy = policy
         self.update_policy = update_policy
         self.save_checkpoint = save_checkpoint
+        self.step_callback = step_callback
         self.state = TrainingState()
         self._current_episode_return = 0.0
 
@@ -122,6 +125,8 @@ class TrainingLoop:
                 next_observation, reward, terminated, truncated, info = (
                     self.environment.step(action)
                 )
+                if self.step_callback is not None:
+                    self.step_callback(self.environment)
                 self._current_episode_return += reward
                 final_observation = next_observation
                 # Calculate the value of the final observation for bootstrapping. This is
@@ -230,6 +235,7 @@ def train(
     config: TrainingConfig | None = None,
     *,
     save_checkpoint: SaveCheckpoint | None = None,
+    step_callback: StepCallback | None = None,
 ) -> TrainingState:
     """Build and run a training loop for one learner-versus-opponent environment."""
     loop = TrainingLoop(
@@ -237,5 +243,6 @@ def train(
         policy,
         update_policy,
         save_checkpoint=save_checkpoint,
+        step_callback=step_callback,
     )
     return loop.run(config or load_config().training)

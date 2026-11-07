@@ -59,7 +59,14 @@ anims = {
 }
 
 
-def draw_fighter(screen, fighter, tick, to_screen, turning=False):
+def draw_fighter(
+    screen,
+    fighter,
+    tick,
+    to_screen,
+    turning=False,
+    shade: tuple[int, int, int] | None = None,
+):
     """Draw a fighter animation and return whether sprite frames were available."""
     if turning:
         animation_name = "turn"
@@ -92,6 +99,9 @@ def draw_fighter(screen, fighter, tick, to_screen, turning=False):
         img = animation.frames[frame_index]
     else:
         img = animation.get_frame(animation_tick)
+    if shade is not None:
+        img = img.copy()
+        img.fill((*shade, 255), special_flags=pygame.BLEND_RGBA_MULT)
     if fighter.facing_dir < 0 and animation_name != "turn":
         img = pygame.transform.flip(img, True, False)
     x_px, y_px = to_screen(fighter.x, fighter.y)
