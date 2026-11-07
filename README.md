@@ -3,9 +3,9 @@
 Arena AI is a Python 2D arena-fighting prototype with a deterministic fighter
 simulation, reinforcement-learning components, and a pygame viewer.
 
-The project is under active development. The simulation and manual viewer are
-available now; Gymnasium/PettingZoo integration and full training workflows
-are still being built.
+The project is under active development. The simulation, manual viewer, and
+initial headless PPO training workflow are available now; Gymnasium/PettingZoo
+compatibility and more advanced training workflows remain future work.
 
 ## Current features
 

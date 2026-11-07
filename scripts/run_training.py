@@ -11,6 +11,7 @@ from arena_ai.envs.training_envs.one_v_one_env import OneVOneEnv
 from arena_ai.training.checkpoints import save_checkpoint
 from arena_ai.training.ppo import (
     advantage_estimation,
+    discounted_returns,
     normalize_advantages,
     train_step,
 )
@@ -34,7 +35,6 @@ def build_update_callback(
         next_values: torch.Tensor,
     ) -> dict[str, float]:
         values = batch.values
-        del last_value
         advantages = advantage_estimation(
             batch.rewards,
             values,
@@ -44,7 +44,14 @@ def build_update_callback(
             policy_config.gae_lambda,
             episode_ends,
         )
-        returns = advantages + values
+        returns = discounted_returns(
+            batch.rewards,
+            terminated,
+            torch.as_tensor(last_value, dtype=values.dtype, device=values.device),
+            policy_config.discount_factor,
+            episode_ends,
+            next_values,
+        )
         advantages = normalize_advantages(advantages)
         flat = batch.flattened()
         flat_advantages = advantages.reshape(-1)

@@ -9,30 +9,52 @@ from arena_ai.sim.observation_vector import observation_size
 
 
 class ActorCritic(nn.Module):
-    """Separate MLPs for action logits and value estimates."""
+    """Creates two MLPs, one for action logits and one for value estimates."""
 
     def __init__(self, config: Config) -> None:
         super().__init__()
+
+        def activation(name: str) -> nn.Module:
+            activations: dict[str, type[nn.Module]] = {
+                "linear": nn.Identity,
+                "relu": nn.ReLU,
+                "tanh": nn.Tanh,
+            }
+            try:
+                return activations[name.lower()]()
+            except KeyError as error:
+                raise ValueError(f"Unsupported network activation: {name}") from error
 
         def build_network(output_size: int) -> nn.Sequential:
             layers: list[nn.Module] = []
             input_size = observation_size()
             for hidden_size in config.agent.network.hidden_layers:
                 layer = nn.Linear(input_size, hidden_size)
-                nn.init.orthogonal_(layer.weight, gain=2**0.5)
+                hidden_gain = nn.init.calculate_gain(
+                    config.agent.network.activation.lower()
+                )
+                nn.init.orthogonal_(layer.weight, gain=hidden_gain)
                 nn.init.zeros_(layer.bias)
-                layers.extend((layer, nn.ReLU()))
+                layers.extend((layer, activation(config.agent.network.activation)))
                 input_size = hidden_size
-            layers.append(nn.Linear(input_size, output_size))
+            output_layer = nn.Linear(input_size, output_size)
+            nn.init.zeros_(output_layer.bias)
+            layers.extend(
+                (output_layer, activation(config.agent.network.output_activation))
+            )
             return nn.Sequential(*layers)
 
         # Build both the policy network (for action selection) and the value network (for state value estimation).
         self.policy_network = build_network(ACTION_COUNT)
         self.value_network = build_network(1)
-        nn.init.orthogonal_(self.policy_network[-1].weight, gain=0.01)
-        nn.init.zeros_(self.policy_network[-1].bias)
-        nn.init.orthogonal_(self.value_network[-1].weight)
-        nn.init.zeros_(self.value_network[-1].bias)
+        policy_output = self.policy_network[-2]
+        value_output = self.value_network[-2]
+        if not isinstance(policy_output, nn.Linear) or not isinstance(
+            value_output, nn.Linear
+        ):
+            raise RuntimeError("Network output layers must be linear")
+        nn.init.orthogonal_(policy_output.weight, gain=0.01)
+        nn.init.orthogonal_(value_output.weight)
 
     def forward(self, observations: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Return action logits and critic values for a tensor batch."""
@@ -53,9 +75,7 @@ class PolicyAdapter:
             observation, dtype=torch.float32, device=self.device
         ).unsqueeze(0)
         with torch.no_grad():
-            # use the policy network to compute the action logits for the given observation,
-            # then sample an action from the resulting categorical distribution and return both
-            # the action and its log probability.
+            # use the policy network to compute the action logits for the given observation.
             logits = self.model.policy_network(observation_tensor)
         distribution = torch.distributions.Categorical(logits=logits)
         action = distribution.sample()

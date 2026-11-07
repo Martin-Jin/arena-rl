@@ -60,7 +60,7 @@ The simulation layer is deterministic and independent of rendering. It must not 
   including `ATTACK`, derives its action count, and converts a policy index
   into a `FighterAction`.
 - `src/arena_ai/agents/scripted.py` — Controls the non-learning opponent with a
-  deterministic baseline policy.
+  deterministic approach-and-attack baseline policy.
 - `src/arena_ai/agents/policy.py` — Defines the current PyTorch networks and
   their configurable hidden-layer structure. The policy and value networks are
   separate. Input and output sizes are derived from the observation and action
@@ -75,8 +75,11 @@ The simulation layer is deterministic and independent of rendering. It must not 
 - `src/arena_ai/training/` — Contains the first learner-versus-scripted-opponent
   workflow and later self-play, fine-tuning, curriculum, and opponent-pool
   workflows.
-- `src/arena_ai/training/rewards.py` — Defines terminal and shaping rewards
+- `src/arena_ai/envs/arena_env.py` — Calculates terminal and shaping rewards
   from the learner's perspective.
+- `src/arena_ai/training/rewards.py` — Legacy reward stub currently unused by
+  the active environment; remove or implement it when reward logic is moved
+  out of `ArenaEnv`.
 - `src/arena_ai/training/rollout.py` — Stores observations, actions, rewards,
   termination flags, and policy values/log probabilities collected from rollouts.
 - `src/arena_ai/training/ppo.py` — Calculates GAE and bootstrapped critic

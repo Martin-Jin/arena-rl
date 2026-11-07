@@ -7,7 +7,7 @@ import pygame
 from arena_ai.config import load_config
 from arena_ai.sim.rules import step_fighter
 from arena_ai.sim.state import FighterState
-from arena_ai.viewer.annimation import PIXELS_PER_METER, draw_fighter
+from arena_ai.viewer.annimation import draw_fighter
 from arena_ai.viewer.audio import AudioManager
 
 # Load all application configuration from the YAML files in configs/.

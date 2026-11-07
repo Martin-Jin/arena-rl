@@ -66,9 +66,10 @@ The update callback receives:
 
 The callback should pass these values to
 [`advantage_estimation`](../src/arena_ai/training/ppo.py) and use the matching
-episode-boundary arguments when calculating discounted returns. This distinction
-allows a time-limit truncation to bootstrap from its final observation while
-still preventing advantages from leaking into the reset episode.
+episode-boundary arguments when calculating
+[`discounted_returns`](../src/arena_ai/training/ppo.py). This distinction allows
+a time-limit truncation to bootstrap from its final observation while still
+preventing advantages from leaking into the reset episode.
 
 ## Environment and rewards
 

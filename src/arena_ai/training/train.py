@@ -1,8 +1,7 @@
 """Orchestrate rollout collection and policy updates.
 
-The policy and optimizer are deliberately injected.  This keeps the training
-loop independent from a particular network implementation while the agent and
-PPO modules are still being built.
+The policy and optimizer are deliberately injected. This keeps the training
+loop independent from a particular network implementation.
 """
 
 from collections.abc import Callable, Mapping
