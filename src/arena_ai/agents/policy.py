@@ -47,7 +47,8 @@ class ActorCritic(nn.Module):
             )
             return nn.Sequential(*layers)
 
-        # Build both the policy network (for action selection) and the value network (for state value estimation).
+        # Build both the policy network (for action selection) and the value network
+        # (for state value estimation).
         self.policy_network = build_network(LOGIT_COUNT)
         self.value_network = build_network(1)
         policy_output = self.policy_network[-2]
@@ -70,7 +71,8 @@ class PolicyAdapter:
     def __init__(
         self, model: ActorCritic, device: torch.device, act_device: str = "cpu"
     ) -> None:
-        # Initiates the network of the agent and sets the device to be used for computations (CPU or GPU).
+        # Initiates the network of the agent and sets the device to be used for
+        # computations (CPU or GPU).
         self.model = model
         self.device = device
         self.act_device = torch.device(act_device)

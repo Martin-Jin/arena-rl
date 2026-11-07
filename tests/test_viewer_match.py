@@ -1,0 +1,62 @@
+import dataclasses
+import os
+import unittest
+
+os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
+
+import pygame
+
+from arena_ai.config import load_config
+from arena_ai.viewer.app import App
+from arena_ai.viewer.scenes.match import MatchScene
+
+
+def _app(time_limit: float) -> App:
+    config = load_config()
+    match = dataclasses.replace(config.viewer.match, time_limit_seconds=time_limit)
+    config = dataclasses.replace(
+        config, viewer=dataclasses.replace(config.viewer, match=match)
+    )
+    app = App(config)
+    app.settings.player = "human"
+    app.settings.opponent = "idle"
+    app.settings.random_spawns = False
+    return app
+
+
+def _play(scene: MatchScene, frames: int = 600) -> None:
+    for _ in range(frames):
+        scene.update(1 / 60)
+        if scene.phase == "over":
+            return
+
+
+class MatchTimeLimitTests(unittest.TestCase):
+    def tearDown(self) -> None:
+        pygame.quit()
+
+    def test_a_match_with_no_winner_ends_as_a_draw_at_the_limit(self) -> None:
+        scene = MatchScene(_app(time_limit=1.0))  # Nobody fights, so health is equal.
+        _play(scene)
+        self.assertEqual(scene.phase, "over")
+        self.assertEqual(scene.outcome, "draw")
+        self.assertEqual(scene.winner, "Draw")
+        self.assertIn("Time's up", scene.subtitle)
+
+    def test_the_healthier_fighter_wins_on_time(self) -> None:
+        scene = MatchScene(_app(time_limit=1.0))
+        scene.fighters["opponent"].health = 40
+        _play(scene)
+        self.assertEqual(scene.outcome, "agent")
+        self.assertEqual(scene.winner, "Victory")
+
+    def test_a_zero_limit_removes_the_time_limit(self) -> None:
+        scene = MatchScene(_app(time_limit=0))
+        _play(scene, frames=300)
+        self.assertEqual(scene.phase, "playing")
+        self.assertFalse(scene.time_limit)
+
+
+if __name__ == "__main__":
+    unittest.main()

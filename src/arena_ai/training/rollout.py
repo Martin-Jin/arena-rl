@@ -73,7 +73,10 @@ class Rollout:
         value: float | list[float],
         log_prob: float | list[float],
     ) -> None:
-        """Append one transition produced by the current policy. Can take either one or multiple environments."""
+        """Append one transition produced by the current policy.
+
+        Takes either one environment or several.
+        """
         if self.environment_count == 1 and isinstance(observation[0], float):
             observation = [observation]  # type: ignore[list-item]
         observations = observation

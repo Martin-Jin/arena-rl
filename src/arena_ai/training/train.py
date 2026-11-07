@@ -4,7 +4,9 @@ The policy and optimizer are deliberately injected. This keeps the training
 loop independent from a particular network implementation.
 """
 
+import signal
 from collections.abc import Callable, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from time import perf_counter
 from typing import Protocol
@@ -110,11 +112,38 @@ class TrainingLoop:
         # Pass a restored state to continue a previous run's counters.
         self.state = initial_state if initial_state is not None else TrainingState()
         self._episode_stats = EpisodeStats(stats_window)
+        self._interrupt_pending = False
         # Seconds the last rollout spent in the environment and in the policy.
         self._env_seconds = 0.0
         self._policy_seconds = 0.0
         self._current_episode_return = 0.0
         self._vector_episode_returns: list[float] = []
+
+    def _remember_interrupt(self, signum: int, frame: object) -> None:
+        """Hold the first Ctrl+C until the update ends. A second one stops at once."""
+        if self._interrupt_pending:
+            raise KeyboardInterrupt
+        self._interrupt_pending = True
+
+    @contextmanager
+    def _defer_interrupt(self):
+        """Delay Ctrl+C while the policy updates, so weights and iteration agree.
+
+        An interrupt in the middle of an update would leave weights that are
+        partway through it, saved next to an iteration count that excludes it.
+        Only the main thread can install a signal handler, so elsewhere this does
+        nothing.
+        """
+        try:
+            previous = signal.signal(signal.SIGINT, self._remember_interrupt)
+        except ValueError:
+            yield
+            return
+        try:
+            yield
+        finally:
+            if previous is not None:
+                signal.signal(signal.SIGINT, previous)
 
     def _record_episode(
         self, info: Mapping[str, object], truncated: bool, episode_return: float
@@ -333,6 +362,7 @@ class TrainingLoop:
             raise ValueError("checkpoint_interval must be positive")
         if config.print_interval < 1:
             raise ValueError("print_interval must be positive")
+        self._interrupt_pending = False
         if isinstance(self.environment, VectorEnv):
             if config.num_envs != self.environment.num_envs:
                 raise ValueError("config.num_envs must match the vector environment")
@@ -358,15 +388,16 @@ class TrainingLoop:
                     observation, config.rollout_steps
                 )
             collected = perf_counter()
-            metrics = dict(
-                self.update_policy(
-                    batch,
-                    last_value,
-                    terminated=batch.terminated,
-                    episode_ends=batch.episode_ends,
-                    next_values=batch.next_values,
+            with self._defer_interrupt():
+                metrics = dict(
+                    self.update_policy(
+                        batch,
+                        last_value,
+                        terminated=batch.terminated,
+                        episode_ends=batch.episode_ends,
+                        next_values=batch.next_values,
+                    )
                 )
-            )
             finished = perf_counter()
             # Update the training state with the latest metrics and progress.
             self.state.iteration = iteration
@@ -405,5 +436,10 @@ class TrainingLoop:
                 and iteration % config.checkpoint_interval == 0
             ):
                 self.save_checkpoint(self.state)
+            if self._interrupt_pending:
+                # Ctrl+C arrived during the update. The iteration is now complete
+                # and recorded, so stop with a consistent state.
+                self._interrupt_pending = False
+                raise KeyboardInterrupt
         # Return the final training state after all iterations are complete.
         return self.state

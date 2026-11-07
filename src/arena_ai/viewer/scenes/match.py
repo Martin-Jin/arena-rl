@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import random
 from typing import TYPE_CHECKING
 
@@ -26,6 +27,7 @@ BUTTON_WIDTH = 300
 BUTTON_HEIGHT = 56
 TURN_FRAMES = 6  # Render frames the turn animation is shown after a direction change.
 NOTICE_SECONDS = 5.0
+URGENT_SECONDS = 10  # The timer turns red for the last seconds of a timed match.
 HUMAN_HINT = "A / D  move     W  jump     Space / Click  attack     Esc  pause"
 WATCH_HINT = "Esc  pause"
 
@@ -42,6 +44,8 @@ class MatchScene:
         self.app = app
         self.config = app.config
         self.dt = self.config.game.world.dt_seconds
+        # None when the limit is 0, which lets a match run until someone is defeated.
+        self.time_limit = self.config.viewer.match.time_limit_seconds or None
         self.rng = random.Random()
         self.hud = Hud(self.config, app.theme, app.to_screen)
         self.notice = ""
@@ -99,7 +103,9 @@ class MatchScene:
         self.render_tick = 0
         self.turn_timer = 0
         self.last_move_dir = 0
-        self.winner = ""
+        self.winner = ""  # Title of the result screen.
+        self.subtitle = ""
+        self.outcome = ""  # "agent", "opponent" or "draw" once the match is over.
         self.app.audio.silence()
 
     @property
@@ -127,27 +133,58 @@ class MatchScene:
                 Button("Main menu", self.app.to_main_menu),
             ]
         )
-        stack(self.menu.widgets, self.app.screen.get_width() // 2, 262, BUTTON_WIDTH, BUTTON_HEIGHT, 14)
+        stack(
+            self.menu.widgets,
+            self.app.screen.get_width() // 2,
+            262,
+            BUTTON_WIDTH,
+            BUTTON_HEIGHT,
+            14,
+        )
 
     def resume(self) -> None:
         self.phase = self._resume_phase
         self.menu = None
 
-    def _finish(self) -> None:
+    def _decide(self, timed_out: bool) -> str:
+        """Return "agent", "opponent" or "draw" for a finished match."""
+        agent, opponent = self.fighters["agent"], self.fighters["opponent"]
+        if timed_out:  # Nobody was defeated, so the healthier fighter wins.
+            if agent.health == opponent.health:
+                return "draw"
+            return "agent" if agent.health > opponent.health else "opponent"
+        if agent.health <= 0 and opponent.health <= 0:
+            return "draw"  # Both fell in the same step.
+        return "agent" if agent.health > 0 else "opponent"
+
+    def _finish(self, timed_out: bool = False) -> None:
         self.phase = OVER
         self.app.audio.silence()
-        agent_won = self.fighters["agent"].health > 0
-        if self.watching:
-            self.winner = f"{self.labels['agent' if agent_won else 'opponent']} wins"
+        self.outcome = self._decide(timed_out)
+        if self.outcome == "draw":
+            self.winner = "Draw"
+        elif self.watching:
+            self.winner = f"{self.labels[self.outcome]} wins"
         else:
-            self.winner = "Victory" if agent_won else "Defeat"
+            self.winner = "Victory" if self.outcome == "agent" else "Defeat"
+        self.subtitle = ""
+        if timed_out:
+            reason = "equal health" if self.outcome == "draw" else "decided on health"
+            self.subtitle = f"Time's up  ·  {reason}"
         self.menu = Menu(
             [
                 Button("Play again", self.restart, primary=True),
                 Button("Main menu", self.app.to_main_menu),
             ]
         )
-        stack(self.menu.widgets, self.app.screen.get_width() // 2, 372, BUTTON_WIDTH, BUTTON_HEIGHT, 14)
+        stack(
+            self.menu.widgets,
+            self.app.screen.get_width() // 2,
+            372,
+            BUTTON_WIDTH,
+            BUTTON_HEIGHT,
+            14,
+        )
 
     # -- events ------------------------------------------------------------
 
@@ -197,12 +234,16 @@ class MatchScene:
                 self.turn_timer = TURN_FRAMES
             if move_dir:
                 self.last_move_dir = move_dir
-            self.app.audio.update_fighter(agent, move_dir, was_on_ground, previous_attack_frame)
+            self.app.audio.update_fighter(
+                agent, move_dir, was_on_ground, previous_attack_frame
+            )
             self.accumulator -= self.dt
-            if self.opponent_kind != "none" and any(
-                f.health <= 0 for f in self.fighters.values()
-            ):
+            if self.opponent_kind == "none":
+                continue  # Practice has no opponent to defeat and no time limit.
+            if any(f.health <= 0 for f in self.fighters.values()):
                 self._finish()
+            elif self.time_limit and self.steps * self.dt >= self.time_limit:
+                self._finish(timed_out=True)
 
     def update(self, dt: float) -> None:
         ui = self.config.viewer.ui
@@ -221,6 +262,14 @@ class MatchScene:
 
     # -- drawing -----------------------------------------------------------
 
+    def _timer(self) -> tuple[int, bool]:
+        """Return the seconds to show, and whether the match is nearly out of time."""
+        elapsed = self.steps * self.dt
+        if not self.time_limit:
+            return int(elapsed), False
+        remaining = max(0, math.ceil(self.time_limit - elapsed))
+        return remaining, remaining <= URGENT_SECONDS
+
     def draw(self, screen: pygame.Surface) -> None:
         theme = self.app.theme
         ui = self.config.viewer.ui
@@ -232,7 +281,8 @@ class MatchScene:
             self.render_tick,
             turning=self.turn_timer > 0,
         )
-        self.hud.draw(screen, self.fighters, self.labels, self.steps * self.dt)
+        timer_seconds, urgent = self._timer()
+        self.hud.draw(screen, self.fighters, self.labels, timer_seconds, urgent)
         if self.phase == INTRO:
             self.hud.draw_banner(screen, "Ready", 255)
         elif self.phase == PLAYING and self.fight_elapsed < ui.fight_banner_seconds:
@@ -279,18 +329,31 @@ class MatchScene:
         panel = pygame.Rect(0, 0, PANEL_WIDTH, 390)
         panel.midtop = (center_x, 150)
         theme.draw_panel(screen, panel)
-        if self.watching:
+        if self.watching or self.outcome == "draw":
             title_color = theme.color("text")
         else:
-            title_color = theme.color("victory" if self.fighters["agent"].health > 0 else "defeat")
-        theme.text(screen, self.winner, "heading", title_color, (center_x, 212), "center")
+            title_color = theme.color("victory" if self.outcome == "agent" else "defeat")
+        theme.text(screen, self.winner, "heading", title_color, (center_x, 200), "center")
+        if self.subtitle:
+            theme.text(
+                screen,
+                self.subtitle,
+                "small",
+                theme.color("text_muted"),
+                (center_x, 240),
+                "center",
+            )
 
         max_health = self.config.game.fighter.max_health
         opponent = self.fighters.get("opponent")
         dealt = max_health - opponent.health if opponent else 0
         taken = max_health - self.fighters["agent"].health
         minutes, seconds = divmod(int(self.steps * self.dt), 60)
-        stats = (("Time", f"{minutes}:{seconds:02d}"), ("Damage dealt", str(dealt)), ("Damage taken", str(taken)))
+        stats = (
+            ("Time", f"{minutes}:{seconds:02d}"),
+            ("Damage dealt", str(dealt)),
+            ("Damage taken", str(taken)),
+        )
         for index, (label, value) in enumerate(stats):
             x = center_x + (index - 1) * 150
             theme.text(screen, value, "heading", theme.color("text"), (x, 290), "center")

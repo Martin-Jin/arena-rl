@@ -52,6 +52,10 @@ next launch. In a match, `Esc` opens a pause menu with a way back to Settings,
 and the result screen offers to play again. The opponent uses the same animated
 sprites as the player with a light-red tint.
 
+A match ends when a fighter is defeated, or after `match.time_limit_seconds` in
+[`configs/viewer.yaml`](configs/viewer.yaml) (60 by default; 0 removes the limit). When
+time runs out the healthier fighter wins, and equal health is a draw.
+
 Controls:
 
 | Key                                | Action     |
@@ -111,7 +115,9 @@ py scripts/run_training.py
 
 Press `Ctrl+C` to stop training. The latest in-memory model, optimizer, and
 completed training state are saved to `checkpoints/latest.pt` before the script
-exits. A checkpoint is also saved every `checkpoint_interval` iterations.
+exits. If you press it during a PPO update, training finishes that update first, so the
+saved weights always match the saved iteration. Pressing it a second time stops at once.
+A checkpoint is also saved every `checkpoint_interval` iterations.
 
 Training prints a statistics block every `training.print_interval` iterations
 (win rate, approximate KL, clip fraction, explained variance, per-head entropy,

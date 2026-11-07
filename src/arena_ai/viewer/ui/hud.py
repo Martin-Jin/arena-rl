@@ -118,10 +118,18 @@ class Hud:
             )
 
         # Name on the outer edge side of the bar, health value on the inner side.
+        top = self.config.viewer.ui.health_bar_y
         name_pos, name_anchor = (rect.right, "topright") if mirrored else (rect.x, "topleft")
         value_pos, value_anchor = (rect.x, "topleft") if mirrored else (rect.right, "topright")
-        theme.text(screen, label, "small", theme.color("text"), (name_pos, self.config.viewer.ui.health_bar_y), name_anchor)
-        theme.text(screen, str(fighter.health), "small", theme.color("text_muted"), (value_pos, self.config.viewer.ui.health_bar_y), value_anchor)
+        theme.text(screen, label, "small", theme.color("text"), (name_pos, top), name_anchor)
+        theme.text(
+            screen,
+            str(fighter.health),
+            "small",
+            theme.color("text_muted"),
+            (value_pos, top),
+            value_anchor,
+        )
 
         self._draw_swing(screen, fighter, rect, mirrored)
 
@@ -153,9 +161,13 @@ class Hud:
         screen: pygame.Surface,
         fighters: Mapping[str, FighterState],
         labels: Mapping[str, str],
-        elapsed_seconds: float,
+        timer_seconds: int,
+        urgent: bool = False,
     ) -> None:
-        """Draw bars, the timer and damage numbers for the current frame."""
+        """Draw bars, the timer and damage numbers for the current frame.
+
+        ``urgent`` colors the timer, for the last seconds of a timed match.
+        """
         agent = fighters.get("agent")
         opponent = fighters.get("opponent")
         if agent is not None:
@@ -163,13 +175,13 @@ class Hud:
         if opponent is not None:
             self._draw_bar(screen, "opponent", opponent, labels["opponent"], mirrored=True)
         if opponent is not None:
-            minutes, seconds = divmod(int(elapsed_seconds), 60)
+            minutes, seconds = divmod(timer_seconds, 60)
             bar = self._bar_rect(False)
             self.theme.text(
                 screen,
                 f"{minutes}:{seconds:02d}",
                 "body",
-                self.theme.color("text_muted"),
+                self.theme.color("damage_taken" if urgent else "text_muted"),
                 (screen.get_width() / 2, bar.centery),
                 "center",
             )

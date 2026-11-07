@@ -143,6 +143,11 @@ path. The script then:
 3. Runs `training.iterations` **more** iterations, numbered after the saved
    ones. A run saved at iteration 600 with `iterations: 600` ends at 1200.
 
+`Ctrl+C` is held until the current PPO update finishes, so a checkpoint saved on
+interrupt never holds weights that are partway through an update while its
+iteration count excludes it. A second `Ctrl+C` stops at once and may save such a
+partial update.
+
 A resumed run is a valid continuation, not an exact replay. These are not saved:
 the random number generators (a configured seed is offset by the saved iteration
 so the stream does not repeat), the rolling per-opponent statistics windows

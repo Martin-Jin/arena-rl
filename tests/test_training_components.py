@@ -42,7 +42,9 @@ class TrainingComponentTests(unittest.TestCase):
         batch = rollout.as_batch()
         flattened = batch.flattened()
 
-        torch.testing.assert_close(flattened.observations, torch.tensor([[1.0], [2.0], [5.0], [6.0]]))
+        torch.testing.assert_close(
+            flattened.observations, torch.tensor([[1.0], [2.0], [5.0], [6.0]])
+        )
         torch.testing.assert_close(flattened.actions, torch.tensor([3, 4, 7, 8]))
         torch.testing.assert_close(flattened.values, torch.tensor([0.5, 0.6, 0.7, 0.8]))
         torch.testing.assert_close(

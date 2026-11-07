@@ -40,6 +40,11 @@ audio:
     running: running.mp3
   music: battle_music.mp3
 
+match:
+  # A match that is still running after this many seconds ends on health (a draw
+  # if equal). 0 removes the limit. Training has its own limit, max_episode_steps.
+  time_limit_seconds: 60
+
 opponent:
   # Checkpoint used by the "Trained agent" choices, relative to the repository.
   checkpoint_path: checkpoints/latest.pt

@@ -163,6 +163,13 @@ class AudioConfig:
 
 
 @dataclass(frozen=True)
+class ViewerMatchConfig:
+    """Rules of a viewer match that are not part of the simulation."""
+
+    time_limit_seconds: float
+
+
+@dataclass(frozen=True)
 class ViewerOpponentConfig:
     """Where the viewer finds the trained agent."""
 
@@ -196,6 +203,7 @@ class ViewerConfig:
     rendering: RenderingConfig
     animation: AnimationConfig
     audio: AudioConfig
+    match: ViewerMatchConfig
     opponent: ViewerOpponentConfig
     ui: ViewerUiConfig
 
@@ -252,6 +260,7 @@ def _build_viewer_config(raw: dict[str, Any]) -> ViewerConfig:
         rendering=RenderingConfig(**raw["rendering"]),
         animation=AnimationConfig(**raw["animation"]),
         audio=AudioConfig(**raw["audio"]),
+        match=ViewerMatchConfig(**raw["match"]),
         opponent=ViewerOpponentConfig(**raw["opponent"]),
         ui=ViewerUiConfig(**ui),
     )
