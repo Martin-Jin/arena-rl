@@ -22,9 +22,9 @@ class TrainingOpponentsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "nonsense"):
             training_opponents(["nonsense"], max_envs=4)
 
-    def test_the_practice_opponent_cannot_be_trained_against(self) -> None:
-        with self.assertRaises(ValueError):
-            training_opponents(["parrier"], max_envs=4)
+    def test_the_perfect_parry_opponent_can_be_trained_against(self) -> None:
+        names = [name for name, _ in training_opponents(["parrier", "idle"], max_envs=4)]
+        self.assertEqual(names, ["parrier", "idle"])
 
     def test_the_shipped_config_is_valid(self) -> None:
         training = load_config().training

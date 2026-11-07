@@ -113,9 +113,11 @@ class TrainingLoop:
         self.state = initial_state if initial_state is not None else TrainingState()
         self._episode_stats = EpisodeStats(stats_window)
         self._interrupt_pending = False
-        # Seconds the last rollout spent in the environment and in the policy.
+        # Seconds the last rollout spent in the environment, choosing actions and
+        # estimating values. The rest of the rollout is bookkeeping.
         self._env_seconds = 0.0
-        self._policy_seconds = 0.0
+        self._act_seconds = 0.0
+        self._value_seconds = 0.0
         self._current_episode_return = 0.0
         self._vector_episode_returns: list[float] = []
 
@@ -190,8 +192,13 @@ class TrainingLoop:
         # Used for the bootstrap term in GAE. At a truncated step it is V(final_observation),
         # and at the end of the rollout it is V(obs) of the observation carried forward.
         next_values: list[float] = []
-        # Wall-clock time in the policy and the environment, for the timing stats.
-        policy_seconds = env_seconds = 0.0
+        # Wall-clock time choosing actions, estimating values and in the environment, for
+        # the timing stats.
+        act_seconds = value_seconds = env_seconds = 0.0
+        # The value of ``observation`` when it was already computed as the last step's
+        # next_value. Reusing it saves a network pass per step. It is only reusable while no
+        # reset replaced the observation.
+        carried_value: float | None = None
         with torch.no_grad():
             for _ in range(steps):
                 started = perf_counter()
@@ -200,8 +207,13 @@ class TrainingLoop:
                 log_probability = _require_python_float(
                     action_result[1], "act log_probability"
                 )
+                act_done = perf_counter()
                 # Critic value of the current observation, before stepping.
-                value = _require_python_float(self.policy.value(observation), "value")
+                value = (
+                    carried_value
+                    if carried_value is not None
+                    else _require_python_float(self.policy.value(observation), "value")
+                )
                 acted = perf_counter()
                 next_observation, reward, terminated, truncated, info = (
                     self.environment.step(action)
@@ -215,7 +227,8 @@ class TrainingLoop:
                 next_value = _require_python_float(
                     self.policy.value(next_observation), "value"
                 )
-                policy_seconds += (acted - started) + (perf_counter() - stepped)
+                act_seconds += act_done - started
+                value_seconds += (acted - act_done) + (perf_counter() - stepped)
                 env_seconds += stepped - acted
                 rollout.add(
                     observation,
@@ -227,6 +240,7 @@ class TrainingLoop:
                     log_probability,
                 )
                 next_values.append(next_value)
+                carried_value = None if terminated or truncated else next_value
                 self.state.environment_steps += 1
                 observation = next_observation
                 # The terminal or truncated observation was valued above and is
@@ -239,7 +253,8 @@ class TrainingLoop:
                     self._record_episode(info, truncated, self._current_episode_return)
                     self._current_episode_return = 0.0
                     observation, _ = self.environment.reset()
-        self._env_seconds, self._policy_seconds = env_seconds, policy_seconds
+        self._env_seconds = env_seconds
+        self._act_seconds, self._value_seconds = act_seconds, value_seconds
         batch = rollout.as_batch(device=self.device)
         batch = replace(
             batch,
@@ -249,6 +264,8 @@ class TrainingLoop:
                 device=batch.values.device,
             ),
         )
+        if carried_value is not None:
+            return batch, observation, carried_value
         with torch.no_grad():
             last_value = _require_python_float(
                 self.policy.value(observation), "value"
@@ -269,7 +286,11 @@ class TrainingLoop:
         if len(self._vector_episode_returns) != environment_count:
             self._vector_episode_returns = [0.0] * environment_count
 
-        policy_seconds = env_seconds = 0.0
+        act_seconds = value_seconds = env_seconds = 0.0
+        # The values of ``observations`` when they were already computed as the last step's
+        # final values. Reusing them saves a network pass per step. They are only reusable
+        # while no environment reset, because a reset replaces that environment's observation.
+        carried_values: list[float] | None = None
         with torch.no_grad():
             for _ in range(steps):
                 started = perf_counter()
@@ -282,9 +303,13 @@ class TrainingLoop:
                         "batched policy must return lists of actions and log probabilities"
                     )
                 actions, log_probabilities = action_result
-                values = self.policy.value(observations)
-                if not isinstance(values, list):
-                    raise TypeError("batched policy must return a list of values")
+                act_done = perf_counter()
+                if carried_values is not None:
+                    values = carried_values
+                else:
+                    values = self.policy.value(observations)
+                    if not isinstance(values, list):
+                        raise TypeError("batched policy must return a list of values")
                 acted = perf_counter()
                 next_observations, rewards, terminated, truncated, infos = (
                     self.environment.step(actions)
@@ -297,7 +322,8 @@ class TrainingLoop:
                 final_values = self.policy.value(final_observations)
                 if not isinstance(final_values, list):
                     raise TypeError("batched policy must return a list of values")
-                policy_seconds += (acted - started) + (perf_counter() - stepped)
+                act_seconds += act_done - started
+                value_seconds += (acted - act_done) + (perf_counter() - stepped)
                 env_seconds += stepped - acted
                 rollout.add(
                     observations,
@@ -309,6 +335,11 @@ class TrainingLoop:
                     log_probabilities,
                 )
                 next_values.append(final_values)
+                carried_values = (
+                    None
+                    if any(ended or timed_out for ended, timed_out in zip(terminated, truncated))
+                    else final_values
+                )
                 for index, (reward, ended, timed_out, info) in enumerate(
                     zip(rewards, terminated, truncated, infos)
                 ):
@@ -330,7 +361,8 @@ class TrainingLoop:
                     self.step_callback(self.environment.envs[best_index])
                 observations = next_observations
                 self.state.environment_steps += environment_count
-        self._env_seconds, self._policy_seconds = env_seconds, policy_seconds
+        self._env_seconds = env_seconds
+        self._act_seconds, self._value_seconds = act_seconds, value_seconds
 
         batch = rollout.as_batch(device=self.device)
         batch = replace(
@@ -339,6 +371,8 @@ class TrainingLoop:
                 next_values, dtype=batch.values.dtype, device=batch.values.device
             ),
         )
+        if carried_values is not None:
+            return batch, observations, carried_values
         with torch.no_grad():
             last_value = self.policy.value(observations)
         if not isinstance(last_value, list):
@@ -411,7 +445,8 @@ class TrainingLoop:
                     "wins": float(self.state.wins),
                     "rollout_seconds": collected - started,
                     "env_seconds": self._env_seconds,
-                    "policy_seconds": self._policy_seconds,
+                    "act_seconds": self._act_seconds,
+                    "value_seconds": self._value_seconds,
                     "update_seconds": finished - collected,
                     "iteration_seconds": seconds,
                     "steps_per_second": (

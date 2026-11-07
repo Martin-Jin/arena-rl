@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from arena_ai.agents.action import to_fighter_action
-from arena_ai.agents.scripted import OPPONENTS, SCRIPTED_OPPONENTS, parrying_hunter
+from arena_ai.agents.scripted import OPPONENTS, parrying_hunter
 from arena_ai.config import load_config
 from arena_ai.sim.observation import get_observation
 from arena_ai.sim.observation_vector import encode_observation
@@ -51,9 +51,8 @@ class ParryingHunterTests(unittest.TestCase):
         self.assertGreaterEqual(parries, 5)
         self.assertEqual(fighters["opponent"].health, 100)
 
-    def test_it_is_for_practice_only(self) -> None:
-        self.assertNotIn("parrier", OPPONENTS)
-        self.assertIn("parrier", SCRIPTED_OPPONENTS)
+    def test_it_is_a_scripted_opponent_for_training_and_the_viewer(self) -> None:
+        self.assertIs(OPPONENTS["parrier"], parrying_hunter)
         controller = make_controller("parrier", CONFIG, True, "opponent")
         fighters = {"agent": FighterState(x=3.0), "opponent": FighterState(x=6.0)}
         self.assertIsInstance(controller.action(fighters), int)

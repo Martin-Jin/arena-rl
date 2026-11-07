@@ -18,6 +18,16 @@ def format_stats(state: TrainingState) -> str:
     def episode(name: str) -> float:
         return e.get(name, 0.0)
 
+    # What the rollout spent outside the environment and the network: building the
+    # batch and recording episodes.
+    other = max(
+        0.0,
+        metric("rollout_seconds")
+        - metric("env_seconds")
+        - metric("act_seconds")
+        - metric("value_seconds"),
+    )
+
     lines = [
         f"[iter {state.iteration}] steps={state.environment_steps:,} "
         f"episodes={int(metric('episodes'))}",
@@ -45,7 +55,8 @@ def format_stats(state: TrainingState) -> str:
         f"loss length {episode('loss_length'):.0f}",
         f"  time     {metric('iteration_seconds'):.2f}s/iter  "
         f"rollout {metric('rollout_seconds'):.2f}s "
-        f"(env {metric('env_seconds'):.2f}s policy {metric('policy_seconds'):.2f}s)  "
+        f"(env {metric('env_seconds'):.2f}s  act {metric('act_seconds'):.2f}s  "
+        f"value {metric('value_seconds'):.2f}s  other {other:.2f}s)  "
         f"update {metric('update_seconds'):.2f}s  "
         f"{metric('steps_per_second'):,.0f} steps/s",
     ]

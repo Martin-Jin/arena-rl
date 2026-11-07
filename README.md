@@ -17,7 +17,8 @@ compatibility and more advanced training workflows remain future work.
   modules, run with `py scripts/run_training.py`. Choose the opponent of each parallel
   environment with `training.opponents` in [`configs/agent.yaml`](configs/agent.yaml).
   See [Training](#training) and the [training guide](docs/training-process.md).
-- Practice opponents for the viewer, including one that parries every attack it can see.
+- Scripted opponents for the viewer and training, including one that hunts you and
+  parries every attack it can see.
 - Pygame viewer with configurable idle, running, turning, single-slash attack,
   and airborne animation fallback, plus battle music and fighter sound effects.
 - Premade Knight Hero Platformer sprite assets, scaled to the configured

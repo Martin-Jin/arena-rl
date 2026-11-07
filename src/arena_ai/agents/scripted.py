@@ -74,7 +74,7 @@ def approach_and_attack(
     return int(move_toward)
 
 
-# Chance per step that the practice opponent attacks a learner that stands still. It cannot
+# Chance per step that the perfect-parry opponent attacks a learner that stands still. It cannot
 # tell a learner that is passive from one that is spamming attack: a spamming learner
 # looks still for the one step between swings. Attacking at once on that step meant it
 # swung at the same time as the learner and could never parry, so it only attacks now
@@ -92,8 +92,7 @@ def parrying_hunter(
 ) -> int:
     """Chase the learner, parry every attack it can, and attack a learner that stands still.
 
-    For practice only: it is not in ``OPPONENTS``, so training never uses it. A swing
-    that is about to hit it from the front is parried on the exact step the swing turns
+    A swing that is about to hit it from the front is parried on the exact step the swing turns
     active, so the learner cannot win by attacking from the front. It attacks after a
     parry (the counter) and, now and then (``HUNTER_ATTACK_CHANCE`` per step), when the
     learner stands on the ground, not swinging, with no movement input. It never starts
@@ -167,18 +166,16 @@ def random_action(observation, config=None) -> int:
     return random.randrange(ACTION_COUNT)
 
 
-# Opponents the training loop samples from. Do not add the practice opponent here: it
-# parries every attack from the front, so the learner could not win against it.
+# Every scripted opponent, for the training loop (``training.opponents``) and the viewer.
+# ``parrier`` parries every attack it can see from the front, so a learner cannot win
+# against it by attacking head on. Mix it with easier opponents so there is still a
+# winning signal, and so the learner has to find another way past it.
 OPPONENTS = {
     "approach": approach_and_attack,
+    "parrier": parrying_hunter,
     "idle": idle,
     "random": random_action,
 }
-# Opponents for playing against in the viewer only.
-PRACTICE_OPPONENTS = {
-    "parrier": parrying_hunter,
-}
-SCRIPTED_OPPONENTS = {**OPPONENTS, **PRACTICE_OPPONENTS}
 
 
 def training_opponents(names: list[str], max_envs: int) -> list[tuple[str, Callable]]:

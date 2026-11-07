@@ -33,9 +33,11 @@ defines:
   last iteration of a run always print.
 
 Environment `i` plays `opponents[i]`. The names come from `OPPONENTS` in
-[`scripted.py`](../src/arena_ai/agents/scripted.py) (`approach`, `idle`, `random`).
-The practice opponents are not accepted, because the perfect-parry opponent cannot
-be beaten from the front, so the agent could not learn from it.
+[`scripted.py`](../src/arena_ai/agents/scripted.py) (`approach`, `parrier`, `idle`,
+`random`). `parrier` parries every attack it can see from the front, so the learner
+cannot win against it by attacking head on. It earns only parry rewards until it finds
+another way past, so give it a share of the environments, not all of them, and keep
+some easy opponents (`idle`, `random`) for a winning signal.
 
 An iteration is not an episode. A rollout collects exactly `rollout_steps`
 transitions, resetting the environment whenever an episode terminates or is
@@ -214,7 +216,7 @@ iterations when `print_stats` is true:
   loss     total 0.2295  policy -0.0020  value 0.5175
   actions  attack 31%  jump 12%  left 20%  right 25%  idle 22%
   combat   accuracy 38%  dealt 71  taken 45  near wall 8%  win length 612  loss length 480
-  time     0.81s/iter  rollout 0.52s (env 0.10s policy 0.41s)  update 0.28s  2,530 steps/s
+  time     0.81s/iter  rollout 0.52s (env 0.10s  act 0.28s  value 0.09s  other 0.05s)  update 0.28s  2,530 steps/s
   vs approach  win 33%  timeout 0%  length 571  (6 episodes)
 ```
 
@@ -235,7 +237,7 @@ healthy, and the actions and combat lines say what the agent is actually doing.
 | combat | `dealt`, `taken` | Mean damage per episode, which is clearer than the reward because the reward also includes the wall penalty. |
 | combat | `near wall` | Share of steps within `edge_margin` of a wall, which shows whether it still hugs walls. |
 | combat | `win length`, `loss length` | Mean episode length in steps for wins and for losses. Shorter wins mean a more decisive agent. |
-| time | `s/iter`, `rollout`, `update`, `steps/s` | Wall-clock time. The rollout splits into time in the environment (`env`) and in the policy (`policy`, the network's acting and value calls). The remainder is bookkeeping. This shows whether the simulation or the network is the bottleneck. |
+| time | `s/iter`, `rollout`, `update`, `steps/s` | Wall-clock time. The rollout splits into time in the environment (`env`), choosing actions (`act`), estimating values (`value`) and `other` (building the batch and recording episodes). Compare it with `update` to see whether the simulation, the network or the PPO update is the bottleneck. |
 
 **Cost:** these are designed to cost almost nothing next to a simulation step.
 Measured on this machine, per iteration of 2,048 steps:

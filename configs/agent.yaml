@@ -21,11 +21,16 @@ training:
   rollout_steps: 512 # transitions collected before each policy update
   checkpoint_interval: 100 # iterations between checkpoint saves
   seed: null # optional seed for the initial environment reset
-  # One environment per entry, in order, each playing the named opponent (approach, idle,
-  # random). Repeat a name to run several environments against it, for example
-  # [approach, approach, idle] runs two against approach and one against idle.
-  opponents: [approach, idle, random, approach]
-  num_envs: 4 # the most environments allowed: training refuses to start with more opponents
+  # One environment per entry, in order, each playing the named opponent (approach, parrier,
+  # idle, random). Repeat a name to run several environments against it, for example
+  # [approach, approach, idle] runs two against approach and one against idle. Here ten of
+  # sixteen play the perfect-parry hunter, with three idle and three random for a winning
+  # signal (the hunter parries every attack it can see from the front).
+  opponents: [
+    parrier, parrier, parrier, parrier, parrier, parrier, parrier, parrier, parrier, parrier,
+    idle, idle, idle, random, random, random,
+  ]
+  num_envs: 16 # the most environments allowed: training refuses to start with more opponents
   randomize_spawns: true # random fighter start positions each episode
   max_episode_steps: 1500 # episode time limit in sim steps (25 s at 60 Hz); null = 10 s
   stats_window: 100 # recent episodes used for the rolling episode stats (overall and per opponent)
