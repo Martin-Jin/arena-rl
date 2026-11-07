@@ -241,12 +241,13 @@ def draw_fighter(
     partly transparent, by that fraction.
     """
     effect_color = effect_color or config.viewer.ui.colors["accent"]
-    # After a successful parry the shield animation plays on to the end of the window.
-    # Starting an attack ends it and pressing parry again restarts it, both in the
-    # simulation.
+    # After a successful parry the shield effects play on to the end of the window, even
+    # while the fighter counters. Pressing parry again restarts them. The fighter's own
+    # pose switches to the attack as soon as it swings.
     parry_frame = fighter.parry_frame or fighter.parry_pose_frame
+    parry_visible = 0 < parry_frame <= fighter.parry_window
     deflected = False
-    if 0 < parry_frame <= fighter.parry_window:
+    if parry_visible and not fighter.attack_frame:
         animation_name = "parry"
         animation_tick = 0
     elif fighter.attack_frame:
@@ -313,6 +314,6 @@ def draw_fighter(
     x_px, y_px = to_screen(fighter.x, fighter.y)
     rect = img.get_rect(midbottom=(x_px, y_px))
     screen.blit(img, rect)
-    if animation_name == "parry":
+    if parry_visible:
         draw_parry_bubble(screen, fighter, x_px, y_px, parry_frame, effect_color)
     return True

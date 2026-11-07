@@ -105,7 +105,6 @@ def step_fighter(
             f.parry_pose_frame = 0
         elif attack and not staggered:
             f.attack_frame = 1
-            f.parry_pose_frame = 0
             f.attack_hit = False
             if f.counter_frames:
                 f.attack_counter = True

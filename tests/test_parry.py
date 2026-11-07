@@ -283,7 +283,12 @@ class ParryTests(unittest.TestCase):
         self.assertEqual((agent.parry_frame, agent.parry_pose_frame), (0, 1))
         step(fighters)
         self.assertEqual(agent.parry_pose_frame, 2)
-        step(fighters, agent=ATTACK)  # Attacking ends the animation.
+        step(fighters, agent=ATTACK)  # A counter does not cut the shield effects short.
+        self.assertEqual(agent.parry_pose_frame, 3)
+        step(fighters, agent=ATTACK)
+        self.assertEqual(agent.parry_pose_frame, 4)
+        for _ in range(20):  # It runs out by itself, a little after the window ends.
+            step(fighters)
         self.assertEqual(agent.parry_pose_frame, 0)
 
     def test_every_step_costs_the_time_penalty(self) -> None:

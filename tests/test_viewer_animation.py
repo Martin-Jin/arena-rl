@@ -224,6 +224,22 @@ class ParryAnimationTests(unittest.TestCase):
         hud.update(config.viewer.ui.counter_effect_seconds, fighters)
         self.assertEqual(hud._slashes, [])
 
+    def test_the_shield_bubble_stays_while_the_fighter_counters(self) -> None:
+        surface = pygame.Surface((400, 300), pygame.SRCALPHA)
+
+        def draw(fighter: FighterState) -> bytes:
+            surface.fill((0, 0, 0, 0))
+            animation.draw_fighter(surface, fighter, 0, lambda x, y: (200, 250))
+            return pygame.image.tobytes(surface, "RGBA")
+
+        countering = FighterState(attack_frame=3, attack_counter=True)
+        with_bubble = FighterState(
+            attack_frame=3, attack_counter=True, parry_pose_frame=3, parry_window=8
+        )
+        self.assertNotEqual(draw(with_bubble), draw(countering))  # The bubble is still drawn.
+        # The sprite is the attack pose, not the shield pose.
+        self.assertNotEqual(draw(countering), draw(FighterState(parry_frame=3, parry_window=8)))
+
     def test_a_fighter_in_parry_recovery_is_not_drawn_with_the_shield(self) -> None:
         surface = pygame.Surface((200, 200), pygame.SRCALPHA)
 

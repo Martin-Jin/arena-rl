@@ -28,8 +28,9 @@ class FighterState:
     parry_count: int = 0  # Recent parry presses, which shrink the next window.
     parry_idle_frames: int = 0  # Frames since the last parry, capped at the reset time.
     parry_held: bool = False  # Parry input of the previous step, so holding parries once.
-    # Visual only: the parry animation keeps playing after a successful parry, which ends
-    # the parry itself so the fighter can counter at once. This is the frame it is on.
+    # Visual only: the parry effects keep playing after a successful parry, which ends the
+    # parry itself so the fighter can counter at once. Attacking does not stop them. This
+    # is the frame they are on.
     parry_pose_frame: int = 0
     stagger_frames: int = 0  # Frames left in which a parried fighter cannot attack.
     # The normal-swing frame the parried swing had reached, for the deflect animation.

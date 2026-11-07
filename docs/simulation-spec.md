@@ -117,8 +117,8 @@ is a counter.
 against a normal recovery of 14), during which it cannot start an attack. It can
 still move and parry, so it can answer the counter. The viewer plays the swing
 backwards over those frames (the sword looks deflected), and the parrying fighter's
-shield animation plays on to the end of the protected window after the parry, unless
-it attacks or parries again. The shield is drawn only during the protected window, so
+shield effects play on to the end of the protected window after the parry, even while
+it counters. Only a new parry restarts them, and its sprite pose changes to the attack. The shield is drawn only during the protected window, so
 it is never visible while the fighter cannot parry, and a spam-shrunk window gives a
 shorter animation. Feature 12 shows the stagger.
 
