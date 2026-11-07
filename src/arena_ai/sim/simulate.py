@@ -86,6 +86,7 @@ def step_game(
             else:
                 target.health = max(0, target.health - config.game.combat.attack_damage)
                 attacker.attack_hit = True
+                attacker.counter_hit = attacker.attack_counter
             break
 
 

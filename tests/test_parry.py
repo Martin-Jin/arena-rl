@@ -182,6 +182,27 @@ class ParryTests(unittest.TestCase):
         step(normal, agent=ATTACK)
         self.assertFalse(normal["agent"].counter_started)  # A normal swing is not one.
 
+    def test_a_counter_that_hits_is_rewarded_once_and_a_normal_hit_is_not(self) -> None:
+        fighters = duel()
+        wind_up_opponent(fighters)
+        step(fighters, agent=PARRY, opponent=ATTACK)
+        hit_steps = 0
+        for _ in range(COMBAT.counter_windup_frames + 3):
+            step(fighters, agent=ATTACK)
+            if fighters["agent"].counter_hit:
+                hit_steps += 1
+                self.assertAlmostEqual(
+                    calculate_reward({"agent": 100, "opponent": 100}, fighters, CONFIG)
+                    - CONFIG.scoring.damage_reward_scale * COMBAT.attack_damage,
+                    CONFIG.scoring.counter_reward - CONFIG.scoring.time_penalty_per_step,
+                )
+        self.assertEqual(hit_steps, 1)
+        normal = duel()
+        for _ in range(COMBAT.attack_windup_frames + 2):
+            step(normal, agent=ATTACK)
+        self.assertEqual(normal["opponent"].health, 100 - COMBAT.attack_damage)
+        self.assertFalse(normal["agent"].counter_hit)
+
     def test_a_fleeing_opponent_is_still_hit_by_the_counter(self) -> None:
         fighters = duel()
         wind_up_opponent(fighters)

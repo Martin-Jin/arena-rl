@@ -40,6 +40,7 @@ class FighterState:
     # Events of the latest step, cleared at the start of the next one. Rewards read them.
     parried: bool = False  # This fighter parried an attack.
     counter_started: bool = False  # This fighter began a counter attack.
+    counter_hit: bool = False  # This fighter's counter attack hit.
     missed_attack: bool = False  # A swing finished without hitting or being parried.
     missed_parry: bool = False  # A parry ended without parrying anything.
 

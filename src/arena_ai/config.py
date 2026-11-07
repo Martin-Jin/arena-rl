@@ -172,6 +172,7 @@ class ScoringConfig:
     edge_penalty_scale: float = 0.0
     time_penalty_per_step: float = 0.0
     parry_reward: float = 0.0
+    counter_reward: float = 0.0
     missed_parry_penalty: float = 0.0
     missed_attack_penalty: float = 0.0
 

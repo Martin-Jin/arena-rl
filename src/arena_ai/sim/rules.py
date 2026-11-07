@@ -55,6 +55,7 @@ def step_fighter(
     combat = config.combat
 
     f.parried = f.missed_attack = f.missed_parry = f.counter_started = False
+    f.counter_hit = False
     staggered = f.stagger_frames > 0
 
     # A fighter that was busy at the start of the step cannot start anything new, so

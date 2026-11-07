@@ -25,7 +25,7 @@ def calculate_reward(
     fighters: Mapping[str, FighterState],
     config: Config,
 ) -> float:
-    """Reward damage and parries, penalise damage taken, misses, walls, time and defeat."""
+    """Reward damage, parries and counter hits; penalise damage taken, misses, walls and time."""
     scoring = config.scoring
     agent = fighters["agent"]
     opponents = [f for fid, f in fighters.items() if fid != "agent"]
@@ -38,6 +38,7 @@ def calculate_reward(
     reward -= edge_penalty(agent, config)
     reward -= scoring.time_penalty_per_step
     reward += scoring.parry_reward * agent.parried
+    reward += scoring.counter_reward * agent.counter_hit
     reward -= scoring.missed_parry_penalty * agent.missed_parry
     reward -= scoring.missed_attack_penalty * agent.missed_attack
     if agent.health <= 0:

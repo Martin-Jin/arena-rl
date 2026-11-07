@@ -167,6 +167,7 @@ reward = damage_reward_scale * (damage dealt - damage taken)
          + victory_reward      (an opponent reached 0 health)
          - defeat_penalty      (the learner reached 0 health)
          + parry_reward        (the learner's parry stopped an attack)
+         + counter_reward      (the learner's counter attack hit)
          - missed_parry_penalty  (a parry ended without stopping an attack)
          - missed_attack_penalty (a swing finished without hitting or being parried)
 ```
@@ -175,10 +176,14 @@ The time penalty is small on purpose: it only decides between fights the agent
 already wins or parries well, so it pushes the agent to finish them sooner. A
 full-length episode costs 0.3, less than a victory (1.0).
 
+The counter reward pays for finishing a parry with its counter attack, so the agent
+learns the parry is worth more than a block. It pays only when the counter hits, so
+spamming counters earns nothing.
+
 The parry reward is needed because a random policy rarely finds a parry timed
 inside an 8-frame window. The two miss penalties push the agent toward accurate
 attacks and parries instead of spamming. The simulation reports each as a one-step
-event on `FighterState` (`parried`, `missed_parry`, `missed_attack`).
+event on `FighterState` (`parried`, `counter_hit`, `missed_parry`, `missed_attack`).
 
 The edge penalty applies when the learner is closer than `edge_margin` meters to
 a wall and grows linearly from 0 at the margin to `edge_penalty_scale` at the
