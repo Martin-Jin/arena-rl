@@ -2,8 +2,8 @@ import random
 import unittest
 from unittest.mock import patch
 
-from arena_ai.agents.action import to_fighter_action
-from arena_ai.agents.scripted import OPPONENTS, parrying_hunter
+from arena_ai.agents.action import Action, to_fighter_action
+from arena_ai.agents.scripted import OPPONENTS, parrying_hunter, runner
 from arena_ai.config import load_config
 from arena_ai.sim.observation import get_observation
 from arena_ai.sim.observation_vector import encode_observation
@@ -143,6 +143,44 @@ class ParryingHunterTests(unittest.TestCase):
             CONFIG,
         )
         self.assertFalse(to_fighter_action(parrying_hunter(observation, CONFIG)).attack)
+
+    def test_it_attacks_a_learner_that_swings_away_from_it(self) -> None:
+        # Regression: the hunter treated every swing in reach as a threat even when it
+        # pointed away, so it kept waiting and almost never attacked a spamming learner.
+        self.chance.return_value = 0.0
+        fighters = {
+            "agent": FighterState(x=5.0, facing_dir=-1, attack_frame=3),
+            "opponent": FighterState(x=5.5, facing_dir=-1),
+        }
+        observation = encode_observation(
+            get_observation(fighters["agent"], {"opponent": fighters["opponent"]}, CONFIG),
+            CONFIG,
+        )
+        self.assertTrue(to_fighter_action(parrying_hunter(observation, CONFIG)).attack)
+
+
+class RunnerTests(unittest.TestCase):
+    def observe(self, learner_x: float, runner_x: float, **runner_state) -> list[float]:
+        fighters = {
+            "agent": FighterState(x=learner_x),
+            "opponent": FighterState(x=runner_x, **runner_state),
+        }
+        return encode_observation(
+            get_observation(fighters["agent"], {"opponent": fighters["opponent"]}, CONFIG),
+            CONFIG,
+        )
+
+    def test_it_runs_away_from_the_learner(self) -> None:
+        self.assertEqual(runner(self.observe(3.0, 5.0), CONFIG), int(Action.MOVE_RIGHT))
+        self.assertEqual(runner(self.observe(7.0, 5.0), CONFIG), int(Action.MOVE_LEFT))
+
+    def test_it_jumps_over_the_learner_when_cornered(self) -> None:
+        wall = CONFIG.game.world.arena_width_m
+        action = runner(self.observe(wall - 0.8, wall - 0.1), CONFIG)
+        self.assertEqual(action, int(Action.MOVE_LEFT_JUMP))
+
+    def test_it_is_a_scripted_opponent_for_training(self) -> None:
+        self.assertIs(OPPONENTS["runner"], runner)
 
 
 if __name__ == "__main__":

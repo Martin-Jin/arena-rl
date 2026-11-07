@@ -19,6 +19,7 @@ OPPONENT_OPTIONS = (
     ("approach", "Scripted: approach"),
     ("parrier", "Scripted: perfect parry"),
     ("idle", "Idle dummy"),
+    ("runner", "Scripted: runs away"),
     ("random", "Random"),
     ("none", "Practice (solo)"),
 )

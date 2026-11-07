@@ -128,7 +128,7 @@ class MatchScene:
     def pause(self) -> None:
         self._resume_phase = self.phase
         self.phase = PAUSED
-        self.app.audio.silence()
+        self.app.audio.cut_footsteps()
         self.menu = Menu(
             [
                 Button("Resume", self.resume, primary=True),

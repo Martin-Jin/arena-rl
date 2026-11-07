@@ -47,7 +47,7 @@ mouse, or the arrow keys with `Enter`. The settings menu has:
   and you spectate the agent fight the chosen opponent).
 - **Opponent** — a dropdown with the trained agent, the scripted
   approach-and-attack fighter, a perfect-parry fighter (it parries every attack it can
-  see coming, so hit it while it is busy swinging or recovering), an idle dummy, a random fighter, or solo practice
+  see coming, so hit it while it is busy swinging or recovering), an idle dummy, a fighter that runs away, a random fighter, or solo practice
   (not available while watching). The trained agent needs a checkpoint, so run
   training first. It can play its best move or sample varied moves.
 - **Checkpoint** — which file in `checkpoints/` the trained agent loads. Automatic

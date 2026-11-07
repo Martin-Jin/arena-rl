@@ -95,9 +95,11 @@ def parrying_hunter(
     A swing that is about to hit it from the front is parried on the exact step the swing turns
     active, so the learner cannot win by attacking from the front. It attacks after a
     parry (the counter) and, now and then (``HUNTER_ATTACK_CHANCE`` per step), when the
-    learner stands on the ground, not swinging, with no movement input. It never starts
-    a swing against a learner that is moving or swinging, because a swing leaves it
-    unable to parry. An attack it starts against a still learner can still trade hits
+    learner stands on the ground with no movement input, including one that swings
+    away from it, since that swing cannot hit. It never starts a swing against a
+    learner that is moving or whose swing points at it, because a swing leaves it
+    unable to parry. A learner that swings away and turns back while the swing is
+    active can therefore hit it. An attack it starts against a still learner can still trade hits
     with a swing the learner starts right after. It uses the global ``random`` module,
     like ``random_action``, so it is not reproducible.
     It turns to face an attacker that is behind it (for example one that walked past it
@@ -118,8 +120,8 @@ def parrying_hunter(
 
     learner_x = observation[0] * arena_width
     learner_y = observation[1] * max_height
-    learner_facing = int(observation[5])
     learner_swing = round(observation[7] * combat.attack_total_frames)
+    learner_facing = int(observation[5])
     learner_is_counter = observation[8] > 0.5
     self_x = observation[14] * arena_width
     self_y = observation[15] * max_height
@@ -129,7 +131,9 @@ def parrying_hunter(
 
     if learner_swing and not self_busy:
         # Where the learner's swing reaches, widened by one step of the learner's
-        # walking, since its input on the step the swing lands is not known.
+        # walking, since its input on the step the swing lands is not known. A swing that
+        # points away from this fighter cannot hit it, so it is not a threat: the fighter
+        # carries on and may attack instead of parrying.
         reach = game.fighter.width_m / 2 + combat.attack_range_m
         slack = game.fighter.move_speed_mps * game.world.dt_seconds
         to_self = (self_x - learner_x) * learner_facing  # Positive: in front of the swing.
@@ -150,9 +154,9 @@ def parrying_hunter(
         return int(Action.ATTACK)  # The counter after a parry.
     # Otherwise chase and face the learner, and attack only a learner that stands still.
     action = approach_and_attack(observation, config)
-    learner_still = (
-        observation[2] == 0 and observation[4] == 1.0 and learner_swing == 0
-    )  # vx, on_ground
+    # A swing that reached the branch above is no threat (it points away, or this fighter is
+    # busy), so only movement, not swinging, stops the fighter from attacking.
+    learner_still = observation[2] == 0 and observation[4] == 1.0  # vx, on_ground
     if action == Action.ATTACK and not (learner_still and random.random() < HUNTER_ATTACK_CHANCE):
         return int(Action.IDLE)
     return action
@@ -160,6 +164,32 @@ def parrying_hunter(
 
 def idle(observation, config=None) -> int:
     return int(Action.IDLE)
+
+
+def runner(observation: list[float], config: Config | None = None) -> int:
+    """Run away from the learner, and jump over it when pinned against a wall.
+
+    It never attacks or parries, so it can only be beaten by catching it. Running at
+    the same speed as the learner, it is only caught when it is cornered, which the
+    jump delays: it leaps toward the learner and lands behind it with room to run.
+    """
+    if len(observation) < 28:
+        raise ValueError("one-versus-one observations require at least 28 values")
+
+    config = config or load_config()
+    game = config.game
+    arena_width = game.world.arena_width_m
+    reach = game.fighter.width_m + game.combat.attack_range_m
+
+    dx = (observation[0] - observation[14]) * arena_width  # Learner relative to this fighter.
+    self_x = observation[14] * arena_width
+    away = -1 if dx > 0 else 1  # Run left when the learner is on the right.
+    wall_gap = self_x if away < 0 else arena_width - self_x
+    if wall_gap < game.fighter.width_m:
+        if abs(dx) < 1.5 * reach and observation[18] == 1.0:  # Cornered, learner close, grounded.
+            return int(Action.MOVE_RIGHT_JUMP if dx > 0 else Action.MOVE_LEFT_JUMP)
+        return int(Action.IDLE)
+    return int(Action.MOVE_LEFT if away < 0 else Action.MOVE_RIGHT)
 
 
 def random_action(observation, config=None) -> int:
@@ -174,6 +204,7 @@ OPPONENTS = {
     "approach": approach_and_attack,
     "parrier": parrying_hunter,
     "idle": idle,
+    "runner": runner,
     "random": random_action,
 }
 

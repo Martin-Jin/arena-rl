@@ -34,10 +34,11 @@ defines:
 
 Environment `i` plays `opponents[i]`. The names come from `OPPONENTS` in
 [`scripted.py`](../src/arena_ai/agents/scripted.py) (`approach`, `parrier`, `idle`,
-`random`). `parrier` parries every attack it can see from the front, so the learner
+`runner`, `random`). `parrier` parries every attack it can see from the front, so the learner
 cannot win against it by attacking head on. It earns only parry rewards until it finds
 another way past, so give it a share of the environments, not all of them, and keep
-some easy opponents (`idle`, `random`) for a winning signal.
+some easy opponents (`idle`, `random`) for a winning signal. `runner` flees from the
+learner and jumps over it when cornered, so it teaches the learner to chase.
 
 An iteration is not an episode. A rollout collects exactly `rollout_steps`
 transitions, resetting the environment whenever an episode terminates or is

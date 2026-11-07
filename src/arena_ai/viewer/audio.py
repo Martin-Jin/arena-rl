@@ -168,6 +168,15 @@ class AudioManager:
             if loop.running:
                 loop.stop()
 
+    def cut_footsteps(self) -> None:
+        """Stop every footstep loop at once, for the pause menu.
+
+        ``silence`` only fades the active channel, so a loop still fading in or out
+        when the game paused could keep playing under the menu.
+        """
+        for loop in self._loops.values():
+            loop.halt()
+
     def cut_effects(self) -> None:
         """Stop every sound effect at once, footsteps included. The music keeps playing.
 

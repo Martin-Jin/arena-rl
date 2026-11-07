@@ -79,7 +79,7 @@ The simulation layer is deterministic and independent of rendering. It must not 
   faster no-gradient version of sampling plus `log_prob` used for rollouts.
 - `src/arena_ai/agents/scripted.py` — Provides the non-learning opponents in
   the `OPPONENTS` registry: a deterministic approach-and-attack policy, an idle
-  policy, a uniformly random policy and the perfect-parry hunter (it parries every
+  policy, a runner that flees the learner, a uniformly random policy and the perfect-parry hunter (it parries every
   attack it can see from the front, so mix it with easier opponents in training).
 - `src/arena_ai/agents/policy.py` — Defines the PyTorch `ActorCritic` module
   with separate, configurable policy and value networks (input and output sizes
