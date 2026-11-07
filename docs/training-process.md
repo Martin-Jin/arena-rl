@@ -102,5 +102,15 @@ PPO epochs/minibatches, and returns scalar metrics. The next iteration then
 creates a fresh [`Rollout`](../src/arena_ai/training/rollout.py).
 
 The current repository exposes the reusable loop and PPO building blocks;
-network construction, optimizer wiring, checkpoint implementation, and a
-command-line training entry point remain separate integration work.
+[`scripts/run_training.py`](../scripts/run_training.py) now wires those components into a
+single runnable workflow. It creates the actor-critic model and optimizer,
+constructs the one-versus-one environment, computes PPO advantages and
+returns, performs minibatch updates, and saves `checkpoints/latest.pt` at the
+configured interval. Run it from the repository root with:
+
+```powershell
+py scripts/run_training.py
+```
+
+The script uses the values in `configs/agent.yaml`; reduce `training.iterations`
+and `training.rollout_steps` there for a short smoke run.

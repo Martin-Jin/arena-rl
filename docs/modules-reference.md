@@ -61,9 +61,10 @@ The simulation layer is deterministic and independent of rendering. It must not 
   into a `FighterAction`.
 - `src/arena_ai/agents/scripted.py` — Controls the non-learning opponent with a
   deterministic baseline policy.
-- `src/arena_ai/agents/network.py` — Defines the current PyTorch network and its
-  configurable hidden-layer structure. Input and output sizes are derived from
-  the observation and action codecs.
+- `src/arena_ai/agents/policy.py` — Defines the current PyTorch networks and
+  their configurable hidden-layer structure. The policy and value networks are
+  separate. Input and output sizes are derived from the observation and action
+  codecs.
 - `src/arena_ai/agents/policy.py` — Converts fixed observation vectors into
   action probabilities, samples actions during training, and selects greedy
   actions during evaluation.
@@ -87,6 +88,9 @@ The simulation layer is deterministic and independent of rendering. It must not 
   updates, checkpoint callbacks, and training metrics. See
   [`docs/training-process.md`](training-process.md) for the complete current
   process and data flow.
+- `scripts/run_training.py` — Wires the model, optimizer, one-versus-one environment,
+  PPO update callback, and checkpoint callback into the runnable training
+  command.
 
 ### Viewer
 

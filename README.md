@@ -65,6 +65,12 @@ See the [training process guide](docs/training-process.md) for the current
 rollout/update loop, PPO bootstrapping and episode-boundary handling, policy
 interfaces, and progress metrics.
 
+Run training from the repository root with:
+
+```powershell
+py scripts/run_training.py
+```
+
 ## Animation assets
 
 The active attack animation uses only the single-slash `Attack 1` sequence.
