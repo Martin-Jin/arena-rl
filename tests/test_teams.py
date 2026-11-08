@@ -1,3 +1,4 @@
+import dataclasses
 import random
 import unittest
 
@@ -292,3 +293,33 @@ class TimeoutRewardTests(unittest.TestCase):
         self.assertIsNone(info["winner"])
         self.assertGreater(reward, 0.0)
         self.assertLess(CONFIG.scoring.timeout_win_reward, CONFIG.scoring.victory_reward)
+
+
+class KillRewardTests(unittest.TestCase):
+    def _reward(self, kill_reward: float, healths: tuple[int, int]) -> float:
+        scoring = dataclasses.replace(CONFIG.scoring, kill_reward=kill_reward)
+        config = dataclasses.replace(CONFIG, scoring=scoring)
+        fighters = {
+            AGENT_ID: FighterState(),
+            "opponent": FighterState(health=healths[0]),
+            "opponent_1": FighterState(health=healths[1]),
+        }
+        previous = {AGENT_ID: 100, "opponent": 10, "opponent_1": 100}
+        return calculate_reward(previous, fighters, config)
+
+    def test_it_is_off_by_default(self) -> None:
+        self.assertEqual(CONFIG.scoring.kill_reward, 0.0)
+
+    def test_each_opponent_finished_off_pays_once_however_the_damage_is_spread(self) -> None:
+        base = self._reward(0.0, (0, 100))
+        self.assertAlmostEqual(self._reward(0.5, (0, 100)) - base, 0.5)  # One kill.
+        # The same 10 damage that does not kill (10 damage to the other) pays no bonus.
+        self.assertAlmostEqual(self._reward(0.5, (10, 90)), self._reward(0.0, (10, 90)))
+
+    def test_a_fighter_that_was_already_dead_pays_nothing_more(self) -> None:
+        scoring = dataclasses.replace(CONFIG.scoring, kill_reward=0.5)
+        config = dataclasses.replace(CONFIG, scoring=scoring)
+        fighters = {AGENT_ID: FighterState(), "opponent": FighterState(health=0)}
+        previous = {AGENT_ID: 100, "opponent": 0}
+        plain = calculate_reward(previous, fighters, CONFIG)
+        self.assertAlmostEqual(calculate_reward(previous, fighters, config), plain)

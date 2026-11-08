@@ -187,6 +187,7 @@ class ScoringConfig:
     missed_parry_penalty: float = 0.0
     missed_attack_penalty: float = 0.0
     timeout_win_reward: float = 0.0
+    kill_reward: float = 0.0
 
 
 @dataclass(frozen=True)

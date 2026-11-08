@@ -232,6 +232,7 @@ for each step:
 reward = damage_reward_scale * (damage dealt - damage taken)
          - edge_penalty
          - time_penalty_per_step  (every step)
+         + kill_reward         (per opponent that reached 0 health this step; 0 by default)
          + victory_reward      (every opponent reached 0 health)
          - defeat_penalty      (the learner reached 0 health)
          + parry_reward        (the learner's parry stopped an attack)

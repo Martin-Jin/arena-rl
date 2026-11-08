@@ -37,6 +37,10 @@ def calculate_reward(
     reward = scoring.damage_reward_scale * (
         opponent_damage - (previous_health[AGENT_ID] - agent.health)
     )
+    # Each opponent that reached 0 health this step. Damage is paid the same however it is
+    # spread, so this is what rewards finishing an attacker off instead of wearing all down.
+    kills = sum(previous_health[fid] > 0 and f.health <= 0 for fid, f in opponents.items())
+    reward += scoring.kill_reward * kills
     reward -= edge_penalty(agent, config)
     reward -= scoring.time_penalty_per_step
     reward += scoring.parry_reward * agent.parried
