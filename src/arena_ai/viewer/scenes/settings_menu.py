@@ -74,6 +74,8 @@ class SettingsScene:
             settings.player = value
             if value != "human" and settings.opponent_count == 0:
                 settings.opponent_count = 1  # An AI needs someone to fight.
+            if value not in ("human", TRAINED):
+                settings.opponent_count = 1  # Scripted policies only play one-on-ones.
 
         def set_slot(index: int):
             def set_kind(value: str) -> None:
@@ -123,7 +125,11 @@ class SettingsScene:
                 count_options,
                 lambda: str(settings.opponent_count),
                 lambda value: setattr(settings, "opponent_count", int(value)),
-                option_enabled=lambda value: value != "0" or settings.player == "human",
+                option_enabled=lambda value: (
+                    value == "1"
+                    if settings.player not in ("human", TRAINED)
+                    else value != "0" or settings.player == "human"
+                ),
             ),
             *[
                 Dropdown(

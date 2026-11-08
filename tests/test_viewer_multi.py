@@ -54,8 +54,28 @@ class ControllerTests(unittest.TestCase):
             controller = make_controller("approach", CONFIG, True, fighter_id)
             self.assertIsInstance(controller, ScriptedController)
             self.assertIsInstance(controller.action(fighters), int)
-        with self.assertRaises(ValueError):
-            make_controller("approach", CONFIG, True, AGENT_ID)
+
+    def test_a_scripted_controller_can_play_the_agent_side(self) -> None:
+        from arena_ai.agents.action import to_fighter_action
+
+        fighters = {
+            AGENT_ID: FighterState(x=9.0, facing_dir=-1),
+            "opponent": FighterState(x=1.0),
+        }
+        action = make_controller("approach", CONFIG, True, AGENT_ID).action(fighters)
+        self.assertEqual(to_fighter_action(action).move_dir, -1)  # Toward the opponent.
+
+    def test_a_scripted_player_forces_a_one_on_one(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        from arena_ai.viewer.settings import load_settings
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "settings.json"
+            path.write_text('{"player": "parrier", "opponent_count": 3}', encoding="utf-8")
+            settings = load_settings(CONFIG, path)
+        self.assertEqual((settings.player, settings.opponent_count), ("parrier", 1))
 
     def test_a_scripted_opponent_walks_toward_the_agent_not_its_ally(self) -> None:
         fighters = {

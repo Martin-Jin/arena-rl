@@ -142,11 +142,13 @@ The viewer layer is the only layer intended to depend on `pygame`.
 - `src/arena_ai/viewer/settings.py` — The settings the menu edits (audio, player, the
   opponent count and the kind of each opponent slot, spawns, hints), their labels, and
   loading/saving them to `data/viewer_settings.json`. A saved single `opponent` key from an
-  older version is moved to the first slot.
+  older version is moved to the first slot. The player can also be a scripted opponent kind
+  (to watch it fight); that forces a one-on-one.
 - `src/arena_ai/viewer/matchup.py` — Names the fighters of a match ("Scripted: approach #2")
   and writes the matchup line of the main menu.
 - `src/arena_ai/viewer/controllers.py` — AI controllers for scripted and trained
-  fighters, one per fighter id (a trained one sees only its enemies), and the discovery of checkpoints in the checkpoint
+  fighters, one per fighter id (a trained one sees only its enemies; a scripted one on the
+  agent's side sees the two fighters swapped, so it works only one-on-one), and the discovery of checkpoints in the checkpoint
   folder (`latest.pt` first, then the newest). Torch is imported only when the
   trained agent is used.
 - `src/arena_ai/viewer/audio.py` — Loads configured music and sound effects

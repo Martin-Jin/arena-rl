@@ -14,7 +14,7 @@ from arena_ai.agents.scripted.view import team_observation
 from arena_ai.config import Config
 from arena_ai.sim.observation import get_observation
 from arena_ai.sim.observation_vector import encode_observation
-from arena_ai.sim.state import AGENT_ID, FighterState, enemies_of, is_opponent
+from arena_ai.sim.state import AGENT_ID, FighterState, enemies_of, opponent_id
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TRAINED = "trained"
@@ -65,7 +65,7 @@ def trained_available(config: Config) -> bool:
 
 
 class ScriptedController:
-    """A scripted opponent. Scripted policies play one of the opponents' sides."""
+    """A scripted policy playing an opponent's side, or the agent's side in a one-on-one."""
 
     def __init__(self, name: str, config: Config, fighter_id: str) -> None:
         self.policy = OPPONENTS[name]
@@ -75,6 +75,12 @@ class ScriptedController:
     def action(self, fighters: Mapping[str, FighterState]) -> int:
         # Scripted policies read the learner-first observation used in training: the agent,
         # this fighter, then its living allies.
+        if self.fighter_id == AGENT_ID:
+            # Playing the agent's side: swap the two fighters, so the policy sees itself as
+            # the first opponent and its enemy as the learner.
+            (enemy,) = enemies_of(AGENT_ID, fighters).values()
+            fighters = {AGENT_ID: enemy, opponent_id(0): fighters[AGENT_ID]}
+            return self.policy(team_observation(fighters, opponent_id(0), self.config), self.config)
         return self.policy(team_observation(fighters, self.fighter_id, self.config), self.config)
 
 
@@ -131,7 +137,5 @@ def make_controller(
     if kind == TRAINED:
         return TrainedController(config, greedy, fighter_id, checkpoint)
     if kind in OPPONENTS:
-        if not is_opponent(fighter_id):
-            raise ValueError("scripted policies can only control an opponent")
         return ScriptedController(kind, config, fighter_id)
     raise ValueError(f"Unknown controller: {kind}")

@@ -13,7 +13,6 @@ from arena_ai.viewer.controllers import (
 )
 
 # (stored value, label shown in the menu)
-PLAYER_OPTIONS = (("human", "You"), (TRAINED, "Trained agent"))
 OPPONENT_OPTIONS = (
     (TRAINED, "Trained agent"),
     ("approach", "Scripted: approach"),
@@ -22,6 +21,8 @@ OPPONENT_OPTIONS = (
     ("runner", "Scripted: runs away"),
     ("random", "Random"),
 )
+# The player's side can be you, or any opponent kind. Scripted policies there fight one-on-one.
+PLAYER_OPTIONS = (("human", "You"), *OPPONENT_OPTIONS)
 DEFAULT_OPPONENT = "approach"
 
 # Generated runtime data lives in data/, which is gitignored.
@@ -39,7 +40,7 @@ class ViewerSettings:
 
     music_volume: float
     effects_volume: float
-    player: str = "human"  # "human" or "trained" (watch the agent play)
+    player: str = "human"  # "human", or an opponent kind to watch it play (scripted: 1v1 only)
     opponent_count: int = 1  # 0 is solo practice, with no opponent and no time limit.
     # The kind of each opponent slot, ``observation.max_opponents`` long. Slots at or above
     # ``opponent_count`` are remembered but not used.
@@ -72,6 +73,8 @@ def _valid(
         settings.checkpoint = ""  # The file was renamed or deleted: choose automatically.
     if settings.player != "human" and settings.opponent_count == 0:
         settings.opponent_count = 1  # an AI needs someone to fight
+    if settings.player not in ("human", TRAINED):
+        settings.opponent_count = 1  # scripted policies only play one-on-ones
     return settings
 
 
