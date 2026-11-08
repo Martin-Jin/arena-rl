@@ -25,9 +25,16 @@ def parry_window_for_observation(f: FighterState, combat: CombatConfig) -> int:
     return f.parry_window if f.parry_frame else next_parry_window(f, combat)
 
 
-def is_lunging(f: FighterState, combat: CombatConfig) -> bool:
-    """Return whether the fighter is in a counter's wind-up, when it passes through bodies."""
-    return f.attack_counter and f.attack_frame <= combat.counter_windup_frames
+def is_lunging(f: FighterState, combat: CombatConfig, hits_checked: bool = False) -> bool:
+    """Return whether a counter is lunging, so it moves by the lunge and passes through bodies.
+
+    The lunge lasts the wind-up plus the first active frame, the one the hit and any parry
+    are checked on, so the lunger is still level with the opponent (in front of it) then.
+    ``hits_checked`` is for after that check, when only the wind-up counts: the lunger left
+    inside an opponent is pushed out the far side.
+    """
+    last = combat.counter_windup_frames + (0 if hits_checked else 1)
+    return f.attack_counter and f.attack_frame <= last
 
 
 def end_attack(f: FighterState) -> None:
@@ -56,7 +63,8 @@ def step_fighter(
     swing starts, so the lunge does not follow an opponent that moves away or jumps over.
     It passes through the opponent's body (see ``resolve_collisions``) and stops at the
     opponent's x, and stays stopped if the opponent walks through it, so the lunge never
-    carries the fighter past or away from an opponent that is no longer ahead.
+    carries the fighter past or away from an opponent that is no longer ahead. The
+    collision step after the hits then puts it on the far side.
     """
     w, fc = config.world, config.fighter
     dt = w.dt_seconds

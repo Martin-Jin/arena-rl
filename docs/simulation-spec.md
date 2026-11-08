@@ -176,8 +176,9 @@ the lunge is not reached. The lunge stays stopped if the opponent walks through 
 reaches `counter_hitbox_back_m` (0.8 m) behind the attacker's center, so walking
 through the lunging attacker does not dodge it. A normal swing starts at the attacker's
 front edge and never reaches behind it. An opponent who runs away is still hit. One
-who times a jump as the lunge begins is not. A counter can be parried like any attack,
-which starts the exchange again.
+who times a jump as the lunge begins is not. A counter can be parried like any attack
+while the attacker is still in front of the parrier, which stops it cutting through and
+starts the exchange again.
 
 **Body collision.** Every fighter has a body box (`width_m` by `height_m`) and two
 fighters cannot overlap, so neither can walk through or get stuck inside the other.
@@ -185,11 +186,14 @@ After the fighters move, and again after hits and parries, `resolve_collisions`
 ([`sim/collision.py`](../src/arena_ai/sim/collision.py)) pushes any overlapping pair
 apart along x. The overlap is split evenly, so a walker nudges a fighter that stands
 still, and a wall takes the push first. Fighters at different heights do not collide,
-so a jump clears an opponent. The only exception is a counter's lunge (its wind-up),
-which passes through the opponent's body. When the wind-up ends, a fighter left inside
-the opponent is pushed out on the side it came from (the lunge stops at the
-opponent's x, so the two are level). It therefore stays in front, where the opponent
-can still parry it, and a parried counter never ends inside the parrier. A fighter that walks into another or into a wall is stopped, and the one standing
+so a jump clears an opponent. The only exception is a counter's lunge (its wind-up and the first active frame),
+which passes through the opponent's body. The lunge stops at the opponent's x, so the
+two are level on that frame, and the opponent can still parry it then. If it is not
+parried, the lunger is pushed out on the far side, the side it was heading toward, and
+the opponent is not moved. A parry stops the lunge, so a parried counter is put back
+on the side it came from and never ends inside the parrier. Once the lunger is past, it
+can no longer be parried, because a parry only blocks an attacker in front of the parrier.
+A fighter that walks into another or into a wall is stopped, and the one standing
 still is not pushed. Its velocity (`vx`) is what it actually moved, so a fighter held
 against a wall or an opponent has `vx` 0: it plays the idle animation and no footsteps,
 and scripted opponents see it as standing still. Collisions change no observation,

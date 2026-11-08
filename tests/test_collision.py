@@ -87,7 +87,7 @@ class CollisionTests(unittest.TestCase):
         step(fighters, agent=PARRY, opponent=ATTACK)
         return fighters
 
-    def test_a_counter_lunges_through_the_opponent_and_is_pushed_out_in_front(self) -> None:
+    def test_a_counter_lunges_through_the_opponent_and_ends_on_the_far_side(self) -> None:
         fighters = self._counter()
         agent, opponent = fighters["agent"], fighters["opponent"]
         overlapped = False
@@ -95,8 +95,30 @@ class CollisionTests(unittest.TestCase):
             step(fighters, agent=ATTACK)
             overlapped = overlapped or bodies_overlap(agent, opponent, GAME)
         self.assertTrue(overlapped)  # The lunge passed through the opponent's body.
-        self.assertFalse(bodies_overlap(agent, opponent, GAME))  # The wind-up is over.
-        self.assertLess(agent.x, opponent.x)  # Back in front, where it can still be parried.
+        self.assertFalse(bodies_overlap(agent, opponent, GAME))  # The lunge is over.
+        self.assertGreater(agent.x, opponent.x)  # Cut through: ends beyond the opponent.
+
+    def test_a_counter_is_pushed_out_by_the_lunger_and_never_snaps_back(self) -> None:
+        fighters = self._counter()
+        agent, opponent = fighters["agent"], fighters["opponent"]
+        opponent_x = opponent.x
+        for _ in range(COMBAT.counter_windup_frames + 2):
+            step(fighters, agent=ATTACK)
+        side = agent.x - opponent.x
+        self.assertGreaterEqual(side, WIDTH - 1e-6)
+        self.assertEqual(opponent.x, opponent_x)  # The opponent was not shoved.
+        for _ in range(COMBAT.attack_total_frames):
+            step(fighters, agent=ATTACK)
+            self.assertGreater(agent.x, opponent.x)
+
+    def test_a_counter_can_still_be_parried_when_it_reaches_the_opponent(self) -> None:
+        fighters = self._counter()
+        for _ in range(COMBAT.counter_windup_frames):
+            step(fighters, agent=ATTACK)
+        health = fighters["opponent"].health
+        step(fighters, agent=ATTACK, opponent=PARRY)  # The lunger is level with the opponent.
+        self.assertTrue(fighters["opponent"].parried)
+        self.assertEqual(fighters["opponent"].health, health)
 
     def test_a_parried_counter_stops_at_the_parrier_and_does_not_end_inside_it(self) -> None:
         fighters = self._counter()

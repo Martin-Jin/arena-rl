@@ -1,3 +1,4 @@
+import dataclasses
 import random
 import unittest
 from unittest.mock import patch
@@ -16,9 +17,17 @@ ATTACK = FighterAction(attack=True)
 
 
 def play(fighters, learner_action, steps: int) -> int:
-    """Step with the hunter as the opponent and return how often it parried."""
+    """Step with the hunter as the opponent and return how often it parried.
+
+    A spamming learner turns toward the hunter when it faces away, which happens once the hunter's
+    counter has cut through it.
+    """
     parries = 0
     for _ in range(steps):
+        action = learner_action
+        gap = fighters["opponent"].x - fighters["agent"].x
+        if learner_action.attack and gap * fighters["agent"].facing_dir < 0:
+            action = dataclasses.replace(action, move_dir=1 if gap > 0 else -1)
         observation = encode_observation(
             get_observation(fighters["agent"], {"opponent": fighters["opponent"]}, CONFIG),
             CONFIG,
@@ -26,7 +35,7 @@ def play(fighters, learner_action, steps: int) -> int:
         step_game(
             fighters,
             {
-                "agent": learner_action,
+                "agent": action,
                 "opponent": to_fighter_action(parrying_hunter(observation, CONFIG)),
             },
             CONFIG,

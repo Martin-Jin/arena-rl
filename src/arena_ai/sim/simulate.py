@@ -111,8 +111,9 @@ def step_game(
             attacker.attack_hit = True
             attacker.counter_hit = attacker.attack_counter
 
-    # A parry cancels a counter's lunge, so a parried fighter is pushed out, not left inside.
-    resolve_collisions(fighters, config.game)
+    # A counter that was not parried ends its lunge here, so it is pushed out the far side. A
+    # parry cancels it, so a parried fighter is pushed out the near side, not left inside.
+    resolve_collisions(fighters, config.game, hits_checked=True)
 
     # A fighter that was stopped by a wall or another fighter is not moving: its velocity is
     # what it actually moved, so the animation, the footsteps and the observation agree.
@@ -186,6 +187,10 @@ def apply_parry(
 ) -> None:
     """Cancel the swing, stagger the attacker and give the parrier its counter window."""
     combat = config.combat
+    if attacker.lunge_dir and abs(attacker.x - target.x) < config.fighter.width_m:
+        # A parried lunge stops on the side it came from. The lunge direction is cleared
+        # below, so put it there now, or the collision step could put it on the far side.
+        attacker.x = target.x - attacker.lunge_dir * config.fighter.width_m
     attacker.stagger_from_frame = combat.normal_swing_frame(
         attacker.attack_frame, attacker.attack_counter
     )
