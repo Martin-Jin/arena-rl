@@ -45,6 +45,8 @@ The simulation layer is deterministic and independent of rendering. It must not 
   in configuration. Each fighter contributes fourteen features, scaled using the
   game configuration's fixed observation limits. See
   [`docs/simulation-spec.md`](simulation-spec.md) for the exact order.
+- `src/arena_ai/sim/collision.py` — Keeps fighters' body boxes from overlapping; a counter's
+  lunge passes through.
 - `src/arena_ai/sim/rules.py` — Implements one fighter's step: movement, attack and
   parry timing, the spam-shrunk parry window, the counter lunge and hover.
 

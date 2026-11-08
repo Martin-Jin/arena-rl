@@ -149,6 +149,19 @@ through the attacker does not dodge it. An opponent who runs away is still hit. 
 who times a jump as the lunge begins is not. A counter can be parried like any attack,
 which starts the exchange again.
 
+**Body collision.** Every fighter has a body box (`width_m` by `height_m`) and two
+fighters cannot overlap, so neither can walk through or get stuck inside the other.
+After the fighters move, and again after hits and parries, `resolve_collisions`
+([`sim/collision.py`](../src/arena_ai/sim/collision.py)) pushes any overlapping pair
+apart along x. The overlap is split evenly, so a walker nudges a fighter that stands
+still, and a wall takes the push first. Fighters at different heights do not collide,
+so a jump clears an opponent. The only exception is a counter's lunge (its wind-up),
+which passes through the opponent's body. When the wind-up ends, a fighter left inside
+the opponent is pushed out on the side it came from (the lunge stops at the
+opponent's x, so the two are level). It therefore stays in front, where the opponent
+can still parry it, and a parried counter never ends inside the parrier. Collisions
+change no observation, action or reward layout.
+
 **Air hover.** A successful parry while airborne lifts the fighter by
 `parry_hover_impulse_mps`, never above `parry_hover_max_vy_mps` (a faster climb is
 kept, not reduced), and scales gravity by `parry_hover_gravity_scale` for

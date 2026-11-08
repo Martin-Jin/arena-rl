@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from collections.abc import Mapping
 
 from arena_ai.config import Config, GameConfig
+from arena_ai.sim.collision import resolve_collisions
 from arena_ai.sim.rules import LEVEL_TOLERANCE_M, end_attack, step_fighter
 from arena_ai.sim.state import FighterState
 
@@ -73,6 +74,8 @@ def step_game(
             target_x=_nearest_opponent_x(fighter_id, fighters),
         )
 
+    resolve_collisions(fighters, config.game)
+
     for fighter_id, attacker in fighters.items():
         if not attacker_is_active(attacker, config.game):
             continue
@@ -88,6 +91,9 @@ def step_game(
                 attacker.attack_hit = True
                 attacker.counter_hit = attacker.attack_counter
             break
+
+    # A parry cancels a counter's lunge, so a parried fighter is pushed out, not left inside.
+    resolve_collisions(fighters, config.game)
 
 
 def _nearest_opponent_x(

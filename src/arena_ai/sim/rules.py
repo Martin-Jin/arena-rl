@@ -25,6 +25,11 @@ def parry_window_for_observation(f: FighterState, combat: CombatConfig) -> int:
     return f.parry_window if f.parry_frame else next_parry_window(f, combat)
 
 
+def is_lunging(f: FighterState, combat: CombatConfig) -> bool:
+    """Return whether the fighter is in a counter's wind-up, when it passes through bodies."""
+    return f.attack_counter and f.attack_frame <= combat.counter_windup_frames
+
+
 def end_attack(f: FighterState) -> None:
     """Return a fighter to not attacking."""
     f.attack_frame = 0
@@ -46,9 +51,10 @@ def step_fighter(
 
     ``target_x`` is the x position of the nearest opponent. A counter attack lunges
     toward it. The direction is fixed when the swing starts, so the lunge does not
-    follow an opponent that moves away or jumps over. It stops at the opponent's x, and
-    stays stopped if the opponent walks through it, so the lunge never carries the
-    fighter past or away from an opponent that is no longer ahead.
+    follow an opponent that moves away or jumps over. It passes through the opponent's
+    body (see ``resolve_collisions``) and stops at the opponent's x, and stays stopped if
+    the opponent walks through it, so the lunge never carries the fighter past or away
+    from an opponent that is no longer ahead.
     """
     w, fc = config.world, config.fighter
     dt = w.dt_seconds
@@ -119,7 +125,7 @@ def step_fighter(
     # A parrying fighter cannot walk or jump.
     if f.parry_frame:
         f.vx = 0.0
-    elif f.attack_counter and f.attack_frame <= combat.counter_windup_frames:
+    elif is_lunging(f, combat):
         f.vx = f.lunge_dir * combat.counter_lunge_speed_mps
         if target_x is not None:
             ahead = (target_x - f.x) * f.lunge_dir  # Not positive once the target is reached.
