@@ -164,7 +164,7 @@ class TeamCombatTests(unittest.TestCase):
         self.assertGreater(fighters[AGENT_ID].x, 6.0)
         self.assertGreater(fighters[AGENT_ID].x, start)
         for opponent in ("opponent", "opponent_1"):  # ...and both are hit.
-            self.assertEqual(fighters[opponent].health, 100 - COMBAT.attack_damage, opponent)
+            self.assertEqual(fighters[opponent].health, 100 - COMBAT.counter_damage, opponent)
         self.assertEqual(fighters[AGENT_ID].health, 100)
 
     def test_a_counter_cannot_cut_through_an_opponent_beyond_its_lunge(self) -> None:
@@ -218,6 +218,25 @@ class TeamCombatTests(unittest.TestCase):
         fighters["opponent_1"].health = 0
         step(fighters, **{AGENT_ID: ATTACK})
         self.assertEqual(fighters[AGENT_ID].lunge_dir, 1)
+
+
+class CounterDamageTests(unittest.TestCase):
+    def test_a_counter_deals_counter_damage_and_a_normal_swing_attack_damage(self) -> None:
+        self.assertEqual(COMBAT.counter_damage, 15)
+        normal = {
+            AGENT_ID: FighterState(x=5.0, facing_dir=1),
+            "opponent": FighterState(x=5.4, facing_dir=-1),
+        }
+        swing(normal, AGENT_ID)
+        self.assertEqual(normal["opponent"].health, 100 - COMBAT.attack_damage)
+        counter = {
+            AGENT_ID: FighterState(
+                x=5.0, facing_dir=1, counter_frames=COMBAT.counter_window_frames
+            ),
+            "opponent": FighterState(x=5.4, facing_dir=-1),
+        }
+        swing(counter, AGENT_ID)
+        self.assertEqual(counter["opponent"].health, 100 - COMBAT.counter_damage)
 
 
 class OutcomeTests(unittest.TestCase):

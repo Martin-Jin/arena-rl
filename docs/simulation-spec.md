@@ -97,7 +97,7 @@ A scripted opponent sees the vector built from the agent's side: slot 0 is the a
   box extending from the attacker's front edge to `width / 2 + attack_range_m` in
   front of its center, and that vertically overlaps by less than one fighter height. Each
   swing hits each enemy at most once, nearest first, and deals `attack_damage` (10) to
-  each. An enemy that parries the swing cancels it for everyone not yet hit. The box never reaches behind the
+  each, or `counter_damage` (15) if it is a counter attack. An enemy that parries the swing cancels it for everyone not yet hit. The box never reaches behind the
   attacker, except for a counter (see Counter).
 - Fighters have `max_health` (100) health. Fighters on the same team never hit each other,
   and a dead fighter cannot attack or be hit. Who is alive is fixed at the start of the

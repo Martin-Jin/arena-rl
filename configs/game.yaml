@@ -27,6 +27,7 @@ combat:
   # start. It is the attacker's cooldown.
   attack_recovery_frames: 14
   attack_damage: 10
+  counter_damage: 15 # damage of each enemy a counter attack hits, in place of attack_damage
   attack_range_m: 0.8
   # Parry: a press opens a protected window, then a fixed recovery. Holding the
   # button parries once. The window halves with every press made soon after the

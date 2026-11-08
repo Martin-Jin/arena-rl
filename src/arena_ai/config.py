@@ -40,6 +40,7 @@ class CombatConfig:
     attack_active_frames: int
     attack_recovery_frames: int
     attack_damage: int
+    counter_damage: int
     attack_range_m: float
     parry_window_frames: int
     parry_recovery_frames: int
@@ -64,6 +65,10 @@ class CombatConfig:
             + self.attack_active_frames
             + self.attack_recovery_frames
         )
+
+    def damage(self, counter: bool) -> int:
+        """Damage of a normal swing, or of a counter attack."""
+        return self.counter_damage if counter else self.attack_damage
 
     def windup_frames(self, counter: bool) -> int:
         """Wind-up length of a normal swing, or of the shorter counter swing."""

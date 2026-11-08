@@ -172,7 +172,7 @@ class ParryTests(unittest.TestCase):
         step(fighters, agent=ATTACK)
         self.assertTrue(fighters["agent"].attack_counter)
         self.assertGreater(fighters["agent"].x, start_x)
-        self.assertEqual(fighters["opponent"].health, 100 - COMBAT.attack_damage)
+        self.assertEqual(fighters["opponent"].health, 100 - COMBAT.counter_damage)
 
     def test_starting_a_counter_sets_a_one_step_event(self) -> None:
         fighters = duel()
@@ -197,7 +197,7 @@ class ParryTests(unittest.TestCase):
                 hit_steps += 1
                 self.assertAlmostEqual(
                     calculate_reward({"agent": 100, "opponent": 100}, fighters, CONFIG)
-                    - CONFIG.scoring.damage_reward_scale * COMBAT.attack_damage,
+                    - CONFIG.scoring.damage_reward_scale * COMBAT.counter_damage,
                     CONFIG.scoring.counter_reward - CONFIG.scoring.time_penalty_per_step,
                 )
         self.assertEqual(hit_steps, 1)
@@ -214,7 +214,7 @@ class ParryTests(unittest.TestCase):
         flee = FighterAction(move_dir=1)
         for _ in range(COMBAT.counter_windup_frames + 1):
             step(fighters, agent=ATTACK, opponent=flee)
-        self.assertEqual(fighters["opponent"].health, 100 - COMBAT.attack_damage)
+        self.assertEqual(fighters["opponent"].health, 100 - COMBAT.counter_damage)
 
     def test_walking_through_the_attacker_does_not_dodge_the_counter(self) -> None:
         for gap in (0.1, 0.5, 0.9):
@@ -226,7 +226,7 @@ class ParryTests(unittest.TestCase):
             for _ in range(COMBAT.counter_windup_frames + 1):
                 step(fighters, agent=ATTACK, opponent=walk)
             self.assertEqual(
-                fighters["opponent"].health, 100 - COMBAT.attack_damage, f"gap {gap}"
+                fighters["opponent"].health, 100 - COMBAT.counter_damage, f"gap {gap}"
             )
 
     def test_a_counter_can_be_parried_back(self) -> None:

@@ -105,7 +105,8 @@ def step_game(
             if parry_blocks(target, attacker):
                 apply_parry(target, attacker, fighter_id, config.game)
                 break
-            target.health = max(0, target.health - config.game.combat.attack_damage)
+            damage = config.game.combat.damage(attacker.attack_counter)
+            target.health = max(0, target.health - damage)
             attacker.hit_targets.add(target_id)
             attacker.attack_hit = True
             attacker.counter_hit = attacker.attack_counter
