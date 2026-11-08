@@ -7,8 +7,9 @@ from typing import Any
 from arena_ai.config import Config
 from arena_ai.sim.observation import get_observation
 from arena_ai.sim.observation_vector import encode_observation
+from arena_ai.sim.outcome import is_over, winner
 from arena_ai.sim.simulate import FighterAction, step_game
-from arena_ai.sim.state import FighterState
+from arena_ai.sim.state import AGENT_ID, FighterState, enemies_of
 from arena_ai.envs.reward import calculate_reward, wall_distance
 
 
@@ -73,8 +74,8 @@ class ArenaEnv(ABC):
         previous_health = {
             fighter_id: fighter.health for fighter_id, fighter in self.fighters.items()
         }
-        attack_frame_before = self.fighters["agent"].attack_frame
-        parry_frame_before = self.fighters["agent"].parry_frame
+        attack_frame_before = self.fighters[AGENT_ID].attack_frame
+        parry_frame_before = self.fighters[AGENT_ID].parry_frame
         step_game(self.fighters, actions, self.config)
         self.step_count += 1
         self._track_episode(previous_health, attack_frame_before, parry_frame_before)
@@ -84,14 +85,16 @@ class ArenaEnv(ABC):
         self._episode_done = terminated or truncated
 
         reward = self.calculate_reward(previous_health)
-        winner = None
-        if terminated and self.fighters["agent"].health > 0:
-            winner = "agent"
-        elif terminated:
-            winner = "opponent"
+        # A time-out is not a kill, so "winner" stays None for it. It still earns a small
+        # reward when the agent is ahead on health, and is reported as "timeout_win".
+        timeout_win = truncated and winner(self.fighters, timed_out=True) == AGENT_ID
+        if timeout_win:
+            reward += self.config.scoring.timeout_win_reward
         info = {
             "step_count": self.step_count,
-            "winner": winner,
+            "winner": winner(self.fighters),
+            "timeout_win": timeout_win,
+            "opponent_count": len(self.fighters) - 1,
             "damage_dealt": self.damage_dealt,
             "damage_taken": self.damage_taken,
             "swings": self.swings,
@@ -110,7 +113,7 @@ class ArenaEnv(ABC):
     ) -> None:
         """Update the cheap per-episode counters after one simulation step."""
         assert self.fighters is not None
-        agent = self.fighters["agent"]
+        agent = self.fighters[AGENT_ID]
         if attack_frame_before == 0 and agent.attack_frame == 1:
             self.swings += 1
         if parry_frame_before == 0 and agent.parry_frame == 1:
@@ -118,13 +121,12 @@ class ArenaEnv(ABC):
         self.parries += agent.parried
         dealt = sum(
             previous_health[fighter_id] - fighter.health
-            for fighter_id, fighter in self.fighters.items()
-            if fighter_id != "agent"
+            for fighter_id, fighter in enemies_of(AGENT_ID, self.fighters).items()
         )
         if dealt > 0:
             self.hits += 1
             self.damage_dealt += dealt
-        self.damage_taken += previous_health["agent"] - agent.health
+        self.damage_taken += previous_health[AGENT_ID] - agent.health
         if wall_distance(agent, self.config) < self.config.scoring.edge_margin:
             self.edge_steps += 1
 
@@ -132,12 +134,8 @@ class ArenaEnv(ABC):
         """Return the current flattened and normalized observation vector."""
         if self.fighters is None:
             raise RuntimeError("reset() must be called before getting an observation")
-        agent = self.fighters["agent"]
-        opponents = {
-            fighter_id: fighter
-            for fighter_id, fighter in self.fighters.items()
-            if fighter_id != "agent"
-        }
+        agent = self.fighters[AGENT_ID]
+        opponents = enemies_of(AGENT_ID, self.fighters)
         structured = get_observation(agent, opponents, self.config)
         return encode_observation(structured, self.config)
 
@@ -160,7 +158,7 @@ class ArenaEnv(ABC):
         return calculate_reward(previous_health, self.fighters, self.config)
 
     def is_terminated(self) -> bool:
-        """Return whether the scenario has reached a natural terminal state."""
+        """Return whether the agent or every opponent is dead."""
         if self.fighters is None:
             return False
-        return any(fighter.health <= 0 for fighter in self.fighters.values())
+        return is_over(self.fighters)

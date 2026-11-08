@@ -60,10 +60,12 @@ def format_stats(state: TrainingState) -> str:
         f"update {metric('update_seconds'):.2f}s  "
         f"{metric('steps_per_second'):,.0f} steps/s",
     ]
+    width = max([9, *map(len, state.opponent_stats)])  # Matchups like "approach+idle+runner".
     for name, stats in state.opponent_stats.items():
         lines.append(
-            f"  vs {name:<9} win {stats['win_rate']:.0%}  "
-            f"timeout {stats['truncation_rate']:.0%}  "
+            f"  vs {name:<{width}} win {stats['win_rate']:.0%}  "
+            f"timeout {stats['truncation_rate']:.0%} "
+            f"(ahead {stats['timeout_win_rate']:.0%})  "
             f"length {stats['mean_length']:.0f}  "
             f"({int(stats['episodes'])} episodes)"
         )

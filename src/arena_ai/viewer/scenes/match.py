@@ -9,13 +9,21 @@ from typing import TYPE_CHECKING
 import pygame
 
 from arena_ai.agents.action import from_parts, to_fighter_action
+from arena_ai.sim.outcome import is_over, winner
 from arena_ai.sim.simulate import FighterAction, step_game
-from arena_ai.sim.state import FighterState, create_initial_fighters
+from arena_ai.sim.state import (
+    AGENT_ID,
+    FighterState,
+    create_initial_fighters,
+    enemies_of,
+    opponent_id,
+)
 from arena_ai.viewer.audio import FighterSnapshot
 from arena_ai.viewer.controllers import Controller, make_controller
 from arena_ai.viewer.render.scene import draw_scene
 from arena_ai.viewer.scenes.settings_menu import SettingsScene
-from arena_ai.viewer.settings import OPPONENT_OPTIONS, PLAYER_OPTIONS, label_for
+from arena_ai.viewer.matchup import fighter_labels
+from arena_ai.viewer.settings import DEFAULT_OPPONENT
 from arena_ai.viewer.ui.hud import Hud
 from arena_ai.viewer.ui.widgets import Button, Menu, stack
 
@@ -53,7 +61,7 @@ class MatchScene:
         self.age = 0.0  # Real seconds since the first round, for the controls hint.
         self.controllers: dict[str, Controller] = {}
         self.player_kind = "human"
-        self.opponent_kind = "none"
+        self.opponent_kinds: list[str] = []  # One per opponent, empty for solo practice.
         self._build_controllers()
         self.restart()
 
@@ -64,32 +72,34 @@ class MatchScene:
         settings = self.app.settings
         greedy = settings.trained_greedy
         self.player_kind = settings.player
-        self.opponent_kind = settings.opponent
+        self.opponent_kinds = settings.opponents[: settings.opponent_count]
         if self.player_kind != "human":
             try:
-                self.controllers["agent"] = make_controller(
-                    self.player_kind, self.config, greedy, "agent", settings.checkpoint
+                self.controllers[AGENT_ID] = make_controller(
+                    self.player_kind, self.config, greedy, AGENT_ID, settings.checkpoint
                 )
             except Exception as error:  # Missing checkpoint, torch not installed...
                 self.notice = f"Could not load the trained agent ({error}). You play instead."
                 self.player_kind = "human"
-        if self.opponent_kind != "none":
+        for index, kind in enumerate(self.opponent_kinds):
+            fighter_id = opponent_id(index)
             try:
-                self.controllers["opponent"] = make_controller(
-                    self.opponent_kind, self.config, greedy, "opponent", settings.checkpoint
+                self.controllers[fighter_id] = make_controller(
+                    kind, self.config, greedy, fighter_id, settings.checkpoint
                 )
             except Exception as error:
+                # Each trained slot loads on its own, so each one falls back.
                 self.notice = f"Could not load the trained agent ({error}). Using scripted."
-                self.opponent_kind = "approach"
-                self.controllers["opponent"] = make_controller(
-                    "approach", self.config, greedy, "opponent"
+                self.opponent_kinds[index] = DEFAULT_OPPONENT
+                self.controllers[fighter_id] = make_controller(
+                    DEFAULT_OPPONENT, self.config, greedy, fighter_id
                 )
 
     def _new_fighters(self) -> dict[str, FighterState]:
-        if self.opponent_kind == "none":
-            return {"agent": FighterState()}  # Practice: a single fighter.
+        if not self.opponent_kinds:
+            return {AGENT_ID: FighterState()}  # Practice: a single fighter.
         rng = self.rng if self.app.settings.random_spawns else None
-        return create_initial_fighters(self.config.game, rng)
+        return create_initial_fighters(self.config.game, rng, len(self.opponent_kinds))
 
     def restart(self) -> None:
         """Start a fresh round with the same opponents."""
@@ -113,15 +123,12 @@ class MatchScene:
 
     @property
     def labels(self) -> dict[str, str]:
-        return {
-            "agent": label_for(PLAYER_OPTIONS, self.player_kind),
-            "opponent": label_for(OPPONENT_OPTIONS, self.opponent_kind),
-        }
+        return fighter_labels(self.player_kind, self.opponent_kinds)
 
     @property
     def watching(self) -> bool:
         """True when the agent is AI-controlled and the human only watches."""
-        return "agent" in self.controllers
+        return AGENT_ID in self.controllers
 
     # -- state changes -----------------------------------------------------
 
@@ -150,15 +157,12 @@ class MatchScene:
         self.menu = None
 
     def _decide(self, timed_out: bool) -> str:
-        """Return "agent", "opponent" or "draw" for a finished match."""
-        agent, opponent = self.fighters["agent"], self.fighters["opponent"]
-        if timed_out:  # Nobody was defeated, so the healthier fighter wins.
-            if agent.health == opponent.health:
-                return "draw"
-            return "agent" if agent.health > opponent.health else "opponent"
-        if agent.health <= 0 and opponent.health <= 0:
-            return "draw"  # Both fell in the same step.
-        return "agent" if agent.health > 0 else "opponent"
+        """Return "agent", "opponent" or "draw" for a finished match.
+
+        A time-out is decided on health (see ``sim.outcome.winner``), and a match that
+        ended in a death is a draw only if the agent and the last opponent fell together.
+        """
+        return winner(self.fighters, timed_out) or "draw"
 
     def _finish(self, timed_out: bool = False) -> None:
         self.phase = OVER
@@ -170,7 +174,11 @@ class MatchScene:
         if self.outcome == "draw":
             self.winner = "Draw"
         elif self.watching:
-            self.winner = f"{self.labels[self.outcome]} wins"
+            if self.outcome == "agent":
+                name = self.labels[AGENT_ID]
+            else:  # The opponents are one team, named after the opponent only if it is alone.
+                name = self.labels[opponent_id(0)] if len(self.opponent_kinds) == 1 else "Opponents"
+            self.winner = f"{name} wins"
         else:
             self.winner = "Victory" if self.outcome == "agent" else "Defeat"
         self.subtitle = ""
@@ -238,7 +246,7 @@ class MatchScene:
             }
             step_game(self.fighters, actions, self.config)
             self.steps += 1
-            move_dir = actions["agent"].move_dir
+            move_dir = actions[AGENT_ID].move_dir
             if move_dir and move_dir != self.last_move_dir:
                 self.turn_timer = TURN_FRAMES
             if move_dir:
@@ -250,9 +258,9 @@ class MatchScene:
                     self.hud.countered(fighter_id, fighter)
                 self.app.audio.update_fighter(fighter_id, fighter, before[fighter_id])
             self.accumulator -= self.dt
-            if self.opponent_kind == "none":
+            if not self.opponent_kinds:
                 continue  # Practice has no opponent to defeat and no time limit.
-            if any(f.health <= 0 for f in self.fighters.values()):
+            if is_over(self.fighters):
                 self._finish()
             elif self.time_limit and self.steps * self.dt >= self.time_limit:
                 self._finish(timed_out=True)
@@ -327,9 +335,15 @@ class MatchScene:
                 self.notice,
                 "small",
                 self.app.theme.color("damage_taken"),
-                pygame.Rect(80, 84, screen.get_width() - 160, 24),
+                self._notice_area(screen),
                 "center",
             )
+
+    def _notice_area(self, screen: pygame.Surface) -> pygame.Rect:
+        """Return the strip between the agent's health bar and the opponents' bars."""
+        ui = self.config.viewer.ui
+        left = ui.health_bar_margin + ui.health_bar_width + 16
+        return pygame.Rect(left, 84, screen.get_width() - 2 * left, 24)
 
     def _draw_pause(self, screen: pygame.Surface) -> None:
         theme = self.app.theme
@@ -373,9 +387,8 @@ class MatchScene:
             )
 
         max_health = self.config.game.fighter.max_health
-        opponent = self.fighters.get("opponent")
-        dealt = max_health - opponent.health if opponent else 0
-        taken = max_health - self.fighters["agent"].health
+        dealt = sum(max_health - f.health for f in enemies_of(AGENT_ID, self.fighters).values())
+        taken = max_health - self.fighters[AGENT_ID].health
         minutes, seconds = divmod(int(self.steps * self.dt), 60)
         stats = (
             ("Time", f"{minutes}:{seconds:02d}"),

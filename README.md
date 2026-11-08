@@ -14,8 +14,9 @@ compatibility and more advanced training workflows remain future work.
 - Configurable game, agent, and scoring values in [`configs/`](configs/).
 - Observation encoding and discrete action definitions used by the learning agent.
 - **Training works today:** hand-written PPO, rollout, checkpoint, and environment
-  modules, run with `py scripts/run_training.py`. Choose the opponent of each parallel
-  environment with `training.opponents` in [`configs/agent.yaml`](configs/agent.yaml).
+  modules, run with `py scripts/run_training.py`. Choose the opponents of each parallel
+  environment (one to three at once) with `training.opponents` in
+  [`configs/agent.yaml`](configs/agent.yaml).
   See [Training](#training) and the [training guide](docs/training-process.md).
 - Scripted opponents for the viewer and training, including one that hunts you and
   parries every attack it can see, and one that runs away from you.
@@ -45,10 +46,11 @@ mouse, or the arrow keys with `Enter`. The settings menu has:
 - **Audio** — music and sound-effect volume.
 - **Player** — you, or the trained agent (the start button then reads **Watch**
   and you spectate the agent fight the chosen opponent).
-- **Opponent** — a dropdown with the trained agent, the scripted
-  approach-and-attack fighter, a perfect-parry fighter (it parries every attack it can
-  see coming, so hit it while it is busy swinging or recovering), an idle dummy, a fighter that runs away, a random fighter, or solo practice
-  (not available while watching). The trained agent needs a checkpoint, so run
+- **Opponents** — how many opponents you face (none for solo practice, up to three;
+  solo is not available while watching), then **Opponent 1** to **3**, one dropdown
+  each: the trained agent, the scripted approach-and-attack fighter, a perfect-parry fighter (it parries every attack it can
+  see coming, so hit it while it is busy swinging or recovering), an idle dummy, a fighter that runs away, or a random fighter. Opponents are allies and never hurt
+  each other, and you win when all of them are dead. The trained agent needs a checkpoint, so run
   training first. It can play its best move or sample varied moves.
 - **Checkpoint** — which file in `checkpoints/` the trained agent loads. Automatic
   uses `latest.pt` if it exists, otherwise the newest `.pt` file, so a checkpoint
@@ -86,6 +88,8 @@ Controls:
   simulation or anything a checkpoint depends on.
 - [`docs/training-process.md`](docs/training-process.md) — the training loop, PPO
   data flow, bootstrapping, resuming a run and the printed training statistics.
+- [`docs/network.md`](docs/network.md) — diagrams of the neural network, how it
+  decides, and how the PPO loss trains each part.
 - [`docs/hardware.md`](docs/hardware.md) — which training steps run on the CPU or
   GPU, and why.
 - [`docs/modules-reference.md`](docs/modules-reference.md) — what every module and
@@ -120,7 +124,10 @@ trained opponent works straight after a clone with no training. Every other file
 13.9 million steps). Over the whole run the agent won 97% of its 27,982 episodes. In the last 100 episodes it won
 every one against the approach, idle and perfect-parry opponents and 99 against the
 random one. It was trained before the runner opponent existed, so it has not been
-measured against it. The viewer picks it up automatically when there is no `latest.pt`,
+measured against it. **Retrain it:** the observation now has opponent slots and a mask
+(spec version 2) and the network has an attention input block, so this checkpoint no
+longer loads and the viewer's trained agent needs a new one. Its figures above are for the
+old network. `checkpoints/best.pt` is left as it was until a new run replaces it. The viewer picks it up automatically when there is no `latest.pt`,
 or you can choose it in Settings. Replace `best.pt` only when a run is clearly better,
 and update these figures when you do.
 

@@ -3,7 +3,7 @@
 from collections.abc import Mapping
 
 from arena_ai.config import Config
-from arena_ai.sim.state import FighterState
+from arena_ai.sim.state import AGENT_ID, FighterState, enemies_of
 
 
 def wall_distance(agent: FighterState, config: Config) -> float:
@@ -25,15 +25,17 @@ def calculate_reward(
     fighters: Mapping[str, FighterState],
     config: Config,
 ) -> float:
-    """Reward damage, parries and counter hits; penalise damage taken, misses, walls and time."""
+    """Reward damage, parries and counter hits; penalise damage taken, misses, walls and time.
+
+    The victory bonus is paid once every opponent is dead. The time-out bonus is added by
+    ``ArenaEnv.step``, since only it knows the episode timed out.
+    """
     scoring = config.scoring
-    agent = fighters["agent"]
-    opponents = [f for fid, f in fighters.items() if fid != "agent"]
-    opponent_damage = sum(
-        previous_health[fid] - f.health for fid, f in fighters.items() if fid != "agent"
-    )
+    agent = fighters[AGENT_ID]
+    opponents = enemies_of(AGENT_ID, fighters)
+    opponent_damage = sum(previous_health[fid] - f.health for fid, f in opponents.items())
     reward = scoring.damage_reward_scale * (
-        opponent_damage - (previous_health["agent"] - agent.health)
+        opponent_damage - (previous_health[AGENT_ID] - agent.health)
     )
     reward -= edge_penalty(agent, config)
     reward -= scoring.time_penalty_per_step
@@ -43,6 +45,6 @@ def calculate_reward(
     reward -= scoring.missed_attack_penalty * agent.missed_attack
     if agent.health <= 0:
         reward -= scoring.defeat_penalty
-    elif any(f.health <= 0 for f in opponents):
+    elif opponents and all(f.health <= 0 for f in opponents.values()):
         reward += scoring.victory_reward
     return reward

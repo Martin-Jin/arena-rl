@@ -15,9 +15,24 @@ from arena_ai.sim.state import FighterState
 ASSET_ROOT = Path(__file__).resolve().parents[3] / "assets" / "audio"
 EFFECT_ROOT = ASSET_ROOT / "effects"
 MUSIC_ROOT = ASSET_ROOT / "music"
-# Each fighter gets its own pair of channels for its looping footsteps.
-MAX_FIGHTERS = 2
-MIXER_CHANNELS = 16
+# Each fighter gets its own pair of channels for its looping footsteps. The rest of the
+# mixer's channels play the one-shot effects.
+FOOTSTEP_CHANNELS_PER_FIGHTER = 2
+EFFECT_CHANNELS = 12
+MAX_MIXER_CHANNELS = 64
+
+
+def mixer_channels(max_fighters: int) -> int:
+    """Return the mixer channels needed for ``max_fighters`` fighters, or raise if too many."""
+    if max_fighters < 1:
+        raise ValueError("at least one fighter must have sound")
+    channels = FOOTSTEP_CHANNELS_PER_FIGHTER * max_fighters + EFFECT_CHANNELS
+    if channels > MAX_MIXER_CHANNELS:
+        raise ValueError(
+            f"{max_fighters} fighters need {channels} mixer channels, more than the "
+            f"{MAX_MIXER_CHANNELS} the viewer allows: lower observation.max_opponents"
+        )
+    return channels
 
 
 def _normalize_sound(
@@ -130,7 +145,10 @@ class _RunningLoop:
 class AudioManager:
     """Load and play the viewer's music and sound effects for every fighter."""
 
-    def __init__(self, config: AudioConfig) -> None:
+    def __init__(self, config: AudioConfig, max_fighters: int) -> None:
+        """Load the sounds. ``max_fighters`` is the most fighters that can make footsteps."""
+        channels = mixer_channels(max_fighters)  # Fails early, before anything is loaded.
+        self.max_fighters = max_fighters
         self.effects = {
             name: _normalize_sound(
                 pygame.mixer.Sound(EFFECT_ROOT / filename),
@@ -140,8 +158,8 @@ class AudioManager:
             for name, filename in config.effects.items()
         }
         self.set_effects_volume(config.effects_volume)
-        pygame.mixer.set_num_channels(MIXER_CHANNELS)
-        pygame.mixer.set_reserved(2 * MAX_FIGHTERS)
+        pygame.mixer.set_num_channels(channels)
+        pygame.mixer.set_reserved(FOOTSTEP_CHANNELS_PER_FIGHTER * max_fighters)
         self.running_fade_ms = config.running_fade_ms
         self.match_end_fade_ms = config.match_end_fade_ms
         # Parries alternate between their sounds, starting with a random one.
@@ -216,8 +234,8 @@ class AudioManager:
         """Return the footstep loop for a fighter, giving it channels on first use."""
         if fighter_id not in self._loops:
             pair = len(self._loops)
-            if pair >= MAX_FIGHTERS:
-                raise ValueError(f"At most {MAX_FIGHTERS} fighters can have sound")
+            if pair >= self.max_fighters:
+                raise ValueError(f"At most {self.max_fighters} fighters can have sound")
             channels = (
                 pygame.mixer.Channel(2 * pair),
                 pygame.mixer.Channel(2 * pair + 1),

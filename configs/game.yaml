@@ -75,8 +75,12 @@ combat:
   parried_stagger_frames: 28
 
 observation:
-  # TODO: spec_version and reaction_delay_frames are loaded but not used yet.
-  # reaction_delay_frames will be the frames an observation lags behind the game.
-  spec_version: 1
+  # spec_version is saved in checkpoints, which refuse to load at another version.
+  # TODO: reaction_delay_frames is loaded but not used yet. It will be the frames an
+  # observation lags behind the game.
+  spec_version: 2
   reaction_delay_frames: 0
   max_observed_height_m: 1.3
+  # Opponent slots in the observation (the network input is padded and masked to this many).
+  # Raise it to train against more opponents at once. Old checkpoints no longer fit.
+  max_opponents: 3

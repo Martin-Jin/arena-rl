@@ -12,8 +12,8 @@ here as the current defaults.
   default). Rendering speed never changes simulation results.
 - One call to `step_game` advances every fighter by one step, then resolves
   hits.
-- A training episode is truncated after `max_episode_steps` steps unless a
-  fighter reaches 0 health first. `training.max_episode_steps` in
+- A training episode is truncated after `max_episode_steps` steps unless the agent
+  or every opponent reaches 0 health first (see Teams and termination). `training.max_episode_steps` in
   `agent.yaml` sets it (1500 steps, 25 s); if unset, the environment defaults to
   `sim_hz * 10` steps.
 
@@ -36,10 +36,28 @@ attack press made at the same time. The viewer maps `Q` to parry.
 
 ## Observation
 
-`encode_observation` returns one vector from the acting fighter's point of
-view: the acting fighter first, then each opponent sorted by ID. A one-versus-one
-game therefore has 28 values. Every fighter contributes these 14 values, each
-clamped to `[-1, 1]`:
+`encode_observation` returns one flat vector from the acting fighter's point of view
+(`spec_version` 2):
+
+```
+[acting fighter: F values] [opponent slot 0: F] ... [opponent slot K-1: F] [mask: K values]
+```
+
+`F` is `FEATURES_PER_FIGHTER` (14) and `K` is `observation.max_opponents` in
+[`configs/game.yaml`](../configs/game.yaml) (3), so the vector has `F * (1 + K) + K` = 59
+values. `K` is the only place the number of opponents appears: raising it needs only that
+config value (and a retrain).
+
+- Opponents fill the slots in the natural order of their ids (`opponent_2` before
+  `opponent_10`), from slot 0.
+- A slot with no opponent, or a dead one, is all zeros. Its **mask** value is 0.0 (1.0 for
+  a living opponent), so a network can tell an absent opponent from one standing at x = 0.
+- Fewer opponents than slots is allowed, so one network plays against any number up to
+  `K`. More than `K` raises an error.
+
+Every fighter contributes these 14 values, each clamped to `[-1, 1]`. Their order is
+`FEATURE_NAMES` in [`sim/observation_vector.py`](../src/arena_ai/sim/observation_vector.py),
+the single source for this table:
 
 | Offset | Feature        | Scaling                                          |
 | ------ | -------------- | ------------------------------------------------ |
@@ -58,11 +76,14 @@ clamped to `[-1, 1]`:
 | 12     | `stagger_frames` | frames left in which a parried fighter cannot attack, divided by `parried_stagger_frames` |
 | 13     | `parry_held` | 1.0 if the fighter's parry input was held on the previous step. Only a new press starts a parry, so a policy that keeps parry on never starts another one, and needs this to know it must release first |
 
-Update `FEATURES_PER_FIGHTER` in
-[`sim/observation_vector.py`](../src/arena_ai/sim/observation_vector.py) when
-this table changes. The scripted opponent in
-[`agents/scripted.py`](../src/arena_ai/agents/scripted.py) reads the vector by
-index, with the learner at 0-13 and itself at 14-27.
+Read a vector by name with `fighter_features(vector, slot)` (slot 0 is the acting fighter,
+1 and up are opponents), `opponent_mask(vector, K)` and `slot_count(vector)`. Never index it
+by number: add a feature at the end of `FEATURE_NAMES` and bump `spec_version`, and the
+checkpoint check refuses old weights.
+
+A scripted opponent sees the vector built from the agent's side: slot 0 is the agent, slot
+1 is the opponent itself and slots 2 and up are its living allies (see
+[`agents/scripted/view.py`](../src/arena_ai/agents/scripted/view.py)).
 
 ## Combat
 
@@ -72,12 +93,16 @@ index, with the learner at 0-13 and itself at 14-27.
   frames (0.27 s). The first active frame is where the animation shows the sword
   raised high and starting to swing. A fighter can turn mid-swing by moving the other way, and the swing's hitbox
   turns with it. Facing is locked only while parrying.
-- During the active frames the attack hits the first opponent that overlaps a
-  box extending from the attacker's center to `width / 2 + attack_range_m` in
-  front, and that vertically overlaps by less than one fighter height. Each
-  swing hits at most once and deals `attack_damage` (10).
-- Fighters have `max_health` (100) health. A fighter at 0 health ends the
-  episode. If both fighters are hit in the same step, both lose health.
+- During the active frames the attack hits every enemy that overlaps a
+  box extending from the attacker's front edge to `width / 2 + attack_range_m` in
+  front of its center, and that vertically overlaps by less than one fighter height. Each
+  swing hits each enemy at most once, nearest first, and deals `attack_damage` (10) to
+  each. An enemy that parries the swing cancels it for everyone not yet hit. The box never reaches behind the
+  attacker, except for a counter (see Counter).
+- Fighters have `max_health` (100) health. Fighters on the same team never hit each other,
+  and a dead fighter cannot attack or be hit. Who is alive is fixed at the start of the
+  step, for attackers and for targets, so the result does not depend on fighter order:
+  if two fighters are hit in the same step, both lose health.
 - A fighter starts an attack or a parry only when it was doing neither at the
   start of the step, so the two never overlap.
 - The total attack length is derived as wind-up + active + recovery frames
@@ -141,10 +166,13 @@ ends at once.
 **Counter.** A counter has a shorter wind-up (`counter_windup_frames`, 12 frames
 instead of 16), so it is harder to react to but still possible to parry. During the
 wind-up the fighter lunges at `counter_lunge_speed_mps` toward the fighter whose
-swing it parried (the nearest other fighter if that one is gone). The direction is fixed when the swing
-starts, so the lunge does not
-follow an opponent who moves away or jumps over, and it stops at the opponent's x
-(and stays stopped if the opponent walks through it). The counter's hitbox also
+swing it parried (the nearest other fighter if that one is gone). The direction is fixed
+when the swing starts, so the lunge does not follow an opponent who moves away or jumps
+over. It cuts through that fighter and goes on to the farthest living enemy in that
+direction that the lunge can still reach (`counter_lunge_speed_mps` times
+`counter_windup_frames`, 1.2 m), stopping at its x, so enemies in a row are all passed
+through and, as the swing hits every enemy it reaches, all damaged. An enemy farther than
+the lunge is not reached. The lunge stays stopped if the opponent walks through it. The counter's hitbox also
 reaches `counter_hitbox_back_m` (0.8 m) behind the attacker's center, so walking
 through the lunging attacker does not dodge it. A normal swing starts at the attacker's
 front edge and never reaches behind it. An opponent who runs away is still hit. One
@@ -173,6 +201,28 @@ kept, not reduced), and scales gravity by `parry_hover_gravity_scale` for
 `parry_hover_frames`. A parry that does not stop an attack never hovers, so spamming
 the button does not keep a fighter in the air.
 
+## Teams and termination
+
+- **Ids.** [`sim/state.py`](../src/arena_ai/sim/state.py) is the single source: the agent
+  is `"agent"` and opponent `i` is `opponent_id(i)`: `"opponent"`, then `"opponent_1"`,
+  `"opponent_2"`, ... `team_of` gives the agent team 0 and everyone else team 1, derived
+  from the id, so a bare `FighterState` needs no team field. `enemies_of(id, fighters)`
+  returns the other team in natural id order.
+- **Spawns.** `create_initial_fighters(config, rng, opponent_count)` puts the agent at
+  0.25 of the arena width and the opponents in a row on the right, centered on 0.75 and
+  one body width or more apart (a single opponent is at 0.75, as before). With an `rng`
+  every fighter spawns at a random position, the agent first and then the opponents in
+  order, and overlapping fighters are pushed apart without drawing more random numbers.
+  The agent faces its nearest opponent, and every opponent faces the agent.
+- **Episode end.** The episode terminates when the agent is dead or every opponent is dead
+  (`sim/outcome.py`). `info["winner"]` is `"agent"` if the agent is alive and every
+  opponent is dead, `"opponent"` if the agent is dead and at least one opponent is alive,
+  and `None` for a draw (the agent and the last opponent fall in the same step).
+- **Time-out.** A truncated episode has no winner. If the agent is ahead on health (above
+  the mean opponent health, dead opponents counting as 0), `info["timeout_win"]` is true
+  and the agent earns `timeout_win_reward`, much less than a kill. The viewer decides a
+  timed-out match the same way and calls an equal result a draw.
+
 ## Reward
 
 [`envs/reward.py`](../src/arena_ai/envs/reward.py) returns the learner's reward
@@ -182,13 +232,17 @@ for each step:
 reward = damage_reward_scale * (damage dealt - damage taken)
          - edge_penalty
          - time_penalty_per_step  (every step)
-         + victory_reward      (an opponent reached 0 health)
+         + victory_reward      (every opponent reached 0 health)
          - defeat_penalty      (the learner reached 0 health)
          + parry_reward        (the learner's parry stopped an attack)
          + counter_reward      (the learner's counter attack hit)
          - missed_parry_penalty  (a parry ended without stopping an attack)
          - missed_attack_penalty (a swing finished without hitting or being parried)
 ```
+
+On a time-out the environment adds `timeout_win_reward` (0.25) when the agent is ahead
+on health. It is positive but well below the victory reward, so ending a fight by
+stalling is better than losing and worse than winning.
 
 The time penalty is small on purpose: it only decides between fights the agent
 already wins or parries well, so it pushes the agent to finish them sooner. A
@@ -209,6 +263,6 @@ wall. Current values are in [`configs/scoring.yaml`](../configs/scoring.yaml).
 If the learner is defeated the defeat penalty applies even if an opponent also
 reached 0 health on the same step.
 
-`info["winner"]` is `"agent"` or `"opponent"` on natural termination and `None`
-otherwise. Truncated episodes have no winner and do not stop value
+`info["winner"]` is `"agent"` or `"opponent"` on natural termination (`None` for a draw)
+and `None` otherwise. `info["timeout_win"]` and `info["opponent_count"]` are also set. Truncated episodes have no winner and do not stop value
 bootstrapping (see [training-process.md](training-process.md)).

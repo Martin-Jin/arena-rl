@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from arena_ai.config import Config, GameConfig
 from arena_ai.sim.collision import resolve_collisions
 from arena_ai.sim.rules import LEVEL_TOLERANCE_M, end_attack, step_fighter
-from arena_ai.sim.state import FighterState
+from arena_ai.sim.state import FighterState, enemies_of
 
 
 # A difference below this between the intended and the actual velocity is float rounding.
@@ -67,8 +67,14 @@ def step_game(
     _validate_actions(fighters, actions)
     start_x = {fighter_id: fighter.x for fighter_id, fighter in fighters.items()}
 
+    # Who is alive is fixed at the start of the step, for attackers and for targets, so that
+    # the result does not depend on the order of the fighters: hits that land on the same
+    # step all land.
+    alive = {fighter_id for fighter_id, fighter in fighters.items() if fighter.health > 0}
+
     for fighter_id, fighter in fighters.items():
-        action = actions[fighter_id]
+        # A dead fighter does nothing, but still falls and stops.
+        action = actions[fighter_id] if fighter_id in alive else FighterAction()
         step_fighter(
             fighter,
             action.move_dir,
@@ -76,26 +82,33 @@ def step_game(
             config.game,
             attack=action.attack,
             parry=action.parry,
-            target_x=_lunge_target_x(fighter_id, fighters),
+            target_x=_lunge_target_x(fighter_id, fighters, config.game),
         )
 
     resolve_collisions(fighters, config.game)
 
     for fighter_id, attacker in fighters.items():
-        if not attacker_is_active(attacker, config.game):
+        if fighter_id not in alive or not attacker_is_active(attacker, config.game):
             continue
-        if attacker.attack_hit:
-            continue
-        for target_id, target in fighters.items():
-            if target_id == fighter_id or not attack_hits(attacker, target, config.game):
+        # Fighters only hit the other team. A swing hits every enemy it reaches, each at most
+        # once, nearest first. An enemy that parries it cancels the whole swing.
+        enemies = enemies_of(fighter_id, fighters)
+        for target_id, target in sorted(
+            enemies.items(), key=lambda item: abs(item[1].x - attacker.x)
+        ):
+            if (
+                target_id not in alive
+                or target_id in attacker.hit_targets
+                or not attack_hits(attacker, target, config.game)
+            ):
                 continue
             if parry_blocks(target, attacker):
                 apply_parry(target, attacker, fighter_id, config.game)
-            else:
-                target.health = max(0, target.health - config.game.combat.attack_damage)
-                attacker.attack_hit = True
-                attacker.counter_hit = attacker.attack_counter
-            break
+                break
+            target.health = max(0, target.health - config.game.combat.attack_damage)
+            attacker.hit_targets.add(target_id)
+            attacker.attack_hit = True
+            attacker.counter_hit = attacker.attack_counter
 
     # A parry cancels a counter's lunge, so a parried fighter is pushed out, not left inside.
     resolve_collisions(fighters, config.game)
@@ -109,18 +122,46 @@ def step_game(
             fighter.vx = moved
 
 
-def _lunge_target_x(fighter_id: str, fighters: Mapping[str, FighterState]) -> float | None:
-    """Return the x a counter lunges toward: the parried fighter, else the nearest other."""
-    parried = fighters.get(fighters[fighter_id].counter_target or "")
-    return parried.x if parried is not None else _nearest_opponent_x(fighter_id, fighters)
+def _lunge_target_x(
+    fighter_id: str, fighters: Mapping[str, FighterState], config: GameConfig
+) -> float | None:
+    """Return the x a counter lunges toward, so that it cuts through every enemy it can reach.
+
+    It starts from the parried fighter (the nearest enemy if that one is gone). The lunge
+    then goes on to the farthest living enemy in that direction that the lunge can still
+    reach, so enemies in a row are all passed through and hit.
+    """
+    me = fighters[fighter_id]
+    parried = fighters.get(me.counter_target or "")
+    if parried is not None and parried.health > 0:
+        base = parried.x
+    else:
+        base = _nearest_opponent_x(fighter_id, fighters)
+    if base is None:
+        return None
+    direction = me.lunge_dir or (base > me.x) - (base < me.x)
+    if direction == 0:
+        return base
+    reach = (
+        config.combat.counter_lunge_speed_mps
+        * config.combat.counter_windup_frames
+        * config.world.dt_seconds
+    )
+    ahead = [
+        (enemy.x - me.x) * direction
+        for enemy in enemies_of(fighter_id, fighters).values()
+        if enemy.health > 0 and 0 < (enemy.x - me.x) * direction <= reach
+    ]
+    base_distance = (base - me.x) * direction
+    return me.x + direction * max([base_distance, *ahead])
 
 
 def _nearest_opponent_x(
     fighter_id: str, fighters: Mapping[str, FighterState]
 ) -> float | None:
-    """Return the x position of the nearest other fighter, or None when alone."""
+    """Return the x position of the nearest living enemy, or None when there is none."""
     me = fighters[fighter_id]
-    others = [f for other_id, f in fighters.items() if other_id != fighter_id]
+    others = [f for f in enemies_of(fighter_id, fighters).values() if f.health > 0]
     if not others:
         return None
     return min(others, key=lambda other: abs(other.x - me.x)).x
@@ -202,4 +243,4 @@ def attack_hits(
         target.y < attacker.y + fighter_height
         and attacker.y < target.y + fighter_height
     )
-    return horizontal_overlap and vertical_overlap and target.health > 0
+    return horizontal_overlap and vertical_overlap

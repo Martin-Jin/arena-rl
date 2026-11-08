@@ -34,6 +34,7 @@ def end_attack(f: FighterState) -> None:
     """Return a fighter to not attacking."""
     f.attack_frame = 0
     f.attack_hit = False
+    f.hit_targets = set()
     f.attack_counter = False
     f.lunge_dir = 0
     f.counter_target = None
@@ -51,11 +52,11 @@ def step_fighter(
     """Advance one fighter by one step.
 
     ``target_x`` is the x position of the fighter the counter lunges toward (the one this
-    fighter parried). A counter attack lunges toward it. The direction is fixed when the swing starts, so
-    the lunge does not follow an opponent that moves away or jumps over. It passes through the opponent's
-    body (see ``resolve_collisions``) and stops at the opponent's x, and stays stopped if
-    the opponent walks through it, so the lunge never carries the fighter past or away
-    from an opponent that is no longer ahead.
+    fighter parried). A counter attack lunges toward it. The direction is fixed when the
+    swing starts, so the lunge does not follow an opponent that moves away or jumps over.
+    It passes through the opponent's body (see ``resolve_collisions``) and stops at the
+    opponent's x, and stays stopped if the opponent walks through it, so the lunge never
+    carries the fighter past or away from an opponent that is no longer ahead.
     """
     w, fc = config.world, config.fighter
     dt = w.dt_seconds
@@ -116,6 +117,7 @@ def step_fighter(
         elif attack and not staggered:
             f.attack_frame = 1
             f.attack_hit = False
+            f.hit_targets = set()
             if f.counter_frames:
                 f.attack_counter = True
                 f.counter_started = True

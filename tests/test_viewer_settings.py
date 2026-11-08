@@ -34,7 +34,8 @@ class ViewerSettingsTests(unittest.TestCase):
     def test_save_and_load_round_trip(self) -> None:
         settings = load_settings(self.config, self.path)
         settings.music_volume = 0.75
-        settings.opponent = "idle"
+        settings.opponents[0] = "idle"
+        settings.opponent_count = 2
         settings.random_spawns = True
         save_settings(settings, self.path)
         loaded = load_settings(self.config, self.path)
@@ -42,13 +43,42 @@ class ViewerSettingsTests(unittest.TestCase):
 
     def test_invalid_saved_values_are_repaired(self) -> None:
         self.path.write_text(
-            json.dumps({"music_volume": 7.0, "opponent": "nonsense", "player": 3}),
+            json.dumps(
+                {
+                    "music_volume": 7.0,
+                    "opponents": ["nonsense", "idle"],
+                    "opponent_count": 99,
+                    "player": 3,
+                }
+            ),
             encoding="utf-8",
         )
         settings = load_settings(self.config, self.path)
+        slots = self.config.game.observation.max_opponents
         self.assertEqual(settings.music_volume, 1.0)
-        self.assertEqual(settings.opponent, "approach")
+        self.assertEqual(settings.opponents, ["approach", "idle"] + ["approach"] * (slots - 2))
+        self.assertEqual(settings.opponent_count, slots)
         self.assertEqual(settings.player, "human")
+
+    def test_a_saved_opponent_count_below_zero_or_an_ai_player_alone_is_repaired(self) -> None:
+        self.path.write_text(
+            json.dumps({"opponent_count": 0, "player": "trained"}), encoding="utf-8"
+        )
+        settings = load_settings(self.config, self.path)
+        self.assertGreaterEqual(settings.opponent_count, 0)
+        if settings.player != "human":
+            self.assertGreaterEqual(settings.opponent_count, 1)
+
+    def test_the_legacy_single_opponent_key_moves_to_the_first_slot(self) -> None:
+        self.path.write_text(json.dumps({"opponent": "idle"}), encoding="utf-8")
+        settings = load_settings(self.config, self.path)
+        self.assertEqual(settings.opponents[0], "idle")
+        self.assertEqual(settings.opponent_count, 1)
+        self.assertEqual(len(settings.opponents), self.config.game.observation.max_opponents)
+
+    def test_the_legacy_practice_choice_becomes_zero_opponents(self) -> None:
+        self.path.write_text(json.dumps({"opponent": "none"}), encoding="utf-8")
+        self.assertEqual(load_settings(self.config, self.path).opponent_count, 0)
 
     def test_corrupt_file_falls_back_to_defaults(self) -> None:
         self.path.write_text("{not json", encoding="utf-8")

@@ -10,10 +10,11 @@ from pathlib import Path
 from typing import Protocol
 
 from arena_ai.agents.scripted import OPPONENTS
+from arena_ai.agents.scripted.view import team_observation
 from arena_ai.config import Config
 from arena_ai.sim.observation import get_observation
 from arena_ai.sim.observation_vector import encode_observation
-from arena_ai.sim.state import FighterState
+from arena_ai.sim.state import AGENT_ID, FighterState, enemies_of, is_opponent
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TRAINED = "trained"
@@ -64,18 +65,17 @@ def trained_available(config: Config) -> bool:
 
 
 class ScriptedController:
-    """A scripted opponent. Scripted policies play the ``"opponent"`` side."""
+    """A scripted opponent. Scripted policies play one of the opponents' sides."""
 
-    def __init__(self, name: str, config: Config) -> None:
+    def __init__(self, name: str, config: Config, fighter_id: str) -> None:
         self.policy = OPPONENTS[name]
         self.config = config
+        self.fighter_id = fighter_id
 
     def action(self, fighters: Mapping[str, FighterState]) -> int:
-        # Scripted policies read the learner-first observation used in training.
-        structured = get_observation(
-            fighters["agent"], {"opponent": fighters["opponent"]}, self.config
-        )
-        return self.policy(encode_observation(structured, self.config), self.config)
+        # Scripted policies read the learner-first observation used in training: the agent,
+        # this fighter, then its living allies.
+        return self.policy(team_observation(fighters, self.fighter_id, self.config), self.config)
 
 
 class TrainedController:
@@ -109,8 +109,8 @@ class TrainedController:
         self.model.eval()
 
     def action(self, fighters: Mapping[str, FighterState]) -> int:
-        others = {fid: f for fid, f in fighters.items() if fid != self.fighter_id}
-        structured = get_observation(fighters[self.fighter_id], others, self.config)
+        enemies = enemies_of(self.fighter_id, fighters)
+        structured = get_observation(fighters[self.fighter_id], enemies, self.config)
         observation = self._torch.tensor(
             encode_observation(structured, self.config), dtype=self._torch.float32
         ).unsqueeze(0)
@@ -131,7 +131,7 @@ def make_controller(
     if kind == TRAINED:
         return TrainedController(config, greedy, fighter_id, checkpoint)
     if kind in OPPONENTS:
-        if fighter_id != "opponent":
-            raise ValueError("scripted policies can only control the opponent")
-        return ScriptedController(kind, config)
+        if not is_opponent(fighter_id):
+            raise ValueError("scripted policies can only control an opponent")
+        return ScriptedController(kind, config, fighter_id)
     raise ValueError(f"Unknown controller: {kind}")

@@ -31,6 +31,7 @@ class EpisodeRecord:
     edge_steps: int  # Steps spent within the edge margin of a wall.
     parry_attempts: int = 0
     parries: int = 0
+    timeout_win: bool = False  # Truncated with the agent ahead on health.
 
 
 class _Window:
@@ -39,7 +40,7 @@ class _Window:
     _FIELDS = (
         "wins", "losses", "truncated", "return", "length", "win_length",
         "loss_length", "dealt", "taken", "swings", "hits", "edge_steps",
-        "parry_attempts", "parries",
+        "parry_attempts", "parries", "timeout_wins",
     )  # fmt: skip
 
     def __init__(self, size: int) -> None:
@@ -63,6 +64,7 @@ class _Window:
         sums["edge_steps"] += sign * record.edge_steps
         sums["parry_attempts"] += sign * record.parry_attempts
         sums["parries"] += sign * record.parries
+        sums["timeout_wins"] += sign * record.timeout_win
 
     def add(self, record: EpisodeRecord) -> None:
         self._records.append(record)
@@ -79,6 +81,7 @@ class _Window:
             "episodes": float(count),
             "win_rate": s["wins"] / count,
             "truncation_rate": s["truncated"] / count,
+            "timeout_win_rate": s["timeout_wins"] / count,
             "mean_return": s["return"] / count,
             "mean_length": s["length"] / count,
             # How long wins and losses take: shorter wins mean a more decisive agent.

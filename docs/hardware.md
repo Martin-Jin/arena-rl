@@ -1,7 +1,10 @@
 # Hardware use: what runs on the CPU and the GPU
 
-Training uses the GPU only for the work that benefits from it. The network is a
-small MLP (two hidden layers of 128 units) and most of the work is many tiny
+Training uses the GPU only for the work that benefits from it. The network is small:
+an attention input block over the fighters (64-wide embeddings, one head) that feeds two
+hidden layers of 128 units, about 113,000 parameters in total. The hidden layers receive
+`[e_self ; context]`, the acting fighter's own embedding joined to the attention context
+(see [network.md](network.md)). Most of the work is many tiny
 steps, so a GPU is often slower than the CPU. Each GPU operation has a fixed
 launch cost of a few microseconds, and moving data between devices costs more.
 The GPU pays off only when one operation processes a lot of data at once.

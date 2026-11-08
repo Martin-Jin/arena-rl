@@ -98,6 +98,9 @@ class ObservationConfig:
     spec_version: int
     reaction_delay_frames: int
     max_observed_height_m: float
+    # Opponent slots in the observation. This is the only place the number appears: raising
+    # it needs only this value, and a network works for any opponent count up to it.
+    max_opponents: int = 3
 
 
 @dataclass(frozen=True)
@@ -115,6 +118,8 @@ class NetworkConfig:
     hidden_layers: list[int]
     activation: str
     output_activation: str
+    embed_dim: int = 64  # Width of each fighter's embedding in the attention block.
+    num_heads: int = 1  # Attention heads. Must divide embed_dim.
 
 
 @dataclass(frozen=True)
@@ -139,8 +144,9 @@ class TrainingConfig:
     rollout_steps: int
     checkpoint_interval: int
     seed: int | None
-    # Opponent of each parallel environment, one entry per environment.
-    opponents: list[str] = field(default_factory=lambda: ["approach"])
+    # One entry per parallel environment, each a list of that environment's opponent names
+    # (a bare name means one opponent).
+    opponents: list = field(default_factory=lambda: [["approach"]])
     # The most environments training allows; ``opponents`` sets how many run.
     num_envs: int = 1
     randomize_spawns: bool = False
@@ -175,6 +181,7 @@ class ScoringConfig:
     counter_reward: float = 0.0
     missed_parry_penalty: float = 0.0
     missed_attack_penalty: float = 0.0
+    timeout_win_reward: float = 0.0
 
 
 @dataclass(frozen=True)

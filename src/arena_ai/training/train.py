@@ -161,6 +161,7 @@ class TrainingLoop:
             str(info.get("opponent", "unknown")),
             EpisodeRecord(
                 won=winner == "agent",
+                timeout_win=bool(info.get("timeout_win")),
                 lost=winner == "opponent",
                 truncated=truncated,
                 length=count("step_count"),

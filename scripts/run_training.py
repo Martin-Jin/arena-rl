@@ -9,7 +9,7 @@ import torch
 from arena_ai.agents.policy import ActorCritic, PolicyAdapter
 from arena_ai.agents.scripted import training_opponents
 from arena_ai.config import Config, load_config
-from arena_ai.envs.training_envs.one_v_one_env import OneVOneEnv
+from arena_ai.envs.training_envs.one_v_many_env import OneVManyEnv
 from arena_ai.envs.vector_env import VectorEnv
 from arena_ai.training.checkpoints import load_checkpoint, save_checkpoint
 from arena_ai.training.ppo import (
@@ -30,8 +30,9 @@ TRAINING_DEVICE = "auto"
 # run. The model, optimizer and progress counters are restored and
 # training.iterations more iterations are run on top of the saved ones. Leave as
 # None to start a new run.
-# checkpoints/best.pt predates the parry action and observation features, so it no
-# longer fits the network: train a new one before resuming from it again.
+# checkpoints/best.pt was trained before the observation gained opponent slots and a mask
+# and before the attention network, so it no longer loads: train a new one before
+# resuming from it again.
 RESUME_FROM: str | None = None
 # RESUME_FROM = "checkpoints/best.pt"
 
@@ -155,7 +156,6 @@ def run_training(config: Config | None = None) -> TrainingState:
             f"Resuming from {RESUME_FROM} at iteration {resumed_state.iteration}; "
             f"running {config.training.iterations} more."
         )
-    environment_factory = partial(OneVOneEnv, config)
     update_policy = build_update_callback(policy, optimizer, config)
     checkpoint_path = Path("checkpoints") / "latest.pt"
     # Each run also keeps numbered checkpoints in its own folder, so starting a
@@ -213,16 +213,19 @@ def run_training(config: Config | None = None) -> TrainingState:
 
 def make_factories(config: Config):
     """Create a list of environment factories for the training loop."""
-    opponents = training_opponents(config.training.opponents, config.training.num_envs)
+    environments = training_opponents(
+        config.training.opponents,
+        config.training.num_envs,
+        config.game.observation.max_opponents,
+    )
     return [
         partial(
-            OneVOneEnv,
+            OneVManyEnv,
             config,
-            opponent_policy=partial(policy, config=config),
-            opponent_name=name,
+            [(name, partial(policy, config=config)) for name, policy in zip(names, policies)],
             max_episode_steps=config.training.max_episode_steps,
         )
-        for name, policy in opponents
+        for names, policies in environments
     ]
 
 

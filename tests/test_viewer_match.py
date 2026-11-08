@@ -20,7 +20,8 @@ def _app(time_limit: float) -> App:
     )
     app = App(config)
     app.settings.player = "human"
-    app.settings.opponent = "idle"
+    app.settings.opponent_count = 1
+    app.settings.opponents = ["idle"] * app.config.game.observation.max_opponents
     app.settings.random_spawns = False
     return app
 

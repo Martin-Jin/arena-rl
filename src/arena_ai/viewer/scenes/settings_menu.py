@@ -12,7 +12,11 @@ from arena_ai.viewer.controllers import (
     resolve_checkpoint,
     trained_available,
 )
-from arena_ai.viewer.settings import OPPONENT_OPTIONS, PLAYER_OPTIONS, save_settings
+from arena_ai.viewer.settings import (
+    OPPONENT_OPTIONS,
+    PLAYER_OPTIONS,
+    save_settings,
+)
 from arena_ai.viewer.ui.widgets import (
     Button,
     Dropdown,
@@ -25,7 +29,9 @@ from arena_ai.viewer.ui.widgets import (
 if TYPE_CHECKING:
     from arena_ai.viewer.app import App
 
-PANEL_WIDTH = 640
+COLUMN_WIDTH = 560
+COLUMN_GAP = 40
+PANEL_PADDING = 24
 ROW_HEIGHT = 40
 ROW_GAP = 6
 SECTION_HEIGHT = 30
@@ -66,11 +72,26 @@ class SettingsScene:
 
         def set_player(value: str) -> None:
             settings.player = value
-            if value != "human" and settings.opponent == "none":
-                settings.opponent = "approach"  # An AI needs someone to fight.
+            if value != "human" and settings.opponent_count == 0:
+                settings.opponent_count = 1  # An AI needs someone to fight.
+
+        def set_slot(index: int):
+            def set_kind(value: str) -> None:
+                settings.opponents[index] = value
+
+            return set_kind
+
+        def active_opponents() -> list[str]:
+            return settings.opponents[: settings.opponent_count]
 
         def trained_plays() -> bool:
-            return trained_ok and TRAINED in (settings.player, settings.opponent)
+            return trained_ok and TRAINED in (settings.player, *active_opponents())
+
+        max_opponents = len(settings.opponents)
+        count_options = [("0", "None (practice)")] + [
+            (str(count), f"{count} opponent{'s' if count > 1 else ''}")
+            for count in range(1, max_opponents + 1)
+        ]
 
         automatic = resolve_checkpoint(app.config)
         shown = [path.name for path in list_checkpoints(app.config)[:MAX_CHECKPOINTS_SHOWN]]
@@ -80,7 +101,7 @@ class SettingsScene:
             ("", f"Automatic ({automatic.name})" if automatic else "Automatic"),
             *[(name, name) for name in shown],
         ]
-        rows = [
+        audio_rows = [
             Slider("Music", lambda: settings.music_volume, set_music),
             Slider(
                 "Sound effects",
@@ -88,6 +109,8 @@ class SettingsScene:
                 set_effects,
                 on_release=lambda: app.audio.play("hit"),
             ),
+        ]
+        match_rows = [
             Dropdown(
                 "Player",
                 with_note(PLAYER_OPTIONS, " (watch)"),
@@ -96,13 +119,25 @@ class SettingsScene:
                 option_enabled=lambda value: value != TRAINED or trained_ok,
             ),
             Dropdown(
-                "Opponent",
-                with_note(OPPONENT_OPTIONS),
-                lambda: settings.opponent,
-                set_attr("opponent"),
-                option_enabled=lambda value: (value != TRAINED or trained_ok)
-                and not (value == "none" and settings.player != "human"),
+                "Opponents",
+                count_options,
+                lambda: str(settings.opponent_count),
+                lambda value: setattr(settings, "opponent_count", int(value)),
+                option_enabled=lambda value: value != "0" or settings.player == "human",
             ),
+            *[
+                Dropdown(
+                    f"Opponent {index + 1}",
+                    with_note(OPPONENT_OPTIONS),
+                    lambda index=index: settings.opponents[index],
+                    set_slot(index),
+                    option_enabled=lambda value: value != TRAINED or trained_ok,
+                    enabled_fn=lambda index=index: index < settings.opponent_count,
+                )
+                for index in range(max_opponents)
+            ],
+        ]
+        trained_rows = [
             Dropdown(
                 "Checkpoint",
                 checkpoint_options,
@@ -117,6 +152,8 @@ class SettingsScene:
                 lambda value: setattr(settings, "trained_greedy", value == "greedy"),
                 enabled_fn=trained_plays,
             ),
+        ]
+        display_rows = [
             Toggle(
                 "Random starting positions",
                 lambda: settings.random_spawns,
@@ -129,28 +166,37 @@ class SettingsScene:
             ),
         ]
         self.back = Button("Back", self.close, primary=True)
-        self.menu = Menu([*rows, self.back])
-        self._sections = [("Audio", rows[0:2]), ("Match", rows[2:7]), ("Display", rows[7:8])]
+        self.menu = Menu([*audio_rows, *match_rows, *trained_rows, *display_rows, self.back])
+        # Two columns keep the panel on the screen however many opponent rows there are.
+        self._columns = [
+            [("Match", match_rows)],
+            [("Trained agent", trained_rows), ("Audio", audio_rows), ("Display", display_rows)],
+        ]
         self._layout()
 
     def _layout(self) -> None:
-        """Place section headers, rows and the back button inside the panel."""
+        """Place section headers and rows in their columns, and the back button below."""
         center_x = self.app.screen.get_width() // 2
-        x = center_x - PANEL_WIDTH // 2 + 24
-        width = PANEL_WIDTH - 48
-        y = 102
-        self._headers: list[tuple[str, int]] = []
-        for title, rows in self._sections:
-            self._headers.append((title.upper(), y))
-            y += SECTION_HEIGHT
-            for row in rows:
-                row.rect = pygame.Rect(x, y, width, ROW_HEIGHT)
-                y += ROW_HEIGHT + ROW_GAP
-            y += SECTION_GAP
+        panel_width = 2 * COLUMN_WIDTH + COLUMN_GAP + 2 * PANEL_PADDING
+        left = center_x - panel_width // 2 + PANEL_PADDING
+        top = 102
+        self._headers: list[tuple[str, int, int]] = []
+        bottom = top
+        for column, sections in enumerate(self._columns):
+            x = left + column * (COLUMN_WIDTH + COLUMN_GAP)
+            y = top
+            for title, rows in sections:
+                self._headers.append((title.upper(), x, y))
+                y += SECTION_HEIGHT
+                for row in rows:
+                    row.rect = pygame.Rect(x, y, COLUMN_WIDTH, ROW_HEIGHT)
+                    y += ROW_HEIGHT + ROW_GAP
+                y += SECTION_GAP
+            bottom = max(bottom, y)
         self.back.rect = pygame.Rect(0, 0, 200, 50)
-        self.back.rect.midtop = (center_x, y + 4)
+        self.back.rect.midtop = (center_x, bottom + 4)
         self.panel = pygame.Rect(
-            center_x - PANEL_WIDTH // 2, 84, PANEL_WIDTH, self.back.rect.bottom + 24 - 84
+            center_x - panel_width // 2, 84, panel_width, self.back.rect.bottom + 24 - 84
         )
 
     def close(self) -> None:
@@ -173,8 +219,6 @@ class SettingsScene:
         center_x = screen.get_width() // 2
         theme.text(screen, "Settings", "heading", theme.color("text"), (center_x, 44), "center")
         theme.draw_panel(screen, self.panel)
-        for title, y in self._headers:
-            theme.text(
-                screen, title, "small", theme.color("text_muted"), (self.panel.x + 28, y + 6)
-            )
+        for title, x, y in self._headers:
+            theme.text(screen, title, "small", theme.color("text_muted"), (x + 4, y + 6))
         self.menu.draw(screen, theme)

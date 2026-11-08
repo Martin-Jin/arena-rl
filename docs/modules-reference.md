@@ -36,17 +36,22 @@ This document describes the intended purpose of each module and project director
 The simulation layer is deterministic and independent of rendering. It must not import `pygame`.
 
 - `src/arena_ai/sim/` — Provides pure game simulation logic.
-- `src/arena_ai/sim/state.py` — Defines data structures such as `FighterState` and `GameState`.
+- `src/arena_ai/sim/state.py` — Defines `FighterState`, the fighter ids and teams (`AGENT_ID`,
+  `opponent_id`, `team_of`, `enemies_of`, the natural `sort_key`) and the starting positions.
 - `src/arena_ai/sim/simulate.py` — Advances independently controlled fighters by one timestep using ID-keyed actions.
 - `src/arena_ai/sim/observation.py` — Builds nested observations with one agent and a keyed collection of opponents.
 - `src/arena_ai/sim/observation_vector.py` — Flattens observations into a
   fixed ordered and normalized vector whose layout matches the network input.
-  It exposes the derived observation size so the network does not duplicate it
-  in configuration. Each fighter contributes fourteen features, scaled using the
-  game configuration's fixed observation limits. See
+  It exposes the derived observation size and reads by feature name
+  (`FEATURE_NAMES`, `fighter_features`, `opponent_mask`), so nothing indexes a vector by
+  number. The layout is the acting fighter, `max_opponents` padded opponent slots and a
+  mask. Each fighter contributes fourteen features, scaled using the game
+  configuration's fixed observation limits. See
   [`docs/simulation-spec.md`](simulation-spec.md) for the exact order.
 - `src/arena_ai/sim/collision.py` — Keeps fighters' body boxes from overlapping; a counter's
   lunge passes through.
+- `src/arena_ai/sim/outcome.py` — When an episode or match is over and who won it
+  (agent dead or every opponent dead; the time-out health rule).
 - `src/arena_ai/sim/rules.py` — Implements one fighter's step: movement, attack and
   parry timing, the spam-shrunk parry window, the counter lunge and hover.
 
@@ -57,15 +62,19 @@ The simulation layer is deterministic and independent of rendering. It must not 
   lifecycle: reset, step, observations, episode limits, and terminal status.
   It must remain headless and must not import `pygame`.
 - `src/arena_ai/envs/reward.py` — Calculates the learner's per-step reward
-  (damage, terminal outcomes, and wall-proximity penalty) as a pure function of
+  (damage, terminal outcomes, and wall-proximity penalty; the victory bonus needs every
+  opponent dead) as a pure function of
   fighter state and scoring config.
 - `src/arena_ai/envs/vector_env.py` — Runs independent headless environments
   synchronously and auto-resets completed instances for batched collection.
 - `src/arena_ai/envs/training_envs/` — Contains concrete environments for
   training and scenario testing.
-- `src/arena_ai/envs/training_envs/one_v_one_env.py` — Implements the current
-  one-learning-agent versus one-opponent scenario, including its initial
-  fighters (optionally randomized spawn positions) and opponent policy.
+- `src/arena_ai/envs/training_envs/one_v_many_env.py` — `OneVManyEnv`: one learning
+  agent against one or more allied scripted opponents (up to `max_opponents`), with its
+  initial fighters (optionally randomized spawn positions), each opponent's view and
+  the matchup label reported in `info`.
+- `src/arena_ai/envs/training_envs/one_v_one_env.py` — `OneVOneEnv`, `OneVManyEnv` with
+  a single opponent and the signature the one-on-one tests use.
 
 ### Agents
 
@@ -79,13 +88,21 @@ The simulation layer is deterministic and independent of rendering. It must not 
   independent move, jump and attack distributions that sample, score and
   report the entropy of a flat action index. `sample_with_log_prob` is a
   faster no-gradient version of sampling plus `log_prob` used for rollouts.
-- `src/arena_ai/agents/scripted.py` — Provides the non-learning opponents in
-  the `OPPONENTS` registry: a deterministic approach-and-attack policy, an idle
-  policy, a runner that flees the learner, a uniformly random policy and the perfect-parry hunter (it parries every
-  attack it can see from the front, so mix it with easier opponents in training).
+- `src/arena_ai/agents/scripted/` — The non-learning opponents, one module each:
+  `approach.py` (deterministic approach-and-attack), `parrier.py` (the perfect-parry
+  hunter: it parries every attack it can see from the front, so mix it with easier
+  opponents in training), `runner.py` (flees the learner), `simple.py` (idle and uniformly
+  random), `registry.py` (the `OPPONENTS` registry and `training_opponents`, which checks a
+  `training.opponents` list), `view.py` (how a policy reads its observation by name, and
+  `team_observation`, which builds it: the agent, the opponent, then its allies) and
+  `teamwork.py` (`jumps_over_allies`, which lets opponents queued behind an ally hop over
+  it).
+- `src/arena_ai/agents/attention.py` — `EntityAttention`, the input block of both
+  networks: it encodes the acting fighter and each opponent, attends over the opponents
+  with a mask and returns `[e_self ; context]`.
 - `src/arena_ai/agents/policy.py` — Defines the PyTorch `ActorCritic` module
-  with separate, configurable policy and value networks (input and output sizes
-  come from the observation and action codecs), and `PolicyAdapter`, which
+  with separate, configurable policy and value networks (an attention block, hidden
+  layers and an output layer each, with a `signature` that checkpoints must match), and `PolicyAdapter`, which
   samples actions and estimates values for rollouts from a CPU copy of the
   network that is synchronized after each update.
 
@@ -122,18 +139,22 @@ The viewer layer is the only layer intended to depend on `pygame`.
 - `src/arena_ai/viewer/game.py` — Entry point (`py -m arena_ai.viewer.game`); opens the app.
 - `src/arena_ai/viewer/app.py` — `App` owns the window, audio, settings and a
   stack of scenes, and runs the main loop.
-- `src/arena_ai/viewer/settings.py` — The settings the menu edits (audio, player, opponent,
-  spawns, hints), their labels, and loading/saving them to
-  `data/viewer_settings.json`.
+- `src/arena_ai/viewer/settings.py` — The settings the menu edits (audio, player, the
+  opponent count and the kind of each opponent slot, spawns, hints), their labels, and
+  loading/saving them to `data/viewer_settings.json`. A saved single `opponent` key from an
+  older version is moved to the first slot.
+- `src/arena_ai/viewer/matchup.py` — Names the fighters of a match ("Scripted: approach #2")
+  and writes the matchup line of the main menu.
 - `src/arena_ai/viewer/controllers.py` — AI controllers for scripted and trained
-  fighters, on either side, and the discovery of checkpoints in the checkpoint
+  fighters, one per fighter id (a trained one sees only its enemies), and the discovery of checkpoints in the checkpoint
   folder (`latest.pt` first, then the newest). Torch is imported only when the
   trained agent is used.
 - `src/arena_ai/viewer/audio.py` — Loads configured music and sound effects
   and plays them from viewer state transitions. Effects are normalized in
   memory using configurable RMS and peak targets. It plays sounds for every
   fighter, including the opponent: attack, jump, landing, running and a hit
-  sound when a fighter loses health. Each fighter has its own running loop,
+  sound when a fighter loses health. It reserves two mixer channels per fighter
+  (`max_opponents + 1` fighters) and refuses a count the mixer cannot cover. Each fighter has its own running loop,
   which fades on start, stop, and direction changes and is gated by support
   state. Volumes can be changed while running.
 - `src/arena_ai/viewer/training.py` — Renders accelerated training simulation

@@ -14,7 +14,7 @@ from arena_ai.viewer.audio import AudioManager, FighterSnapshot
 class FighterSoundTests(unittest.TestCase):
     def setUp(self) -> None:
         pygame.init()
-        self.audio = AudioManager(load_config().viewer.audio)
+        self.audio = AudioManager(load_config().viewer.audio, 2)
         self.played: list[str] = []
         self.audio.play = self.played.append  # Record instead of playing.
 

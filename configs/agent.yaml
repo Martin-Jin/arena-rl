@@ -5,6 +5,10 @@ network:
   hidden_layers: [128, 128] # number of neurons in each hidden layer
   activation: "relu" # activation function for hidden layers
   output_activation: "linear" # activation function for output layer
+  # The input block encodes each fighter to embed_dim values and attends over the opponents;
+  # the hidden layers then get [own embedding ; attention context] (2 * embed_dim values).
+  embed_dim: 64
+  num_heads: 1 # must divide embed_dim
 
 policy:
   clip_range: 0.2 # clipping range for policy updates
@@ -21,32 +25,35 @@ training:
   rollout_steps: 512 # transitions collected before each policy update
   checkpoint_interval: 100 # iterations between checkpoint saves
   seed: null # optional seed for the initial environment reset
-  # One environment per entry, in order, each playing the named opponent (approach, parrier,
-  # idle, runner, random). Repeat a name to run several environments against it, for example
-  # [approach, approach, idle] runs two against approach and one against idle. Here five of
-  # sixteen play the perfect-parry hunter (it parries every attack it can see from the
-  # front), four play the plain approach-and-attack hunter, two run away from the learner,
-  # and idle and random give an easy winning signal.
+  # One environment per entry, in order. Each entry lists the opponents the agent faces at
+  # once in that environment (1 to game.yaml observation.max_opponents names from approach,
+  # parrier, idle, runner, random). A bare name means one opponent. Opponents are allies:
+  # they never hurt each other, and a fight ends when the agent or all of them are dead.
+  # Repeat an entry to run several environments with it. Here seven of sixteen are
+  # one-on-one (two against the perfect-parry hunter, which parries every attack it can
+  # see from the front), five have two opponents and four have three. Most multi-opponent
+  # entries have opponents that all attack (parrier and approach). Easy opponents
+  # (idle, random) keep a winning signal.
   opponents:
     [
-      parrier,
-      parrier,
-      parrier,
-      parrier,
-      parrier,
-      runner,
-      runner,
-      approach,
-      approach,
-      approach,
-      approach,
-      idle,
-      idle,
-      idle,
-      random,
-      random,
+      [parrier],
+      [parrier],
+      [runner],
+      [approach],
+      [approach],
+      [idle],
+      [random],
+      [parrier, approach],
+      [parrier, approach],
+      [parrier, parrier],
+      [approach, runner],
+      [approach, idle],
+      [parrier, approach, approach],
+      [approach, approach, idle],
+      [parrier, parrier, approach],
+      [approach, runner, idle],
     ]
-  num_envs: 16 # the most environments allowed: training refuses to start with more opponents
+  num_envs: 16 # the most environments allowed: training refuses to start with more entries
   randomize_spawns: true # random fighter start positions each episode
   max_episode_steps: 1500 # episode time limit in sim steps (25 s at 60 Hz); null = 10 s
   stats_window: 100 # recent episodes used for the rolling episode stats (overall and per opponent)

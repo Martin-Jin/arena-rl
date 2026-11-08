@@ -7,12 +7,15 @@ import math
 import pygame
 
 from arena_ai.config import Config
-from arena_ai.sim.state import FighterState
+from arena_ai.sim.state import AGENT_ID, FighterState, enemies_of, is_opponent
 from arena_ai.viewer.render.layout import ToScreen
 from arena_ai.viewer.ui.theme import Color, Theme
 
 BAR_RADIUS = 6
 SWING_HEIGHT = 4
+# With several opponents their bars stack on the right, each row this tall, with thinner bars.
+COMPACT_ROW_HEIGHT = 44
+COMPACT_BAR_SCALE = 0.6
 SPARK_COUNT = 8
 
 
@@ -42,6 +45,7 @@ class _Slash:
     """A straight line cut through the arena by a fighter's counter attack."""
 
     fighter_id: str
+    target_id: str | None  # The fighter it parried, which its counter lunges toward.
     direction: int  # Which way the fighter lunges.
     start_x: float
     y: float
@@ -92,7 +96,7 @@ class Hud:
                 damaged.add(fighter_id)
                 self._hurt[fighter_id] = 0.0
                 self._hold[fighter_id] = ui.health_trail_delay_seconds
-                color = "damage_taken" if fighter_id == "agent" else "damage_dealt"
+                color = "damage_taken" if fighter_id == AGENT_ID else "damage_dealt"
                 self._floaters.append(
                     _Floater(
                         f"-{previous - fighter.health}",
@@ -134,7 +138,7 @@ class Hud:
 
     def _side_color(self, fighter_id: str) -> Color:
         """Return the color of a fighter's side: blue for the agent, red for the opponent."""
-        return self.theme.color("opponent_health" if fighter_id == "opponent" else "accent")
+        return self.theme.color("opponent_health" if is_opponent(fighter_id) else "accent")
 
     def parried(self, fighter_id: str, fighter: FighterState) -> None:
         """Show "Parry" above a fighter that just parried an attack.
@@ -169,6 +173,7 @@ class Hud:
         self._slashes.append(
             _Slash(
                 fighter_id,
+                fighter.counter_target,
                 fighter.facing_dir,
                 fighter.x,
                 fighter.y + 0.55 * height,
@@ -199,9 +204,11 @@ class Hud:
             if attacker is None:
                 slash.ended_for = 0.0
                 continue
-            others = [f for fid, f in fighters.items() if fid != slash.fighter_id]
-            target = min(others, key=lambda f: abs(f.x - attacker.x), default=None)
-            hit = any(fid in damaged for fid in fighters if fid != slash.fighter_id)
+            enemies = enemies_of(slash.fighter_id, fighters)
+            target = fighters.get(slash.target_id or "")
+            if target is None:
+                target = min(enemies.values(), key=lambda f: abs(f.x - attacker.x), default=None)
+            hit = any(fid in damaged for fid in enemies)
             if target is not None and hit:
                 slash.end_x = target.x + slash.direction * ui.counter_line_carry_m
                 slash.ended_for = 0.0
@@ -218,11 +225,16 @@ class Hud:
             if s.ended_for is None or s.ended_for < ui.counter_effect_seconds
         ]
 
-    def _bar_rect(self, mirrored: bool) -> pygame.Rect:
+    def _bar_rect(self, mirrored: bool, row: int = 0, rows: int = 1) -> pygame.Rect:
+        """Return a health bar. With several ``rows`` the bars are thinner and stacked."""
         ui = self.config.viewer.ui
         width = self.config.viewer.rendering.screen_width
         x = width - ui.health_bar_margin - ui.health_bar_width if mirrored else ui.health_bar_margin
-        return pygame.Rect(x, ui.health_bar_y + 24, ui.health_bar_width, ui.health_bar_height)
+        height = ui.health_bar_height
+        if rows > 1:
+            height = round(height * COMPACT_BAR_SCALE)
+        y = ui.health_bar_y + 24 + row * COMPACT_ROW_HEIGHT
+        return pygame.Rect(x, y, ui.health_bar_width, height)
 
     def _draw_bar(
         self,
@@ -231,10 +243,12 @@ class Hud:
         fighter: FighterState,
         label: str,
         mirrored: bool,
+        row: int = 0,
+        rows: int = 1,
     ) -> None:
         theme = self.theme
         max_health = self.config.game.fighter.max_health
-        rect = self._bar_rect(mirrored)
+        rect = self._bar_rect(mirrored, row, rows)
         pygame.draw.rect(
             screen, theme.color("health_background"), rect, border_radius=BAR_RADIUS
         )
@@ -251,13 +265,13 @@ class Hud:
         if fill.width > 0:
             pygame.draw.rect(
                 screen,
-                theme.color("agent_health" if fighter_id == "agent" else "opponent_health"),
+                theme.color("agent_health" if fighter_id == AGENT_ID else "opponent_health"),
                 fill,
                 border_radius=BAR_RADIUS,
             )
 
         # Name on the outer edge side of the bar, health value on the inner side.
-        top = self.config.viewer.ui.health_bar_y
+        top = rect.y - 24
         value_pos, value_anchor = (rect.x, "topleft") if mirrored else (rect.right, "topright")
         # The name gets the bar's width minus room for the health value opposite it.
         name_width = rect.width - 70
@@ -313,13 +327,15 @@ class Hud:
 
         ``urgent`` colors the timer, for the last seconds of a timed match.
         """
-        agent = fighters.get("agent")
-        opponent = fighters.get("opponent")
+        agent = fighters.get(AGENT_ID)
+        opponents = enemies_of(AGENT_ID, fighters)
         if agent is not None:
-            self._draw_bar(screen, "agent", agent, labels["agent"], mirrored=False)
-        if opponent is not None:
-            self._draw_bar(screen, "opponent", opponent, labels["opponent"], mirrored=True)
-        if opponent is not None:
+            self._draw_bar(screen, AGENT_ID, agent, labels[AGENT_ID], mirrored=False)
+        for row, (fighter_id, opponent) in enumerate(opponents.items()):
+            self._draw_bar(
+                screen, fighter_id, opponent, labels[fighter_id], True, row, len(opponents)
+            )
+        if opponents:
             minutes, seconds = divmod(timer_seconds, 60)
             bar = self._bar_rect(False)
             self.theme.text(

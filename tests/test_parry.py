@@ -4,7 +4,11 @@ from arena_ai.agents.action import Action, to_fighter_action
 from arena_ai.config import load_config
 from arena_ai.envs.reward import calculate_reward
 from arena_ai.sim.observation import get_observation
-from arena_ai.sim.observation_vector import encode_observation, observation_size
+from arena_ai.sim.observation_vector import (
+    FEATURE_INDEX,
+    encode_observation,
+    observation_size,
+)
 from arena_ai.sim.simulate import FighterAction, step_game
 from arena_ai.sim.state import FighterState
 
@@ -327,8 +331,8 @@ class ParryTests(unittest.TestCase):
             fighters["agent"], {"opponent": fighters["opponent"]}, CONFIG
         )
         vector = encode_observation(structured, CONFIG)
-        self.assertEqual(len(vector), observation_size())
-        parry_frame_index = 9
+        self.assertEqual(len(vector), observation_size(CONFIG.game.observation.max_opponents))
+        parry_frame_index = FEATURE_INDEX["parry_frame"]
         self.assertAlmostEqual(vector[parry_frame_index], 1 / COMBAT.parry_total_frames)
 
     def test_observation_shows_whether_parry_is_still_held(self) -> None:
@@ -338,7 +342,7 @@ class ParryTests(unittest.TestCase):
             structured = get_observation(
                 fighters["agent"], {"opponent": fighters["opponent"]}, CONFIG
             )
-            return encode_observation(structured, CONFIG)[13]
+            return encode_observation(structured, CONFIG)[FEATURE_INDEX["parry_held"]]
 
         self.assertEqual(held(), 0.0)
         step(fighters, agent=PARRY)

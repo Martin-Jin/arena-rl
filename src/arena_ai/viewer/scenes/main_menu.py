@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING
 import pygame
 
 from arena_ai import __version__
-from arena_ai.sim.state import FighterState
+from arena_ai.sim.state import AGENT_ID, FighterState, opponent_id
+from arena_ai.viewer.matchup import matchup_text
 from arena_ai.viewer.render.scene import draw_scene
 from arena_ai.viewer.scenes.settings_menu import SettingsScene
-from arena_ai.viewer.settings import OPPONENT_OPTIONS, PLAYER_OPTIONS, label_for
 from arena_ai.viewer.ui.widgets import Button, Menu, stack
 
 if TYPE_CHECKING:
@@ -39,8 +39,8 @@ class MainMenuScene:
         )
         # Two fighters standing off, drawn with the same idle animation as a match.
         self.fighters = {
-            "agent": FighterState(x=3.0, facing_dir=1),
-            "opponent": FighterState(x=9.0, facing_dir=-1),
+            AGENT_ID: FighterState(x=3.0, facing_dir=1),
+            opponent_id(0): FighterState(x=9.0, facing_dir=-1),
         }
         self.tick = 0
 
@@ -54,11 +54,7 @@ class MainMenuScene:
 
     def _matchup_text(self) -> str:
         settings = self.app.settings
-        player = label_for(PLAYER_OPTIONS, settings.player)
-        opponent = label_for(OPPONENT_OPTIONS, settings.opponent)
-        if settings.opponent == "none":
-            return f"{player}  ·  {opponent}"
-        return f"{player}  vs  {opponent}"
+        return matchup_text(settings.player, settings.opponents[: settings.opponent_count])
 
     def draw(self, screen: pygame.Surface) -> None:
         theme = self.app.theme

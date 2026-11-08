@@ -1,18 +1,14 @@
 """Define the one-learning-agent versus one-opponent training environment."""
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from functools import partial
-import random
 
-from arena_ai.agents.action import to_fighter_action
 from arena_ai.agents.scripted import approach_and_attack
 from arena_ai.config import Config
-from arena_ai.envs.arena_env import ArenaEnv
-from arena_ai.sim.simulate import FighterAction
-from arena_ai.sim.state import FighterState, create_initial_fighters
+from arena_ai.envs.training_envs.one_v_many_env import OneVManyEnv
 
 
-class OneVOneEnv(ArenaEnv):
+class OneVOneEnv(OneVManyEnv):
     """Run a two-fighter episode with one learning agent and one opponent."""
 
     def __init__(
@@ -23,40 +19,5 @@ class OneVOneEnv(ArenaEnv):
         opponent_name: str = "approach",
     ) -> None:
         """Initialize the one-versus-one scenario and its optional opponent."""
-        super().__init__(config, max_episode_steps)
-        self.rng = random.Random()
-        # Reported in info["opponent"] so training can track stats per opponent.
-        self.opponent_name = opponent_name
-        self.opponent_policy: Callable[[list[float]], int] = opponent_policy or partial(
-            approach_and_attack, config=config
-        )
-
-    def reset(self, seed: int | None = None):
-        """Reseed the spawn RNG only when a seed is given, so later
-        auto-resets keep drawing new positions."""
-        if seed is not None:
-            self.rng = random.Random(seed)
-        return super().reset(seed)
-
-    def step(self, action: int):
-        """Advance one step and tag the info mapping with the opponent's name."""
-        observation, reward, terminated, truncated, info = super().step(action)
-        info["opponent"] = self.opponent_name
-        return observation, reward, terminated, truncated, info
-
-    def create_initial_fighters(self) -> dict[str, FighterState]:
-        """Create the one-versus-one starting state, optionally randomized."""
-        rng = self.rng if self.config.training.randomize_spawns else None
-        return create_initial_fighters(self.config.game, rng)
-
-    def get_actions(
-        self,
-        agent_action: int,
-        observation: list[float],
-    ) -> Mapping[str, FighterAction]:
-        """Convert learner and opponent decisions into simulation actions."""
-        opponent_action = self.opponent_policy(observation)
-        return {
-            "agent": to_fighter_action(agent_action),
-            "opponent": to_fighter_action(opponent_action),
-        }
+        policy = opponent_policy or partial(approach_and_attack, config=config)
+        super().__init__(config, [(opponent_name, policy)], max_episode_steps)

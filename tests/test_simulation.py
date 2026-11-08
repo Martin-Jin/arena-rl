@@ -41,7 +41,8 @@ class SimulationTests(unittest.TestCase):
 
         first, second = run(), run()
         self.assertEqual(first, second)
-        self.assertEqual(len(first[0]), observation_size())
+        slots = load_config().game.observation.max_opponents
+        self.assertEqual(len(first[0]), observation_size(slots))
 
 
 if __name__ == "__main__":

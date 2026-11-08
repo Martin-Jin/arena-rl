@@ -5,7 +5,7 @@ from collections.abc import Mapping
 import pygame
 
 from arena_ai.config import Config
-from arena_ai.sim.state import FighterState
+from arena_ai.sim.state import FighterState, is_opponent
 from arena_ai.viewer.render.animation import draw_fighter
 from arena_ai.viewer.render.layout import ToScreen
 
@@ -61,24 +61,32 @@ def draw_scene(
     """
     colors = config.viewer.ui.colors
     draw_arena(screen, config, to_screen)
-    for fighter in fighters.values():
+    # With several opponents a dead one disappears, so the fight is not crowded by bodies.
+    # A one-on-one match keeps showing the fallen fighter behind its result screen.
+    hide_dead = sum(is_opponent(fighter_id) for fighter_id in fighters) > 1
+    shown = {
+        fighter_id: fighter
+        for fighter_id, fighter in fighters.items()
+        if not (hide_dead and is_opponent(fighter_id) and fighter.health <= 0)
+    }
+    for fighter in shown.values():
         _draw_shadow(screen, config, fighter, to_screen)
     pixels_per_meter = config.viewer.rendering.pixels_per_meter
-    for fighter_id, fighter in fighters.items():
-        is_opponent = fighter_id == "opponent"
+    for fighter_id, fighter in shown.items():
+        opponent = is_opponent(fighter_id)
         drawn = draw_fighter(
             screen,
             fighter,
             tick,
             to_screen,
-            turning=turning and not is_opponent,
-            shade=colors["opponent_tint"] if is_opponent else None,
+            turning=turning and not opponent,
+            shade=colors["opponent_tint"] if opponent else None,
             hurt=(hurt or {}).get(fighter_id, 0.0),
-            effect_color=colors["opponent_health"] if is_opponent else None,
+            effect_color=colors["opponent_health"] if opponent else None,
         )
         if not drawn:  # No sprite frames available: draw a plain box instead.
             height = config.game.fighter.height_m * pixels_per_meter
             width = config.game.fighter.width_m * pixels_per_meter
             x, y = to_screen(fighter.x, fighter.y)
-            color = colors["fallback_opponent" if is_opponent else "fallback_agent"]
+            color = colors["fallback_opponent" if opponent else "fallback_agent"]
             pygame.draw.rect(screen, color, (x - width / 2, y - height, width, height))

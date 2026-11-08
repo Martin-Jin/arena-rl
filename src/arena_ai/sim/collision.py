@@ -9,7 +9,10 @@ from arena_ai.sim.state import FighterState
 
 # Bodies closer than this are touching, not overlapping: it absorbs float rounding after a
 # push.
-OVERLAP_TOLERANCE_M = 1e-9
+OVERLAP_TOLERANCE_M = 1e-6
+# Each pass halves what a chain of three or more leaves over, so this ends them well inside
+# the tolerance. The loop stops at the first pass that finds nothing.
+MAX_PASSES = 32
 
 
 def bodies_overlap(a: FighterState, b: FighterState, config: GameConfig) -> bool:
@@ -40,7 +43,7 @@ def _left_right(a: FighterState, b: FighterState) -> tuple[FighterState, Fighter
 def resolve_collisions(fighters: Mapping[str, FighterState], config: GameConfig) -> None:
     """Push overlapping fighters apart along x so none stays inside another.
 
-    Every fighter has a body box (``fighter.width_m`` by ``height_m``). Fighters at
+    Every living fighter has a body box (``fighter.width_m`` by ``height_m``). Fighters at
     different heights do not collide, so a jump clears an opponent. A fighter that walks into
     another is stopped by it, and the one standing still is not moved. If both walk into
     each other, or neither does, the overlap is split evenly. An arena wall takes the
@@ -51,15 +54,25 @@ def resolve_collisions(fighters: Mapping[str, FighterState], config: GameConfig)
     opponent is pushed out. This also runs after a parry, which cancels a lunge, so a
     parried fighter stops at the parrier instead of ending up inside it.
     """
+    ordered = list(fighters.values())
+    # Pushing one pair apart can push a fighter into a third, so repeat until none overlap.
+    for _ in range(MAX_PASSES):
+        if not _resolve_pass(ordered, config):
+            break
+
+
+def _resolve_pass(ordered: list[FighterState], config: GameConfig) -> bool:
+    """Push apart every overlapping pair once. Return whether any pair overlapped."""
     width = config.fighter.width_m
     arena_width = config.world.arena_width_m
-    ordered = list(fighters.values())
+    found = False
     for i, a in enumerate(ordered):
         for b in ordered[i + 1:]:
             if is_lunging(a, config.combat) or is_lunging(b, config.combat):
                 continue
-            if not bodies_overlap(a, b, config):
+            if a.health <= 0 or b.health <= 0 or not bodies_overlap(a, b, config):
                 continue
+            found = True
             left, right = _left_right(a, b)
             push = width - (right.x - left.x)
             # Whoever walked into the other undoes the overlap. A fighter that stands
@@ -74,3 +87,4 @@ def resolve_collisions(fighters: Mapping[str, FighterState], config: GameConfig)
                     left.x = right.x - width
                 else:
                     right.x = left.x + width
+    return found

@@ -15,12 +15,16 @@ defines:
 - `rollout_steps` — environment transitions collected in each cycle.
 - `checkpoint_interval` — cycles between checkpoint callbacks.
 - `seed` — optional seed for the initial environment reset.
-- `opponents` — the opponent of each parallel environment, one entry per
-  environment, in order. The number of entries is the number of environments, so
-  `[approach, approach, idle]` runs two against approach and one against idle, and
-  a single entry uses the scalar environment path.
+- `opponents` — one entry per parallel environment, in order. Each entry lists the
+  opponents the agent faces at once in that environment (1 to `observation.max_opponents`
+  names; a bare name means one). The number of entries is the number of environments, so
+  `[[approach], [approach, idle], [runner, parrier, idle]]` runs a one-on-one, a 1v2 and a
+  1v3, and a single entry uses the scalar environment path. The opponents of an entry are
+  allies: they never hurt each other, and the fight ends when the agent or all of them are
+  dead.
 - `num_envs` — the most environments allowed. Training refuses to start, with an
-  error, if `opponents` lists more.
+  error, if `opponents` lists more entries, or an entry has no names or more than
+  `observation.max_opponents`.
 - `randomize_spawns` — start each episode with random fighter positions.
 - `max_episode_steps` — episode time limit in simulation steps (1500 is 25
   simulated seconds at 60 Hz). `null` uses the environment default of
@@ -33,7 +37,7 @@ defines:
   last iteration of a run always print.
 
 Environment `i` plays `opponents[i]`. The names come from `OPPONENTS` in
-[`scripted.py`](../src/arena_ai/agents/scripted.py) (`approach`, `parrier`, `idle`,
+[`agents/scripted/registry.py`](../src/arena_ai/agents/scripted/registry.py) (`approach`, `parrier`, `idle`,
 `runner`, `random`). `parrier` parries every attack it can see from the front, so the learner
 cannot win against it by attacking head on. It earns only parry rewards until it finds
 another way past, so give it a share of the environments, not all of them, and keep
@@ -61,7 +65,7 @@ middle of an episode.
 ```mermaid
 flowchart TD
     A["py scripts/run_training.py"] --> B["load_config()"]
-    B --> C["Create ActorCritic, Adam optimizer, OneVOneEnv, and TrainingLoop"]
+    B --> C["Create ActorCritic, Adam optimizer, OneVManyEnv per entry, and TrainingLoop"]
     C --> D["TrainingLoop.run()"]
     D --> E["Validate iterations, rollout_steps, and checkpoint_interval"]
     E --> F["environment.reset(seed)"]
@@ -159,8 +163,12 @@ A resumed run is a valid continuation, not an exact replay. These are not saved:
 the random number generators (a configured seed is offset by the saved iteration
 so the stream does not repeat), the rolling per-opponent statistics windows
 (they refill over the next `stats_window` episodes), and the episode that was in
-progress. The network shape in `agent.yaml` must match the checkpoint or loading
-fails.
+progress, plus the network `signature` (the observation `spec_version`, the feature
+count and the network hyperparameters). Loading checks it and raises an error that names
+each difference, so an old or differently shaped checkpoint is refused with a clear
+message instead of a raw weight-shape error. `max_opponents` is not part of the signature:
+a checkpoint trained at one value loads at another, because the network weights do not
+depend on it.
 
 ## Bootstrapping and episode boundaries
 
@@ -262,7 +270,9 @@ plus cumulative `episodes` and `wins`), the rolling overall figures are in
 
 ### Per-opponent statistics
 
-`OneVOneEnv` adds `info["opponent"]` (the opponent's name in `OPPONENTS`). The
+`OneVManyEnv` adds `info["opponent"]`, the matchup label: the opponents' names sorted and
+joined with `+` (`approach+idle+runner`, or just `idle` for one), and
+`info["opponent_count"]`. `OneVOneEnv` is the one-opponent case. The
 loop records every finished episode in
 [`EpisodeStats`](../src/arena_ai/training/stats.py), which keeps one rolling
 window overall and one per opponent. Per opponent it reports `win_rate`,
@@ -292,3 +302,9 @@ py scripts/run_training.py
 
 The script uses the values in `configs/agent.yaml`; reduce `training.iterations`,
 `training.rollout_steps`, or `training.opponents` there for a short smoke run.
+
+## Network
+
+The policy and value networks (an attention block over the opponents, then hidden layers)
+and the loss that trains them are described, with diagrams, in
+[network.md](network.md).

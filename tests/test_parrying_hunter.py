@@ -38,7 +38,7 @@ def play(fighters, learner_action, steps: int) -> int:
 class ParryingHunterTests(unittest.TestCase):
     def setUp(self) -> None:
         # By default the hunter never takes its random chance to attack a still learner.
-        patcher = patch("arena_ai.agents.scripted.random.random", return_value=0.99)
+        patcher = patch("random.random", return_value=0.99)
         self.chance = patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -46,6 +46,18 @@ class ParryingHunterTests(unittest.TestCase):
         fighters = {
             "agent": FighterState(x=5.0, facing_dir=1),
             "opponent": FighterState(x=5.5, facing_dir=-1),
+        }
+        parries = play(fighters, ATTACK, 400)
+        self.assertGreaterEqual(parries, 5)
+        self.assertEqual(fighters["opponent"].health, 100)
+
+    def test_it_parries_a_spamming_learner_at_the_edge_of_its_reach(self) -> None:
+        # The hunter stops to attack at this distance, so it is where a still learner that
+        # lets it walk up ends up. Swings reach it from here, so it has to parry them.
+        edge = CONFIG.game.fighter.width_m + CONFIG.game.combat.attack_range_m
+        fighters = {
+            "agent": FighterState(x=5.0, facing_dir=1),
+            "opponent": FighterState(x=5.0 + edge, facing_dir=-1),
         }
         parries = play(fighters, ATTACK, 400)
         self.assertGreaterEqual(parries, 5)
@@ -101,7 +113,7 @@ class ParryingHunterTests(unittest.TestCase):
 
     def test_it_attacks_a_still_learner_without_a_long_wait(self) -> None:
         rng = random.Random(1)  # A real, seeded source instead of the default fixed one.
-        with patch("arena_ai.agents.scripted.random.random", rng.random):
+        with patch("random.random", rng.random):
             waits = []
             for _ in range(200):
                 fighters = {
