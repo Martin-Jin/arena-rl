@@ -78,6 +78,7 @@ Controls:
 | Left mouse button                  | Attack     |
 | `Q`                                | Parry      |
 | `Esc` or `P`                       | Pause      |
+| `F11`                              | Fullscreen (any screen) |
 
 ## Documentation
 

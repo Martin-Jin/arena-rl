@@ -21,8 +21,11 @@ class App:
         pygame.init()
         rendering = config.viewer.rendering
         self.config = config
+        # SCALED keeps the fixed-size canvas and stretches it to the window or the screen,
+        # with black bars to keep the aspect ratio. Mouse positions are scaled back for us,
+        # so every scene keeps working in 1280x720 coordinates in fullscreen too.
         self.screen = pygame.display.set_mode(
-            (rendering.screen_width, rendering.screen_height)
+            (rendering.screen_width, rendering.screen_height), pygame.SCALED
         )
         pygame.display.set_caption("Arena AI")
         self.clock = pygame.time.Clock()
@@ -72,6 +75,8 @@ class App:
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         self.quit()
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
+                        pygame.display.toggle_fullscreen()
                     else:
                         self.scene.handle_event(event)
                 self.scene.update(dt)
