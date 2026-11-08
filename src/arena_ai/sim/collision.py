@@ -41,10 +41,10 @@ def resolve_collisions(fighters: Mapping[str, FighterState], config: GameConfig)
     """Push overlapping fighters apart along x so none stays inside another.
 
     Every fighter has a body box (``fighter.width_m`` by ``height_m``). Fighters at
-    different heights do not collide, so a jump clears an opponent. The overlap is split
-    evenly between the two, so a fighter walking into another moves it a little too. An
-    arena wall takes the push first: a fighter against it stays put and the other moves
-    the full overlap.
+    different heights do not collide, so a jump clears an opponent. A fighter that walks into
+    another is stopped by it, and the one standing still is not moved. If both walk into
+    each other, or neither does, the overlap is split evenly. An arena wall takes the
+    push first: a fighter against it stays put and the other moves the full overlap.
 
     The one exception is a counter's lunge (``is_lunging``), which passes through the
     opponent. Once the lunge ends, so does the exemption, so a fighter left inside the
@@ -61,9 +61,14 @@ def resolve_collisions(fighters: Mapping[str, FighterState], config: GameConfig)
             if not bodies_overlap(a, b, config):
                 continue
             left, right = _left_right(a, b)
-            push = (width - (right.x - left.x)) / 2
-            left.x = min(max(left.x - push, 0.0), arena_width)
-            right.x = min(max(right.x + push, 0.0), arena_width)
+            push = width - (right.x - left.x)
+            # Whoever walked into the other undoes the overlap. A fighter that stands
+            # still is not moved, and with no walker (or two) the push is split evenly.
+            into_left, into_right = max(0.0, left.vx), max(0.0, -right.vx)
+            walkers = into_left + into_right
+            left_share = into_left / walkers if walkers else 0.5
+            left.x = min(max(left.x - push * left_share, 0.0), arena_width)
+            right.x = min(max(right.x + push * (1 - left_share), 0.0), arena_width)
             if right.x - left.x < width:  # A wall stopped one of them: the other makes room.
                 if right.x >= arena_width:
                     left.x = right.x - width

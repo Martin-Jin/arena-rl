@@ -36,6 +36,7 @@ def end_attack(f: FighterState) -> None:
     f.attack_hit = False
     f.attack_counter = False
     f.lunge_dir = 0
+    f.counter_target = None
 
 
 def step_fighter(
@@ -49,9 +50,9 @@ def step_fighter(
 ) -> None:
     """Advance one fighter by one step.
 
-    ``target_x`` is the x position of the nearest opponent. A counter attack lunges
-    toward it. The direction is fixed when the swing starts, so the lunge does not
-    follow an opponent that moves away or jumps over. It passes through the opponent's
+    ``target_x`` is the x position of the fighter the counter lunges toward (the one this
+    fighter parried). A counter attack lunges toward it. The direction is fixed when the swing starts, so
+    the lunge does not follow an opponent that moves away or jumps over. It passes through the opponent's
     body (see ``resolve_collisions``) and stops at the opponent's x, and stays stopped if
     the opponent walks through it, so the lunge never carries the fighter past or away
     from an opponent that is no longer ahead.
@@ -98,6 +99,8 @@ def step_fighter(
             f.parry_pose_frame = 0
     f.stagger_frames = max(0, f.stagger_frames - 1)
     f.counter_frames = max(0, f.counter_frames - 1)
+    if not f.counter_frames and not f.attack_counter:
+        f.counter_target = None  # The window passed without a counter.
     f.hover_frames = max(0, f.hover_frames - 1)
 
     if not was_busy:

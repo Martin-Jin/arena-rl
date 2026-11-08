@@ -137,8 +137,11 @@ def parrying_hunter(
         reach = game.fighter.width_m / 2 + combat.attack_range_m
         slack = game.fighter.move_speed_mps * game.world.dt_seconds
         to_self = (self_x - learner_x) * learner_facing  # Positive: in front of the swing.
-        # A counter also reaches behind its attacker.
-        behind = combat.counter_hitbox_back_m if learner_is_counter else 0.0
+        # A counter also reaches behind its attacker, as far back as its hitbox touches the
+        # body of this fighter.
+        behind = (
+            combat.counter_hitbox_back_m + game.fighter.width_m / 2 if learner_is_counter else 0.0
+        )
         in_reach = -behind - slack <= to_self <= reach + slack
         level = abs(self_y - learner_y) < game.fighter.height_m
         if in_reach and level:
@@ -156,7 +159,7 @@ def parrying_hunter(
     action = approach_and_attack(observation, config)
     # A swing that reached the branch above is no threat (it points away, or this fighter is
     # busy), so only movement, not swinging, stops the fighter from attacking.
-    learner_still = observation[2] == 0 and observation[4] == 1.0  # vx, on_ground
+    learner_still = observation[2] == 0  # vx: a jumping learner with no walk input is still
     if action == Action.ATTACK and not (learner_still and random.random() < HUNTER_ATTACK_CHANCE):
         return int(Action.IDLE)
     return action

@@ -66,6 +66,26 @@ class ParryingHunterTests(unittest.TestCase):
         self.assertGreaterEqual(parries, 5)
         self.assertEqual(fighters["opponent"].health, 100)
 
+    def _hunter_attacks(self, learner_x: float, hunter_x: float, action: FighterAction) -> bool:
+        """Return whether the hunter ever damages a learner that keeps doing ``action``."""
+        self.chance.return_value = 0.0
+        fighters = {
+            "agent": FighterState(x=learner_x, facing_dir=1 if hunter_x > learner_x else -1),
+            "opponent": FighterState(x=hunter_x, facing_dir=-1 if hunter_x > learner_x else 1),
+        }
+        play(fighters, action, 300)
+        return fighters["agent"].health < 100
+
+    def test_it_attacks_a_learner_that_keeps_walking_into_it(self) -> None:
+        self.assertTrue(self._hunter_attacks(5.0, 5.5, FighterAction(move_dir=1)))
+
+    def test_it_attacks_a_learner_that_keeps_walking_into_a_wall(self) -> None:
+        wall = CONFIG.game.world.arena_width_m
+        self.assertTrue(self._hunter_attacks(wall, wall - 3.0, FighterAction(move_dir=1)))
+
+    def test_it_attacks_a_learner_that_keeps_jumping(self) -> None:
+        self.assertTrue(self._hunter_attacks(5.0, 5.5, FighterAction(jump=True)))
+
     def test_it_attacks_a_learner_that_stands_still(self) -> None:
         self.chance.return_value = 0.0
         fighters = {

@@ -140,12 +140,14 @@ ends at once.
 
 **Counter.** A counter has a shorter wind-up (`counter_windup_frames`, 12 frames
 instead of 16), so it is harder to react to but still possible to parry. During the
-wind-up the fighter lunges at `counter_lunge_speed_mps` toward the nearest
-opponent. The direction is fixed when the swing starts, so the lunge does not
+wind-up the fighter lunges at `counter_lunge_speed_mps` toward the fighter whose
+swing it parried (the nearest other fighter if that one is gone). The direction is fixed when the swing
+starts, so the lunge does not
 follow an opponent who moves away or jumps over, and it stops at the opponent's x
 (and stays stopped if the opponent walks through it). The counter's hitbox also
-reaches `counter_hitbox_back_m` (0.8 m) behind the attacker, so walking forward
-through the attacker does not dodge it. An opponent who runs away is still hit. One
+reaches `counter_hitbox_back_m` (0.8 m) behind the attacker's center, so walking
+through the lunging attacker does not dodge it. A normal swing starts at the attacker's
+front edge and never reaches behind it. An opponent who runs away is still hit. One
 who times a jump as the lunge begins is not. A counter can be parried like any attack,
 which starts the exchange again.
 
@@ -159,8 +161,11 @@ so a jump clears an opponent. The only exception is a counter's lunge (its wind-
 which passes through the opponent's body. When the wind-up ends, a fighter left inside
 the opponent is pushed out on the side it came from (the lunge stops at the
 opponent's x, so the two are level). It therefore stays in front, where the opponent
-can still parry it, and a parried counter never ends inside the parrier. Collisions
-change no observation, action or reward layout.
+can still parry it, and a parried counter never ends inside the parrier. A fighter that walks into another or into a wall is stopped, and the one standing
+still is not pushed. Its velocity (`vx`) is what it actually moved, so a fighter held
+against a wall or an opponent has `vx` 0: it plays the idle animation and no footsteps,
+and scripted opponents see it as standing still. Collisions change no observation,
+action or reward layout.
 
 **Air hover.** A successful parry while airborne lifts the fighter by
 `parry_hover_impulse_mps`, never above `parry_hover_max_vy_mps` (a faster climb is

@@ -9,6 +9,10 @@ from arena_ai.sim.rules import LEVEL_TOLERANCE_M, end_attack, step_fighter
 from arena_ai.sim.state import FighterState
 
 
+# A difference below this between the intended and the actual velocity is float rounding.
+VELOCITY_TOLERANCE_MPS = 1e-6
+
+
 @dataclass(frozen=True)
 class FighterAction:
     """Input applied to one fighter during one simulation timestep."""
@@ -61,6 +65,7 @@ def step_game(
     mapping is required so a missing controller cannot silently stop a fighter.
     """
     _validate_actions(fighters, actions)
+    start_x = {fighter_id: fighter.x for fighter_id, fighter in fighters.items()}
 
     for fighter_id, fighter in fighters.items():
         action = actions[fighter_id]
@@ -71,7 +76,7 @@ def step_game(
             config.game,
             attack=action.attack,
             parry=action.parry,
-            target_x=_nearest_opponent_x(fighter_id, fighters),
+            target_x=_lunge_target_x(fighter_id, fighters),
         )
 
     resolve_collisions(fighters, config.game)
@@ -85,7 +90,7 @@ def step_game(
             if target_id == fighter_id or not attack_hits(attacker, target, config.game):
                 continue
             if parry_blocks(target, attacker):
-                apply_parry(target, attacker, config.game)
+                apply_parry(target, attacker, fighter_id, config.game)
             else:
                 target.health = max(0, target.health - config.game.combat.attack_damage)
                 attacker.attack_hit = True
@@ -94,6 +99,20 @@ def step_game(
 
     # A parry cancels a counter's lunge, so a parried fighter is pushed out, not left inside.
     resolve_collisions(fighters, config.game)
+
+    # A fighter that was stopped by a wall or another fighter is not moving: its velocity is
+    # what it actually moved, so the animation, the footsteps and the observation agree.
+    dt = config.game.world.dt_seconds
+    for fighter_id, fighter in fighters.items():
+        moved = (fighter.x - start_x[fighter_id]) / dt
+        if abs(moved - fighter.vx) > VELOCITY_TOLERANCE_MPS:
+            fighter.vx = moved
+
+
+def _lunge_target_x(fighter_id: str, fighters: Mapping[str, FighterState]) -> float | None:
+    """Return the x a counter lunges toward: the parried fighter, else the nearest other."""
+    parried = fighters.get(fighters[fighter_id].counter_target or "")
+    return parried.x if parried is not None else _nearest_opponent_x(fighter_id, fighters)
 
 
 def _nearest_opponent_x(
@@ -120,7 +139,9 @@ def parry_blocks(target: FighterState, attacker: FighterState) -> bool:
     return in_window and in_front
 
 
-def apply_parry(target: FighterState, attacker: FighterState, config: GameConfig) -> None:
+def apply_parry(
+    target: FighterState, attacker: FighterState, attacker_id: str, config: GameConfig
+) -> None:
     """Cancel the swing, stagger the attacker and give the parrier its counter window."""
     combat = config.combat
     attacker.stagger_from_frame = combat.normal_swing_frame(
@@ -134,6 +155,7 @@ def apply_parry(target: FighterState, attacker: FighterState, config: GameConfig
     target.parry_idle_frames = 0
     target.parried = True
     target.counter_frames = combat.counter_window_frames
+    target.counter_target = attacker_id
     if not target.on_ground:
         # Hover: lift to at most the cap (never reduce a faster climb) and fall slowly.
         target.vy = max(
@@ -161,9 +183,13 @@ def attack_hits(
     """Return whether an attacker's forward hitbox overlaps a target."""
     fighter_width = config.fighter.width_m
     attack_range = config.combat.attack_range_m
-    # Hitbox starts at the attacker's center, so overlapping targets are hit.
-    # A counter also reaches behind the attacker, so walking through it does not dodge it.
-    behind = config.combat.counter_hitbox_back_m if attacker.attack_counter else 0.0
+    # Bodies cannot overlap, so the hitbox starts at the attacker's front edge and a swing
+    # never reaches a fighter behind it. Only a counter also reaches back, for an opponent
+    # that walked through its lunge.
+    if attacker.attack_counter:
+        behind = config.combat.counter_hitbox_back_m
+    else:
+        behind = -fighter_width / 2
     attack_start = attacker.x - attacker.facing_dir * behind
     attack_end = attacker.x + attacker.facing_dir * (fighter_width / 2 + attack_range)
     hitbox_left = min(attack_start, attack_end)

@@ -63,9 +63,11 @@ combat:
   # recovery frames are the same as a normal swing.
   counter_windup_frames: 12
   counter_lunge_speed_mps: 6.0 # horizontal speed during the counter's wind-up
-  # A counter's hitbox also reaches this far behind the attacker, so an opponent cannot
-  # dodge it by walking forward through the attacker (0.8 m is more than the 0.7 m an
-  # opponent walks in the 12 wind-up frames).
+  # Only a counter's hitbox reaches behind the attacker's center, by this much. The lunge
+  # passes through bodies, so an opponent can walk through the lunging attacker: in the 13
+  # steps up to the first hit it walks 0.87 m, so its body edge can end 0.73 m behind the
+  # attacker's center. A normal swing starts at the attacker's front edge and never
+  # reaches behind it.
   counter_hitbox_back_m: 0.8
   # Frames after its swing is parried in which the attacker cannot start an attack. It
   # replaces the rest of the swing, so compare it with attack_recovery_frames. The

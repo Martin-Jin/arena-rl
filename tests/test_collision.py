@@ -35,12 +35,26 @@ class CollisionTests(unittest.TestCase):
             self.assertFalse(bodies_overlap(fighters["agent"], fighters["opponent"], GAME))
         self.assertGreaterEqual(fighters["opponent"].x - fighters["agent"].x, WIDTH - 1e-6)
 
-    def test_a_walker_pushes_a_fighter_standing_still(self) -> None:
+    def test_a_walker_is_stopped_by_a_fighter_standing_still(self) -> None:
         fighters = duel(gap=1.0)
         for _ in range(120):
             step(fighters, agent=RIGHT)
-        self.assertGreater(fighters["opponent"].x, 6.0)
+        self.assertEqual(fighters["opponent"].x, 6.0)  # Not pushed.
         self.assertFalse(bodies_overlap(fighters["agent"], fighters["opponent"], GAME))
+
+    def test_a_fighter_blocked_by_another_or_a_wall_has_no_velocity(self) -> None:
+        fighters = duel(gap=1.0)
+        for _ in range(120):
+            step(fighters, agent=RIGHT)
+        self.assertEqual(fighters["agent"].vx, 0.0)
+        self.assertEqual(fighters["agent"].facing_dir, 1)  # Still facing what it pushes.
+        step(fighters, agent=RIGHT, opponent=FighterAction(move_dir=1))
+        self.assertGreater(fighters["agent"].vx, 0.0)  # Moving again once the way is free.
+        wall = {"agent": FighterState(x=GAME.world.arena_width_m, facing_dir=1),
+                "opponent": FighterState(x=1.0)}
+        step(wall, agent=RIGHT)
+        self.assertEqual(wall["agent"].vx, 0.0)
+        self.assertEqual(wall["agent"].facing_dir, 1)
 
     def test_fighters_that_start_on_top_of_each_other_are_separated(self) -> None:
         fighters = duel(gap=0.0)
@@ -100,3 +114,39 @@ class CollisionTests(unittest.TestCase):
         for _ in range(COMBAT.attack_total_frames):
             step(fighters, agent=ATTACK)
         self.assertFalse(bodies_overlap(fighters["agent"], fighters["opponent"], GAME))
+
+
+class HitboxTests(unittest.TestCase):
+    def test_a_swing_never_hits_a_fighter_behind_it(self) -> None:
+        fighters = duel(gap=WIDTH)  # Touching: as close as bodies get.
+        fighters["agent"].facing_dir = -1  # Facing away from the opponent.
+        for _ in range(COMBAT.attack_total_frames + 1):
+            step(fighters, agent=ATTACK)
+        self.assertEqual(fighters["opponent"].health, 100)
+
+    def test_a_swing_hits_a_touching_fighter_in_front(self) -> None:
+        fighters = duel(gap=WIDTH)
+        for _ in range(COMBAT.attack_total_frames + 1):
+            step(fighters, agent=ATTACK)
+        self.assertEqual(fighters["opponent"].health, 100 - COMBAT.attack_damage)
+
+    def test_a_counter_lunges_toward_the_fighter_it_parried(self) -> None:
+        fighters = duel(gap=0.5)
+        fighters["third"] = FighterState(x=4.0, facing_dir=1)  # Nearer on the other side.
+        while fighters["opponent"].attack_frame < COMBAT.attack_windup_frames:
+            step_game(
+                fighters,
+                {"agent": FighterAction(), "opponent": ATTACK, "third": FighterAction()},
+                CONFIG,
+            )
+        step_game(
+            fighters,
+            {"agent": PARRY, "opponent": ATTACK, "third": FighterAction()},
+            CONFIG,
+        )
+        agent = fighters["agent"]
+        self.assertEqual(agent.counter_target, "opponent")
+        fighters["third"].x = 4.9  # Now the nearest fighter, but not the one it parried.
+        step_game(fighters, {"agent": ATTACK, "opponent": FighterAction(),
+                             "third": FighterAction()}, CONFIG)
+        self.assertEqual(agent.lunge_dir, 1)

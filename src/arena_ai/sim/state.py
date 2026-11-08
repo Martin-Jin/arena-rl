@@ -36,6 +36,8 @@ class FighterState:
     # The normal-swing frame the parried swing had reached, for the deflect animation.
     stagger_from_frame: int = 0
     counter_frames: int = 0  # Frames left in which an attack is a counter.
+    # Id of the fighter whose swing this fighter parried. Its counter lunges toward it.
+    counter_target: str | None = None
     hover_frames: int = 0  # Frames left of reduced gravity after an air parry.
     # Events of the latest step, cleared at the start of the next one. Rewards read them.
     parried: bool = False  # This fighter parried an attack.
