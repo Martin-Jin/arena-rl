@@ -10,7 +10,7 @@ Code: [`agents/policy.py`](../src/arena_ai/agents/policy.py) (`ActorCritic`,
 (`EntityAttention`), [`agents/distribution.py`](../src/arena_ai/agents/distribution.py)
 (the action heads) and [`training/ppo.py`](../src/arena_ai/training/ppo.py) (the loss).
 Sizes are the defaults in [`configs/agent.yaml`](../configs/agent.yaml): `embed_dim` 64,
-`num_heads` 1, `hidden_layers` [128, 128], and `observation.max_opponents` 3.
+`num_heads` 4, `hidden_layers` [128, 128], and `observation.max_opponents` 3.
 
 ## Two networks, one input
 

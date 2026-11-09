@@ -8,7 +8,7 @@ network:
   # The input block encodes each fighter to embed_dim values and attends over the opponents;
   # the hidden layers then get [own embedding ; attention context] (2 * embed_dim values).
   embed_dim: 64
-  num_heads: 1 # must divide embed_dim
+  num_heads: 4 # must divide embed_dim; 4 heads let separate threats get separate attention
 
 policy:
   clip_range: 0.2 # clipping range for policy updates
