@@ -48,7 +48,7 @@ class Observation(TypedDict):
     opponents: dict[str, FighterObservation]
 
 
-def _fighter_observation(
+def fighter_observation(
     fighter: FighterState, combat: CombatConfig
 ) -> FighterObservation:
     """Return the observation of a single fighter."""
@@ -101,9 +101,9 @@ def get_observation(
         }
 
     return {
-        "agent": _fighter_observation(fighter, combat),
+        "agent": fighter_observation(fighter, combat),
         "opponents": {
-            fighter_id: _fighter_observation(opponent, combat)
+            fighter_id: fighter_observation(opponent, combat)
             for fighter_id, opponent in opponent_states.items()
         },
     }

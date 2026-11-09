@@ -7,6 +7,7 @@ from arena_ai.agents.action import to_fighter_action
 from arena_ai.agents.scripted.view import team_observation
 from arena_ai.config import Config
 from arena_ai.envs.arena_env import ArenaEnv
+from arena_ai.sim.observation_vector import fighter_rows
 from arena_ai.sim.simulate import FighterAction
 from arena_ai.sim.state import (
     AGENT_ID,
@@ -68,24 +69,21 @@ class OneVManyEnv(ArenaEnv):
         rng = self.rng if self.config.training.randomize_spawns else None
         return create_initial_fighters(self.config.game, rng, len(self.opponent_policies))
 
-    def get_actions(
-        self,
-        agent_action: int,
-        observation: list[float],
-    ) -> Mapping[str, FighterAction]:
+    def get_actions(self, agent_action: int) -> Mapping[str, FighterAction]:
         """Convert the learner's and every living opponent's decision into actions.
 
-        The passed observation is the learner's. Each opponent builds its own view from the
-        fighters instead, so that it is the second fighter in it, followed by its allies.
+        Each opponent builds its own view from the fighters, so that it is the second
+        fighter in it, followed by its allies. The fighters are encoded once for all views.
         """
         assert self.fighters is not None
         actions = {AGENT_ID: to_fighter_action(agent_action)}
+        rows = fighter_rows(self.fighters, self.config)
         for fighter_id, policy in self.opponent_policies.items():
             fighter = self.fighters[fighter_id]
             if fighter.health <= 0:
                 actions[fighter_id] = FighterAction()
                 continue
             actions[fighter_id] = to_fighter_action(
-                policy(team_observation(self.fighters, fighter_id, self.config))
+                policy(team_observation(self.fighters, fighter_id, self.config, rows))
             )
         return actions

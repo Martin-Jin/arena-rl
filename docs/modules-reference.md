@@ -94,7 +94,8 @@ The simulation layer is deterministic and independent of rendering. It must not 
   opponents in training), `runner.py` (flees the learner), `simple.py` (idle and uniformly
   random), `registry.py` (the `OPPONENTS` registry and `training_opponents`, which checks a
   `training.opponents` list), `view.py` (how a policy reads its observation by name, and
-  `team_observation`, which builds it: the agent, the opponent, then its allies) and
+  `team_observation`, which builds it: the agent, the opponent, then its allies, from
+  `fighter_rows` so each fighter is encoded once per step) and
   `teamwork.py` (`jumps_over_allies`, which lets opponents queued behind an ally hop over
   it).
 - `src/arena_ai/agents/attention.py` — `EntityAttention`, the input block of both

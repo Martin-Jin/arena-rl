@@ -7,6 +7,7 @@ from arena_ai.agents.scripted.teamwork import jumps_over_allies
 from arena_ai.agents.scripted.view import living_allies, team_observation
 from arena_ai.config import load_config
 from arena_ai.envs.training_envs.one_v_many_env import OneVManyEnv
+from arena_ai.sim.observation_vector import fighter_rows
 from arena_ai.sim.state import AGENT_ID, FighterState
 
 CONFIG = load_config()
@@ -29,6 +30,18 @@ def observation(fighters, fighter_id="opponent"):
 
 
 class TeamObservationTests(unittest.TestCase):
+    def test_views_built_from_shared_rows_match_views_built_alone(self) -> None:
+        fighters = team(2.0, 9.0, 8.0, 7.0)
+        fighters["opponent_1"].health = 0  # A dead ally is left out of every view.
+        rows = fighter_rows(fighters, CONFIG)
+        self.assertNotIn("opponent_1", rows)
+        for fighter_id in ("opponent", "opponent_2"):
+            self.assertEqual(
+                team_observation(fighters, fighter_id, CONFIG, rows),
+                team_observation(fighters, fighter_id, CONFIG),
+            )
+        self.assertEqual(len(rows), 3)
+
     def test_the_opponent_is_slot_one_and_the_allies_follow(self) -> None:
         fighters = team(2.0, 9.0, 8.0, 7.0)
         view = observation(fighters, "opponent_1")

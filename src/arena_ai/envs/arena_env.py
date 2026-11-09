@@ -69,8 +69,7 @@ class ArenaEnv(ABC):
         if self._episode_done:
             raise RuntimeError("reset() must be called after an episode ends")
 
-        current_observation = self.get_observation()
-        actions = self.get_actions(action, current_observation)
+        actions = self.get_actions(action)
         previous_health = {
             fighter_id: fighter.health for fighter_id, fighter in self.fighters.items()
         }
@@ -147,7 +146,6 @@ class ArenaEnv(ABC):
     def get_actions(
         self,
         agent_action: int,
-        observation: list[float],
     ) -> Mapping[str, FighterAction]:
         """Convert scenario controller decisions into ID-keyed simulation actions."""
 

@@ -3,8 +3,8 @@
 from collections.abc import Mapping, Sequence
 
 from arena_ai.config import AttackType, Config, load_config
-from arena_ai.sim.observation import Observation
-from arena_ai.sim.state import sort_key
+from arena_ai.sim.observation import Observation, fighter_observation
+from arena_ai.sim.state import AGENT_ID, FighterState, sort_key
 
 # The features of one fighter, in vector order. Add new features at the end, and bump
 # ``observation.spec_version`` in configs/game.yaml: old checkpoints no longer fit.
@@ -75,85 +75,137 @@ def opponent_mask(vector: Sequence[float], max_opponents: int) -> list[float]:
     return list(vector[start : start + max_opponents])
 
 
-def _normalize(value: float, maximum: float) -> float:
-    """Scale a value by a fixed positive maximum and clamp it to [-1, 1]."""
-    if maximum <= 0:
-        raise ValueError(f"Normalization maximum must be positive, got {maximum}")
-    return max(-1.0, min(1.0, value / maximum))
+# The config the scales were last built for. Building them is pure arithmetic on the
+# config, so one entry is enough: a run uses a single config.
+_scales_cache: tuple[Config, list[float]] | None = None
 
 
-def _fighter_vector(
+def _scales(config: Config) -> list[float]:
+    """Return the divisor of each feature, in ``FEATURE_NAMES`` order.
+
+    A feature that is already in [-1, 1] (flags, facing, the one-hot) has the divisor 1.0.
+    Every divisor must be positive.
+    """
+    global _scales_cache
+    if _scales_cache is not None and _scales_cache[0] is config:
+        return _scales_cache[1]
+    world = config.game.world
+    fighter = config.game.fighter
+    combat = config.game.combat
+    reach = RELATIVE_X_REACHES * (fighter.width_m + combat.attack_range_m)
+    by_name = {
+        "x": world.arena_width_m,
+        "y": config.game.observation.max_observed_height_m,
+        "vx": fighter.move_speed_mps,
+        "vy": fighter.jump_velocity_mps,
+        "health": fighter.max_health,
+        "attack_windup_left": combat.longest_windup_frames,
+        "attack_active_left": combat.longest_active_frames,
+        "attack_recovery_left": combat.longest_recovery_frames,
+        "parry_window_left": combat.parry_window_frames,
+        "parry_recovery_left": combat.parry_recovery_frames,
+        "parry_window": combat.parry_window_frames,
+        "counter_frames": combat.counter_window_frames,
+        "stagger_frames": combat.parried_stagger_frames,
+        "busy_frames_left": max(combat.longest_attack_frames, combat.parry_total_frames),
+        "rel_x_ahead": reach,
+        "rel_y": RELATIVE_Y_HEIGHTS * fighter.height_m,
+        "rel_x_aimed": reach,
+    }
+    scales = [float(by_name.get(name, 1.0)) for name in FEATURE_NAMES]
+    for name, scale in zip(FEATURE_NAMES, scales):
+        if scale <= 0:
+            raise ValueError(f"Normalization maximum for {name} must be positive, got {scale}")
+    _scales_cache = (config, scales)
+    return scales
+
+
+def _fighter_row(
     fighter: Mapping[str, object],
     config: Config,
     acting: Mapping[str, object],
 ) -> list[float]:
-    """Encode one fighter's state as ``FEATURES_PER_FIGHTER`` normalized values.
+    """Encode one fighter's state as ``FEATURES_PER_FIGHTER`` values clamped to [-1, 1].
 
     ``acting`` is the fighter the observation is for: the relative features are measured
-    from it.
+    from it. The raw values are listed in ``FEATURE_NAMES`` order and divided by ``_scales``.
     """
     position = fighter["position"]
     velocity = fighter["velocity"]
-    if not isinstance(position, Mapping) or not isinstance(velocity, Mapping):
-        raise TypeError("Fighter position and velocity must be mappings")
-    world = config.game.world
-    fighter_config = config.game.fighter
-    observation_config = config.game.observation
-
-    combat = config.game.combat
     acting_position = acting["position"]
-    if not isinstance(acting_position, Mapping):
-        raise TypeError("Fighter position must be a mapping")
-    dx = float(position["x"]) - float(acting_position["x"])
-    dy = float(position["y"]) - float(acting_position["y"])
-    reach_scale = RELATIVE_X_REACHES * (fighter_config.width_m + combat.attack_range_m)
-    values = {
-        "x": _normalize(float(position["x"]), world.arena_width_m),
-        "y": _normalize(
-            float(position["y"]) - world.floor_y_m,
-            observation_config.max_observed_height_m,
-        ),
-        "vx": _normalize(float(velocity["x"]), fighter_config.move_speed_mps),
-        "vy": _normalize(float(velocity["y"]), fighter_config.jump_velocity_mps),
-        "on_ground": float(bool(fighter["on_ground"])),
-        "facing_dir": float(fighter["facing_dir"]),
-        "health": _normalize(float(fighter["health"]), fighter_config.max_health),
-        "attack_windup_left": _normalize(
-            float(fighter["attack_windup_left"]), combat.longest_windup_frames
-        ),
-        "attack_active_left": _normalize(
-            float(fighter["attack_active_left"]), combat.longest_active_frames
-        ),
-        "attack_recovery_left": _normalize(
-            float(fighter["attack_recovery_left"]), combat.longest_recovery_frames
-        ),
-        "attack_counter": float(bool(fighter["attack_counter"])),
-        "parry_window_left": _normalize(
-            float(fighter["parry_window_left"]), combat.parry_window_frames
-        ),
-        "parry_recovery_left": _normalize(
-            float(fighter["parry_recovery_left"]), combat.parry_recovery_frames
-        ),
-        "parry_window": _normalize(float(fighter["parry_window"]), combat.parry_window_frames),
-        "counter_frames": _normalize(
-            float(fighter["counter_frames"]), combat.counter_window_frames
-        ),
-        "stagger_frames": _normalize(
-            float(fighter["stagger_frames"]), combat.parried_stagger_frames
-        ),
-        "parry_held": float(bool(fighter["parry_held"])),
-        "busy_frames_left": _normalize(
-            float(fighter["busy_frames_left"]),
-            max(combat.longest_attack_frames, combat.parry_total_frames),
-        ),
+    x = float(position["x"])
+    y = float(position["y"])
+    dx = x - float(acting_position["x"])
+    dy = y - float(acting_position["y"])
+    attack_type = fighter["attack_type"]
+    raw = [
+        x,
+        y - config.game.world.floor_y_m,
+        float(velocity["x"]),
+        float(velocity["y"]),
+        float(bool(fighter["on_ground"])),
+        float(fighter["facing_dir"]),
+        float(fighter["health"]),
+        float(fighter["attack_windup_left"]),
+        float(fighter["attack_active_left"]),
+        float(fighter["attack_recovery_left"]),
+        float(bool(fighter["attack_counter"])),
+        float(fighter["parry_window_left"]),
+        float(fighter["parry_recovery_left"]),
+        float(fighter["parry_window"]),
+        float(fighter["counter_frames"]),
+        float(fighter["stagger_frames"]),
+        float(bool(fighter["parry_held"])),
+        float(fighter["busy_frames_left"]),
+        *(float(attack_type == kind) for kind in AttackType),
+        dx * float(acting["facing_dir"]),
+        dy,
+        # Positive when this fighter faces the acting fighter (its swing points at it).
+        -dx * float(fighter["facing_dir"]),
+    ]
+    return [max(-1.0, min(1.0, value / scale)) for value, scale in zip(raw, _scales(config))]
+
+
+def assemble_vector(
+    agent_row: list[float],
+    opponent_rows: Sequence[list[float] | None],
+    max_opponents: int,
+) -> list[float]:
+    """Join rows into ``[acting fighter][opponent slot 0..K-1][mask 0..K-1]``.
+
+    ``opponent_rows`` fill the slots from the first. ``None`` stands for a dead opponent:
+    its slot is all zeros with mask 0.0, so the network can tell an absent opponent from
+    one standing at x = 0. Unfilled slots are zeros with mask 0.0 as well.
+    """
+    if len(opponent_rows) > max_opponents:
+        raise ValueError(
+            f"{len(opponent_rows)} opponents do not fit observation.max_opponents={max_opponents}"
+        )
+    empty = [0.0] * FEATURES_PER_FIGHTER
+    vector = list(agent_row)
+    mask = []
+    for row in opponent_rows:
+        vector.extend(empty if row is None else row)
+        mask.append(0.0 if row is None else 1.0)
+    padding = max_opponents - len(opponent_rows)
+    vector.extend(empty * padding)
+    return vector + mask + [0.0] * padding
+
+
+def fighter_rows(fighters: Mapping[str, FighterState], config: Config) -> dict[str, list[float]]:
+    """Return the row of the agent and of every living fighter, measured from the agent.
+
+    A row depends only on the fighter and the agent, not on which fighter's view it ends up
+    in, so build the rows once per step and assemble every view from them.
+    """
+    combat = config.game.combat
+    observations = {fid: fighter_observation(f, combat) for fid, f in fighters.items()}
+    acting = observations[AGENT_ID]
+    return {
+        fid: _fighter_row(observation, config, acting)
+        for fid, observation in observations.items()
+        if fid == AGENT_ID or fighters[fid].health > 0
     }
-    values["rel_x_ahead"] = _normalize(dx * float(acting["facing_dir"]), reach_scale)
-    values["rel_y"] = _normalize(dy, RELATIVE_Y_HEIGHTS * fighter_config.height_m)
-    # Positive when this fighter faces the acting fighter (its swing points at it).
-    values["rel_x_aimed"] = _normalize(-dx * float(fighter["facing_dir"]), reach_scale)
-    for attack_type in AttackType:
-        values[f"attack_type_{attack_type.value}"] = float(fighter["attack_type"] == attack_type)
-    return [values[name] for name in FEATURE_NAMES]
 
 
 def encode_observation(
@@ -170,23 +222,13 @@ def encode_observation(
     """
     if config is None:
         config = load_config()
-    max_opponents = config.game.observation.max_opponents
-    opponents = observation["opponents"]
-    if len(opponents) > max_opponents:
-        raise ValueError(
-            f"{len(opponents)} opponents do not fit observation.max_opponents={max_opponents}"
-        )
     acting = observation["agent"]
-    vector = _fighter_vector(acting, config, acting)
-    mask = []
-    for opponent_id in sorted(opponents, key=sort_key):
-        alive = opponents[opponent_id]["health"] > 0
-        vector.extend(
-            _fighter_vector(opponents[opponent_id], config, acting)
-            if alive
-            else [0.0] * FEATURES_PER_FIGHTER
-        )
-        mask.append(1.0 if alive else 0.0)
-    padding = max_opponents - len(opponents)
-    vector.extend([0.0] * (padding * FEATURES_PER_FIGHTER))
-    return vector + mask + [0.0] * padding
+    opponents = observation["opponents"]
+    return assemble_vector(
+        _fighter_row(acting, config, acting),
+        [
+            _fighter_row(opponents[fid], config, acting) if opponents[fid]["health"] > 0 else None
+            for fid in sorted(opponents, key=sort_key)
+        ],
+        config.game.observation.max_opponents,
+    )
