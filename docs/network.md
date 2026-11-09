@@ -96,7 +96,7 @@ flowchart TB
 
 How to read it:
 
-- **Embeddings.** `phi_self` turns the acting fighter's 14 numbers into a 64-number summary,
+- **Embeddings.** `phi_self` turns the acting fighter's 22 numbers into a 64-number summary,
   `e_self`. `phi_opp` does the same for each opponent with the **same weights**, so what is
   learned about one opponent applies to all of them.
 - **Query, keys, values.** Only the acting fighter has a query. Every entity (itself and each
@@ -104,13 +104,20 @@ How to read it:
   entity's key. After the softmax the scores become weights that sum to 1, and the
   **context** is the weighted sum of the values: a blend that leans toward the entities the
   fighter "attends to".
+- **Heads.** With `num_heads` above 1 the 64 numbers of the query, keys and values are
+  split into slices (4 heads: 16 numbers each). Every head runs its own softmax over all the
+  entities, so one head can lean toward the nearest opponent and another toward the one
+  whose swing is about to land. The heads' outputs are joined and mixed by an output
+  projection. The split does not change the parameter count.
 - **Mask.** An absent or dead opponent gets a score of minus infinity, so its weight is
   exactly 0 and it has no influence, whatever its (zeroed) row holds.
 - **Concatenate.** The hidden layers receive `[e_self ; context]` side by side, so the
   fighter's own state reaches them directly and is not only one entry in an average.
-- **Limits.** The context is one summary vector, not each opponent separately. The network
-  has no explicit relative features such as the distance to an opponent: it works them out
-  from the embeddings.
+- **Limits.** The context is a blend, not each opponent separately: two opponents that
+  swing at once can have their frame countdowns averaged within a head, which is why there
+  are several heads. Each row carries `rel_x_ahead`, `rel_y` and `rel_x_aimed` (position
+  relative to the acting fighter), so the network does not have to subtract two absolute
+  positions to tell a near threat from a far one.
 
 ## The decision
 

@@ -54,8 +54,8 @@ class EntityAttention(nn.Module):
     reaches them directly, not only as one entry in a weighted average.
 
     **Limits:** it has no positions between opponents beyond what the features carry (x and
-    y are in each row), and the context is one vector, so the network sees a summary of the
-    opponents, not each one separately.
+    y, and each row's position relative to the acting fighter), and each head's context is
+    a blend, so the network sees a summary of the opponents, not each one separately.
     """
 
     def __init__(

@@ -126,7 +126,8 @@ trained opponent works straight after a clone with no training. Every other file
 every one against the approach, idle and perfect-parry opponents and 99 against the
 random one. It was trained before the runner opponent existed, so it has not been
 measured against it. **Retrain it:** the observation now has opponent slots and a mask
-(spec version 2) and the network has an attention input block, so this checkpoint no
+(it is now at spec version 4: frames-left countdowns, relative distances and an attack
+type) and the network has an attention input block with four heads, so this checkpoint no
 longer loads and the viewer's trained agent needs a new one. Its figures above are for the
 old network. `checkpoints/best.pt` is left as it was until a new run replaces it. The viewer picks it up automatically when there is no `latest.pt`,
 or you can choose it in Settings. Replace `best.pt` only when a run is clearly better,
