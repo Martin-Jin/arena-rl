@@ -6,6 +6,8 @@ from typing import Any
 
 import yaml
 
+DEFAULT_ATTACK: str = "slash"
+
 
 # CONFIGURATION FOR THE GAME SIMULATION
 @dataclass(frozen=True)
@@ -35,13 +37,29 @@ class FighterConfig:
 
 
 @dataclass(frozen=True)
-class CombatConfig:
+class AttackSpec:
+    """Attack timing and damage values for a single attack."""
+
     attack_windup_frames: int
     attack_active_frames: int
     attack_recovery_frames: int
-    attack_damage: int
-    counter_damage: int
-    attack_range_m: float
+    damage: int
+    range_m: float
+
+    @property
+    def attack_total_frames(self) -> int:
+        """Length of a full swing: wind-up, active and recovery frames."""
+        return self.attack_windup_frames + self.attack_active_frames + self.attack_recovery_frames
+
+
+@dataclass(frozen=True)
+class CombatConfig:
+    """Attack, parry and counter timing and damage values."""
+
+    # Dictionary of attacks and their specs
+    attacks: dict[str, AttackSpec]
+
+    # For parries
     parry_window_frames: int
     parry_recovery_frames: int
     parry_min_window_frames: int
@@ -51,51 +69,67 @@ class CombatConfig:
     parry_hover_max_vy_mps: float
     parry_hover_gravity_scale: float
     parry_hover_frames: int
+    parried_stagger_frames: int
+    # For counters
+    counter_damage: int
     counter_window_frames: int
     counter_windup_frames: int
     counter_lunge_speed_mps: float
     counter_hitbox_back_m: float
-    parried_stagger_frames: int
+
+    @property
+    def basic(self) -> AttackSpec:
+        return self.attacks[DEFAULT_ATTACK]
+
+    def damage(self, counter: bool) -> int:
+        return self.counter_damage if counter else self.basic.damage
+
+    def windup_frames(self, counter: bool) -> int:
+        return self.counter_windup_frames if counter else self.basic.attack_windup_frames
+
+    def normal_swing_frame(self, frame: int, counter: bool) -> int:
+        if counter:
+            return frame + self.basic.attack_windup_frames - self.counter_windup_frames
+        return frame
+
+    def swing_total_frames(
+        self,
+        counter: bool,
+    ) -> int:
+        basic = self.basic
+        return (
+            self.windup_frames(counter) + basic.attack_active_frames + basic.attack_recovery_frames
+        )
 
     @property
     def attack_total_frames(self) -> int:
-        """Length of a full swing: wind-up, active and recovery frames."""
-        return (
-            self.attack_windup_frames
-            + self.attack_active_frames
-            + self.attack_recovery_frames
-        )
-
-    def damage(self, counter: bool) -> int:
-        """Damage of a normal swing, or of a counter attack."""
-        return self.counter_damage if counter else self.attack_damage
-
-    def windup_frames(self, counter: bool) -> int:
-        """Wind-up length of a normal swing, or of the shorter counter swing."""
-        return self.counter_windup_frames if counter else self.attack_windup_frames
-
-    def normal_swing_frame(self, frame: int, counter: bool) -> int:
-        """Return the frame of a normal swing that looks like ``frame`` of this swing.
-
-        A counter has a shorter wind-up, so its frames line up with the later frames of
-        a normal swing. The viewer draws the attack animation from this frame.
-        """
-        if counter:
-            return frame + self.attack_windup_frames - self.counter_windup_frames
-        return frame
-
-    def swing_total_frames(self, counter: bool) -> int:
-        """Length of a full normal or counter swing."""
-        return (
-            self.windup_frames(counter)
-            + self.attack_active_frames
-            + self.attack_recovery_frames
-        )
+        return self.basic.attack_total_frames
 
     @property
     def parry_total_frames(self) -> int:
         """Length of a rested parry: the longest window plus the recovery."""
         return self.parry_window_frames + self.parry_recovery_frames
+
+    # Backwards compatibility for the old config names, which are used in the game code.
+    @property
+    def attack_windup_frames(self) -> int:
+        return self.basic.attack_windup_frames
+
+    @property
+    def attack_damage(self) -> int:
+        return self.basic.damage
+
+    @property
+    def attack_range_m(self) -> float:
+        return self.basic.range_m
+
+    @property
+    def attack_active_frames(self) -> int:
+        return self.basic.attack_active_frames
+
+    @property
+    def attack_recovery_frames(self) -> int:
+        return self.basic.attack_recovery_frames
 
 
 @dataclass(frozen=True)
@@ -311,9 +345,15 @@ def _build_game_config(raw: dict[str, Any]) -> GameConfig:
     return GameConfig(
         world=WorldConfig(**raw["world"]),
         fighter=FighterConfig(**raw["fighter"]),
-        combat=CombatConfig(**raw["combat"]),
+        combat=_build_combat_config(raw["combat"]),
         observation=ObservationConfig(**raw["observation"]),
     )
+
+
+def _build_combat_config(raw: dict[str, Any]) -> CombatConfig:
+    raw = dict(raw)
+    raw["attacks"] = {name: AttackSpec(**spec) for name, spec in raw["attacks"].items()}
+    return CombatConfig(**raw)
 
 
 def _build_agent_config(raw: dict[str, Any]) -> AgentConfig:
