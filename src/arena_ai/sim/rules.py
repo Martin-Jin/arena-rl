@@ -25,6 +25,45 @@ def parry_window_for_observation(f: FighterState, combat: CombatConfig) -> int:
     return f.parry_window if f.parry_frame else next_parry_window(f, combat)
 
 
+def _frames_left(phase_length: int, phase_end: int, frame: int) -> int:
+    """Frames of a phase still to run on ``frame``, counting this one.
+
+    ``phase_end`` is the last frame of the phase. A phase that has not started yet counts
+    in full, and one that is over counts 0.
+    """
+    return max(0, min(phase_length, phase_end - frame + 1))
+
+
+def attack_frames_left(f: FighterState, combat: CombatConfig) -> tuple[int, int, int]:
+    """Return the (wind-up, active, recovery) frames of the running swing still to run.
+
+    All 0 when not attacking. They are countdowns of the swing the fighter has already
+    started, so they follow that attack's own timing (a counter has a shorter wind-up).
+    """
+    if not f.attack_frame:
+        return 0, 0, 0
+    spec = combat.spec(f.attack_type)
+    windup = combat.counter_windup_frames if f.attack_counter else spec.attack_windup_frames
+    active_end = windup + spec.attack_active_frames
+    recovery_end = active_end + spec.attack_recovery_frames
+    return (
+        _frames_left(windup, windup, f.attack_frame),
+        _frames_left(spec.attack_active_frames, active_end, f.attack_frame),
+        _frames_left(spec.attack_recovery_frames, recovery_end, f.attack_frame),
+    )
+
+
+def parry_frames_left(f: FighterState, combat: CombatConfig) -> tuple[int, int]:
+    """Return the (protected window, recovery) frames of the running parry still to run."""
+    if not f.parry_frame:
+        return 0, 0
+    recovery = combat.parry_recovery_frames
+    return (
+        _frames_left(f.parry_window, f.parry_window, f.parry_frame),
+        _frames_left(recovery, f.parry_window + recovery, f.parry_frame),
+    )
+
+
 def is_lunging(f: FighterState, combat: CombatConfig, hits_checked: bool = False) -> bool:
     """Return whether a counter is lunging, so it moves by the lunge and passes through bodies.
 

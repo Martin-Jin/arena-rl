@@ -27,6 +27,15 @@ def learner_and_me(observation: list[float]) -> tuple[dict[str, float], dict[str
     return fighter_features(observation, 0), fighter_features(observation, 1)
 
 
+def is_attacking(fighter: dict[str, float]) -> bool:
+    """Return whether the fighter is in any phase of a swing."""
+    return (
+        fighter["attack_windup_left"]
+        + fighter["attack_active_left"]
+        + fighter["attack_recovery_left"]
+    ) > 0
+
+
 def living_allies(observation: list[float]) -> list[dict[str, float]]:
     """Return the named features of this opponent's living allies (empty in a one-on-one)."""
     slots = slot_count(observation)

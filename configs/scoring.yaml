@@ -10,5 +10,5 @@ scoring:
   counter_reward: 0.3 # a counter attack that hits, on top of the damage reward
   kill_reward: 0.0 # each opponent the agent finishes off; off by default, about 0.5 is a modest start
   timeout_win_reward: 0.25 # a time-out with more health than the opponents' mean: well below a kill
-  missed_parry_penalty: 0.05 # a parry that ended without parrying anything
-  missed_attack_penalty: 0.025 # a swing that finished without hitting or being parried
+  missed_parry_penalty: 0.1 # a parry that ended without parrying anything
+  missed_attack_penalty: 0.05 # a swing that finished without hitting or being parried

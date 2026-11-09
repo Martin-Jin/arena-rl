@@ -5,7 +5,7 @@ import random
 from arena_ai.agents.action import Action
 from arena_ai.agents.scripted.approach import approach_and_attack
 from arena_ai.agents.scripted.teamwork import jumps_over_allies
-from arena_ai.agents.scripted.view import learner_and_me
+from arena_ai.agents.scripted.view import is_attacking, learner_and_me
 from arena_ai.config import Config, load_config
 
 # Chance per step that the perfect-parry opponent attacks a learner that stands still. It cannot
@@ -53,16 +53,18 @@ def parrying_hunter(
 
     learner_x = learner["x"] * arena_width
     learner_y = learner["y"] * max_height
-    learner_swing = round(learner["attack_frame"] * combat.attack_total_frames)
     learner_facing = int(learner["facing_dir"])
     learner_is_counter = learner["attack_counter"] > 0.5
+    learner_swinging = is_attacking(learner)
+    # Wind-up frames left: 1 is the last one, so a parry pressed now is up on the first hit.
+    windup_left = round(learner["attack_windup_left"] * combat.longest_windup_frames)
     self_x = me["x"] * arena_width
     self_y = me["y"] * max_height
     self_facing = int(me["facing_dir"])
-    self_busy = me["attack_frame"] > 0 or me["parry_frame"] > 0
+    self_busy = me["busy_frames_left"] > 0
     counter_ready = me["counter_frames"] > 0
 
-    if learner_swing and not self_busy:
+    if learner_swinging and not self_busy:
         # Where the learner's swing reaches, widened by one step of the learner's
         # walking, since its input on the step the swing lands is not known. The swing
         # starts at the learner's front edge and hits any body it touches, so it reaches a
@@ -82,11 +84,10 @@ def parrying_hunter(
         level = abs(self_y - learner_y) < game.fighter.height_m
         if in_reach and level:
             learner_in_front = (learner_x - self_x) * self_facing >= 0
-            windup = combat.windup_frames(learner_is_counter)
-            if not learner_in_front and learner_swing < windup:
+            if not learner_in_front and windup_left > 1:
                 # Moving toward the learner turns this fighter at once, in time to parry.
                 return int(Action.MOVE_RIGHT if learner_x > self_x else Action.MOVE_LEFT)
-            if learner_in_front and learner_swing == windup:
+            if learner_in_front and windup_left == 1:
                 return int(Action.PARRY)
             return int(Action.IDLE)  # Waiting to parry, or too late to turn around.
     if counter_ready and not self_busy:

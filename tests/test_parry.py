@@ -9,6 +9,7 @@ from arena_ai.sim.observation_vector import (
     encode_observation,
     observation_size,
 )
+from arena_ai.sim.rules import parry_frames_left
 from arena_ai.sim.simulate import FighterAction, step_game
 from arena_ai.sim.state import FighterState
 
@@ -332,8 +333,27 @@ class ParryTests(unittest.TestCase):
         )
         vector = encode_observation(structured, CONFIG)
         self.assertEqual(len(vector), observation_size(CONFIG.game.observation.max_opponents))
-        parry_frame_index = FEATURE_INDEX["parry_frame"]
-        self.assertAlmostEqual(vector[parry_frame_index], 1 / COMBAT.parry_total_frames)
+        window = fighters["agent"].parry_window
+        self.assertAlmostEqual(
+            vector[FEATURE_INDEX["parry_window_left"]], window / COMBAT.parry_window_frames
+        )
+        self.assertAlmostEqual(vector[FEATURE_INDEX["parry_recovery_left"]], 1.0)
+        self.assertAlmostEqual(
+            vector[FEATURE_INDEX["busy_frames_left"]],
+            (window + COMBAT.parry_recovery_frames)
+            / max(COMBAT.longest_attack_frames, COMBAT.parry_total_frames),
+        )
+
+    def test_parry_countdowns_end_at_one_on_the_last_frame(self) -> None:
+        fighter = FighterState(parry_frame=1, parry_window=6)
+        recovery = COMBAT.parry_recovery_frames
+        self.assertEqual(parry_frames_left(fighter, COMBAT), (6, recovery))
+        fighter.parry_frame = 7  # First recovery frame.
+        self.assertEqual(parry_frames_left(fighter, COMBAT), (0, recovery))
+        fighter.parry_frame = 6 + recovery  # Last frame.
+        self.assertEqual(parry_frames_left(fighter, COMBAT), (0, 1))
+        fighter.parry_frame = 0
+        self.assertEqual(parry_frames_left(fighter, COMBAT), (0, 0))
 
     def test_observation_shows_whether_parry_is_still_held(self) -> None:
         fighters = duel(gap=5.0)

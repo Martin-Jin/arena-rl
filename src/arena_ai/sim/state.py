@@ -7,13 +7,15 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import TypeVar
 
-from arena_ai.config import GameConfig
+from arena_ai.config import AttackType, GameConfig
 
 T = TypeVar("T")
 
 
 @dataclass
 class FighterState:
+    """The state of a fighter in the arena, updated every step."""
+
     x: float = 6.0  # meters
     y: float = 0.0
     vx: float = 0.0  # m/s
@@ -50,6 +52,11 @@ class FighterState:
     counter_hit: bool = False  # This fighter's counter attack hit.
     missed_attack: bool = False  # A swing finished without hitting or being parried.
     missed_parry: bool = False  # A parry ended without parrying anything.
+    attack_type: AttackType = (
+        AttackType.SLASH
+    )  # The type of attack the fighter is performing currently.
+    # TODO attacks: list[AttackType] = field(default_factory=lambda: [AttackType.SLASH])
+    # TODO The types of attacks the fighter can perform.
 
 
 AGENT_ID = "agent"

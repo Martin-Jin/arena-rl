@@ -1,6 +1,6 @@
 import unittest
 
-from arena_ai.config import load_config
+from arena_ai.config import AttackType, load_config
 from arena_ai.sim.observation import get_observation
 from arena_ai.sim.observation_vector import (
     FEATURE_INDEX,
@@ -11,6 +11,7 @@ from arena_ai.sim.observation_vector import (
     observation_size,
     opponent_mask,
 )
+from arena_ai.sim.rules import attack_frames_left
 from arena_ai.sim.state import FighterState, opponent_ids
 
 CONFIG = load_config()
@@ -62,6 +63,73 @@ class ObservationVectorTests(unittest.TestCase):
         opponents = {i: FighterState() for i in opponent_ids(SLOTS + 1)}
         with self.assertRaises(ValueError):
             encode(FighterState(), opponents)
+
+    def test_attack_countdowns_follow_the_swing_phases(self) -> None:
+        spec = CONFIG.game.combat.basic
+        windup, active, recovery = (
+            spec.attack_windup_frames,
+            spec.attack_active_frames,
+            spec.attack_recovery_frames,
+        )
+        combat = CONFIG.game.combat
+        cases = {
+            0: (0, 0, 0),
+            1: (windup, active, recovery),
+            windup: (1, active, recovery),  # Last wind-up frame: a parry pressed now is up.
+            windup + 1: (0, active, recovery),  # First damaging frame.
+            windup + active: (0, 1, recovery),
+            windup + active + 1: (0, 0, recovery),
+            spec.attack_total_frames: (0, 0, 1),  # Last frame: free to act on the next step.
+        }
+        for frame, expected in cases.items():
+            fighter = FighterState(attack_frame=frame)
+            self.assertEqual(attack_frames_left(fighter, combat), expected, frame)
+
+    def test_a_counter_has_a_shorter_windup_but_the_same_recovery(self) -> None:
+        combat = CONFIG.game.combat
+        counter = FighterState(attack_frame=1, attack_counter=True)
+        self.assertEqual(
+            attack_frames_left(counter, combat),
+            (combat.counter_windup_frames, combat.basic.attack_active_frames,
+             combat.basic.attack_recovery_frames),
+        )
+
+    def test_the_vector_shows_the_countdowns_busy_frames_and_attack_type(self) -> None:
+        combat = CONFIG.game.combat
+        idle = fighter_features(encode(FighterState(), {"opponent": FighterState()}), 0)
+        self.assertEqual(idle["busy_frames_left"], 0.0)
+        self.assertEqual(idle[f"attack_type_{AttackType.SLASH.value}"], 0.0)
+        swinging = fighter_features(
+            encode(FighterState(attack_frame=1), {"opponent": FighterState()}), 0
+        )
+        self.assertAlmostEqual(
+            swinging["attack_windup_left"],
+            combat.basic.attack_windup_frames / combat.longest_windup_frames,
+        )
+        self.assertAlmostEqual(
+            swinging["busy_frames_left"],
+            combat.attack_total_frames
+            / max(combat.longest_attack_frames, combat.parry_total_frames),
+        )
+        self.assertEqual(swinging[f"attack_type_{AttackType.SLASH.value}"], 1.0)
+
+    def test_relative_features_measure_from_the_acting_fighter(self) -> None:
+        combat = CONFIG.game.combat
+        reach = CONFIG.game.fighter.width_m + combat.attack_range_m
+        agent = FighterState(x=5.0, facing_dir=1)
+        near = FighterState(x=5.0 + reach, facing_dir=-1)
+        far = FighterState(x=5.0 - 3 * reach, facing_dir=-1)
+        vector = encode(agent, {"opponent": near, "opponent_1": far})
+        own, near_row, far_row = (fighter_features(vector, slot) for slot in range(3))
+        for name in ("rel_x_ahead", "rel_y", "rel_x_aimed"):
+            self.assertEqual(own[name], 0.0)
+        self.assertAlmostEqual(near_row["rel_x_ahead"], 1 / 3)  # In front, one reach away.
+        self.assertAlmostEqual(near_row["rel_x_aimed"], 1 / 3)  # Facing the agent.
+        self.assertAlmostEqual(far_row["rel_x_ahead"], -1.0)  # Behind, clamped.
+        self.assertAlmostEqual(far_row["rel_x_aimed"], -1.0)  # Faces away (to its left).
+        far.facing_dir = 1
+        far_row = fighter_features(encode(agent, {"opponent": far}), 1)
+        self.assertAlmostEqual(far_row["rel_x_aimed"], 1.0)  # Now facing the agent.
 
     def test_a_row_past_the_end_is_refused(self) -> None:
         with self.assertRaises(ValueError):

@@ -2,7 +2,7 @@
 
 from arena_ai.agents.action import Action
 from arena_ai.agents.scripted.teamwork import jumps_over_allies
-from arena_ai.agents.scripted.view import learner_and_me
+from arena_ai.agents.scripted.view import is_attacking, learner_and_me
 from arena_ai.config import Config, load_config
 
 
@@ -31,7 +31,7 @@ def approach_and_attack(
     self_y = me["y"] * max_height
     self_on_ground = me["on_ground"] == 1.0
     self_facing = int(me["facing_dir"])
-    self_attack_frame = me["attack_frame"]
+    self_attacking = is_attacking(me)
 
     dx = learner_x - self_x
     dy = learner_y - self_y
@@ -45,7 +45,7 @@ def approach_and_attack(
     # Mid-swing: do not turn (turning would also turn the swing), so only chase a learner
     # that is in front
     # of us and out of reach. Otherwise let the swing play out.
-    if self_attack_frame > 0:
+    if self_attacking:
         if forward > reach:
             return int(move_toward)
         return int(Action.IDLE)

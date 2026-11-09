@@ -3,8 +3,12 @@
 from collections.abc import Mapping, Sequence
 from typing import TypedDict
 
-from arena_ai.config import CombatConfig, Config, load_config
-from arena_ai.sim.rules import parry_window_for_observation
+from arena_ai.config import AttackType, CombatConfig, Config, load_config
+from arena_ai.sim.rules import (
+    attack_frames_left,
+    parry_frames_left,
+    parry_window_for_observation,
+)
 from arena_ai.sim.state import FighterState
 
 
@@ -23,13 +27,18 @@ class FighterObservation(TypedDict):
     on_ground: bool
     facing_dir: int
     health: int
-    attack_frame: int
+    attack_windup_left: int
+    attack_active_left: int
+    attack_recovery_left: int
     attack_counter: bool
-    parry_frame: int
+    parry_window_left: int
+    parry_recovery_left: int
     parry_window: int
     counter_frames: int
     stagger_frames: int
     parry_held: bool
+    busy_frames_left: int
+    attack_type: AttackType | None
 
 
 class Observation(TypedDict):
@@ -43,20 +52,30 @@ def _fighter_observation(
     fighter: FighterState, combat: CombatConfig
 ) -> FighterObservation:
     """Return the observation of a single fighter."""
+    windup, active, recovery = attack_frames_left(fighter, combat)
+    parry_window, parry_recovery = parry_frames_left(fighter, combat)
     return {
         "position": {"x": fighter.x, "y": fighter.y},
         "velocity": {"x": fighter.vx, "y": fighter.vy},
         "on_ground": fighter.on_ground,
         "facing_dir": fighter.facing_dir,
         "health": fighter.health,
-        "attack_frame": fighter.attack_frame,
+        # Countdowns, not frame numbers, so the values do not depend on how an attack's
+        # frames are laid out. All 0 when not attacking or parrying.
+        "attack_windup_left": windup,
+        "attack_active_left": active,
+        "attack_recovery_left": recovery,
         "attack_counter": fighter.attack_counter,
-        "parry_frame": fighter.parry_frame,
+        "parry_window_left": parry_window,
+        "parry_recovery_left": parry_recovery,
         # Protected frames of the running parry, or of the next one: shows the spam penalty.
         "parry_window": parry_window_for_observation(fighter, combat),
         "counter_frames": fighter.counter_frames,
         "stagger_frames": fighter.stagger_frames,
         "parry_held": fighter.parry_held,
+        # Frames until the fighter can start an attack or a parry again.
+        "busy_frames_left": max(windup + active + recovery, parry_window + parry_recovery),
+        "attack_type": fighter.attack_type if fighter.attack_frame else None,
     }
 
 

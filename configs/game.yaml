@@ -14,21 +14,28 @@ fighter:
   width_to_height_ratio: 0.3
 
 combat:
+  # TODO Currently the frames are hardcoded for a basic attack. We want to support
+  # TODO multiple attack types, each with its own timing and damage. The config should
+  # TODO then be include frame numbers for a list of attack types, and the agent should
+  # TODO choose which one to use.
+  # TODO The attack frames numbers will need to be updated depending on the attack type.
   # All "frames" below are simulation steps (1/60 s each). A swing runs attack_windup_frames,
   # then attack_active_frames, then attack_recovery_frames, in that order.
   # Frames from starting a swing until its first damaging frame. Nothing can hit during
   # these, so this is how long the opponent has to see the swing and parry. The sprite
   # shown on the first damaging frame is (attack_windup_frames + 1) // frame_duration.attack
   # in viewer.yaml.
-  attack_windup_frames: 16
-  # Frames in which the swing can hit, right after the wind-up. One swing hits at most once.
-  attack_active_frames: 4
-  # Frames after the active frames in which the swing cannot hit and no new attack can
-  # start. It is the attacker's cooldown.
-  attack_recovery_frames: 14
-  attack_damage: 10
-  counter_damage: 15 # damage of each enemy a counter attack hits, in place of attack_damage
-  attack_range_m: 0.8
+  attacks:
+    # basic slash attack
+    slash:
+      attack_windup_frames: 16
+      # Frames in which the swing can hit, right after the wind-up. One swing hits at most once.
+      attack_active_frames: 4
+      # Frames after the active frames in which the swing cannot hit and no new attack can
+      # start. It is the attacker's cooldown.
+      attack_recovery_frames: 14
+      damage: 10
+      range_m: 0.8
   # Parry: a press opens a protected window, then a fixed recovery. Holding the
   # button parries once. The window halves with every press made soon after the
   # last parry (spam), down to a minimum, and resets after a success or a pause.
@@ -60,6 +67,8 @@ combat:
   # Frames after a successful parry in which the parrying fighter's next attack is a
   # counter. The window ends when it attacks or when the frames run out.
   counter_window_frames: 24
+  # damage of each enemy a counter attack hits, in place of attack_damage
+  counter_damage: 15
   # Wind-up frames of a counter, in place of attack_windup_frames. The active and
   # recovery frames are the same as a normal swing.
   counter_windup_frames: 12
@@ -79,7 +88,7 @@ observation:
   # spec_version is saved in checkpoints, which refuse to load at another version.
   # TODO: reaction_delay_frames is loaded but not used yet. It will be the frames an
   # observation lags behind the game.
-  spec_version: 2
+  spec_version: 4
   reaction_delay_frames: 0
   max_observed_height_m: 1.3
   # Opponent slots in the observation (the network input is padded and masked to this many).

@@ -37,21 +37,21 @@ training:
   opponents:
     [
       [parrier],
-      [parrier],
       [runner],
       [approach],
-      [approach],
+      [random],
       [idle],
       [random],
+      [approach, approach],
       [parrier, approach],
-      [parrier, approach],
-      [parrier, parrier],
+      [parrier, random],
       [approach, runner],
       [approach, idle],
       [parrier, approach, approach],
+      [parrier, parrier, parrier],
       [approach, approach, idle],
-      [parrier, parrier, approach],
-      [approach, runner, idle],
+      [parrier, random, approach],
+      [random, runner, idle],
     ]
   num_envs: 16 # the most environments allowed: training refuses to start with more entries
   randomize_spawns: true # random fighter start positions each episode

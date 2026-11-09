@@ -37,7 +37,7 @@ attack press made at the same time. The viewer maps `Q` to parry.
 ## Observation
 
 `encode_observation` returns one flat vector from the acting fighter's point of view
-(`spec_version` 2):
+(`spec_version` 4):
 
 ```
 [acting fighter: F values] [opponent slot 0: F] ... [opponent slot K-1: F] [mask: K values]
@@ -55,7 +55,7 @@ config value (and a retrain).
 - Fewer opponents than slots is allowed, so one network plays against any number up to
   `K`. More than `K` raises an error.
 
-Every fighter contributes these 14 values, each clamped to `[-1, 1]`. Their order is
+Every fighter contributes these 22 values, each clamped to `[-1, 1]`. Their order is
 `FEATURE_NAMES` in [`sim/observation_vector.py`](../src/arena_ai/sim/observation_vector.py),
 the single source for this table:
 
@@ -68,13 +68,33 @@ the single source for this table:
 | 4      | `on_ground`    | 1.0 or 0.0                                       |
 | 5      | `facing_dir`   | -1.0 or 1.0                                      |
 | 6      | `health`       | divided by `max_health`                          |
-| 7      | `attack_frame` | divided by the total attack length (34 frames)   |
-| 8      | `attack_counter` | 1.0 while the swing is a counter, else 0.0     |
-| 9      | `parry_frame`  | divided by `parry_window_frames + parry_recovery_frames` (0 when not parrying) |
-| 10     | `parry_window` | divided by `parry_window_frames`: the protected frames of the running parry, or of the next one when idle. Below 1.0 means spam is shrinking it |
-| 11     | `counter_frames` | frames left to counter, divided by `counter_window_frames` |
-| 12     | `stagger_frames` | frames left in which a parried fighter cannot attack, divided by `parried_stagger_frames` |
-| 13     | `parry_held` | 1.0 if the fighter's parry input was held on the previous step. Only a new press starts a parry, so a policy that keeps parry on never starts another one, and needs this to know it must release first |
+| 7      | `attack_windup_left` | wind-up frames of the running swing still to run, divided by the longest wind-up of any attack type. 1 frame (not 0) is the last wind-up frame, the one a parry must be pressed on |
+| 8      | `attack_active_left` | damaging frames still to run, divided by the longest active phase. Full length until the phase starts |
+| 9      | `attack_recovery_left` | recovery frames still to run, divided by the longest recovery. Full length until the phase starts |
+| 10     | `attack_counter` | 1.0 while the swing is a counter, else 0.0     |
+| 11     | `parry_window_left` | protected frames of the running parry still to run, divided by `parry_window_frames` |
+| 12     | `parry_recovery_left` | parry recovery frames still to run, divided by `parry_recovery_frames`. Full length until the window ends |
+| 13     | `parry_window` | divided by `parry_window_frames`: the protected frames of the running parry, or of the next one when idle. Below 1.0 means spam is shrinking it |
+| 14     | `counter_frames` | frames left to counter, divided by `counter_window_frames` |
+| 15     | `stagger_frames` | frames left in which a parried fighter cannot attack, divided by `parried_stagger_frames` |
+| 16     | `parry_held` | 1.0 if the fighter's parry input was held on the previous step. Only a new press starts a parry, so a policy that keeps parry on never starts another one, and needs this to know it must release first |
+| 17     | `busy_frames_left` | frames until the fighter can start an attack or a parry again (the larger of the attack and parry countdowns), divided by the longer of `longest_attack_frames` and `parry_total_frames` |
+| 18     | `attack_type_<name>` | one-hot of the attack in progress, one value per `AttackType` (only `slash` for now), all 0 when not attacking |
+| 19     | `rel_x_ahead` | horizontal distance from the acting fighter, positive in front of it (along its facing), divided by 3 attack reaches (`width_m + attack_range_m`) |
+| 20     | `rel_y` | height above the acting fighter, divided by 2 fighter heights |
+| 21     | `rel_x_aimed` | horizontal distance, positive when this fighter faces the acting fighter (its swing points at it), divided by 3 attack reaches |
+
+The three `rel_*` features are measured from the acting fighter, so they are 0 in its own
+row. They exist because each opponent row is encoded on its own: without them the network
+would have to subtract two absolute positions, which it learns slowly (a far-away swing
+looks as threatening as a near one). `x` and `y` stay, since the walls are at fixed
+absolute positions.
+
+The attack and parry features are countdowns, not frame numbers. They describe the swing
+or parry the fighter has already started, so they follow that attack's own timing and a
+new attack type needs no new timing feature. All are 0 when the fighter is not attacking
+or parrying. The attack type is a one-hot because the timing countdowns do not say which
+attack it is (damage and range will differ).
 
 Read a vector by name with `fighter_features(vector, slot)` (slot 0 is the acting fighter,
 1 and up are opponents), `opponent_mask(vector, K)` and `slot_count(vector)`. Never index it
@@ -106,8 +126,9 @@ A scripted opponent sees the vector built from the agent's side: slot 0 is the a
 - A fighter starts an attack or a parry only when it was doing neither at the
   start of the step, so the two never overlap.
 - The total attack length is derived as wind-up + active + recovery frames
-  (`CombatConfig.attack_total_frames`), so the observed attack progress always
-  ends at 1.0.
+  (`CombatConfig.attack_total_frames`). The observation reports the frames left in
+  each phase, not the frame number (see the attack countdowns above), so a new
+  attack type with other timing needs no new feature.
 
 ## Parry and counter
 
