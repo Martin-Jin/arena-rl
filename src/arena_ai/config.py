@@ -1,12 +1,11 @@
 """Load the application's configuration from the YAML files in ``configs/``."""
 
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
 import yaml
-
-DEFAULT_ATTACK: str = "slash"
 
 
 # CONFIGURATION FOR THE GAME SIMULATION
@@ -52,6 +51,16 @@ class AttackSpec:
         return self.attack_windup_frames + self.attack_active_frames + self.attack_recovery_frames
 
 
+class AttackType(str, Enum):
+    """The type of attack a fighter is performing."""
+
+    SLASH = "slash"
+    # HEAVY = "heavy"
+
+
+DEFAULT_ATTACK = AttackType.SLASH.value
+
+
 @dataclass(frozen=True)
 class CombatConfig:
     """Attack, parry and counter timing and damage values."""
@@ -77,8 +86,13 @@ class CombatConfig:
     counter_lunge_speed_mps: float
     counter_hitbox_back_m: float
 
+    def spec(self, attack_type: AttackType) -> AttackSpec:
+        """Return the attack spec for this type of attack."""
+        return self.attacks[attack_type.value]
+
     @property
     def basic(self) -> AttackSpec:
+        """Return the basic attack spec."""
         return self.attacks[DEFAULT_ATTACK]
 
     def damage(self, counter: bool) -> int:
@@ -352,6 +366,13 @@ def _build_game_config(raw: dict[str, Any]) -> GameConfig:
 
 def _build_combat_config(raw: dict[str, Any]) -> CombatConfig:
     raw = dict(raw)
+    expected = {t.value for t in AttackType}
+    found = set(raw["attacks"])
+    if found != expected:
+        raise ValueError(
+            f"combat.attacks keys must match AttackType: "
+            f"unknown {found - expected}, missing {expected - found}"
+        )
     raw["attacks"] = {name: AttackSpec(**spec) for name, spec in raw["attacks"].items()}
     return CombatConfig(**raw)
 
