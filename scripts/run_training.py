@@ -34,7 +34,7 @@ TRAINING_DEVICE = "auto"
 # and before the attention network, so it no longer loads: train a new one before
 # resuming from it again.
 RESUME_FROM: str | None = None
-# RESUME_FROM = "checkpoints/best.pt"
+# RESUME_FROM = "checkpoints/latest.pt"
 
 
 def select_training_device() -> torch.device:
