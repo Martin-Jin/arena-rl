@@ -69,12 +69,13 @@ def is_lunging(f: FighterState, combat: CombatConfig, hits_checked: bool = False
     Only an attack type with a ``lunge_speed_mps`` lunges (the counter).
 
     The lunge lasts the wind-up plus the first active frame, the one the hit and any parry
-    are checked on, so the lunger is still level with the opponent (in front of it) then.
-    ``hits_checked`` is for after that check, when only the wind-up counts: the lunger left
-    inside an opponent is pushed out the far side.
+    are checked on, so the lunger is still level with the opponent (in front of it) then. It
+    then carries on for ``lunge_carry_frames``, which takes the lunger clear of the enemies it
+    cut through. ``hits_checked`` is for after the hit check, when the last lunge frame does not
+    count: a lunger left inside an opponent is pushed out the far side.
     """
     spec = combat.spec(f.attack_type)
-    last = spec.attack_windup_frames + (0 if hits_checked else 1)
+    last = spec.lunge_last_frame - (1 if hits_checked else 0)
     return bool(f.attack_frame) and spec.lunge_speed_mps > 0 and f.attack_frame <= last
 
 

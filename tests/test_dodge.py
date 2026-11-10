@@ -31,6 +31,17 @@ def run(fighters, steps: int, agent=NONE, opponent=NONE) -> None:
 
 
 class DodgeTests(unittest.TestCase):
+    def test_a_dodge_from_touching_ends_just_out_of_the_opponents_swing_range(self) -> None:
+        # The opponent cannot turn round and hit the dodger at once: it has to walk first.
+        width = CONFIG.game.fighter.width_m
+        reach = width + COMBAT.basic.range_m  # The farthest a swing hits, center to center.
+        fighters = duel(gap=width)  # Touching.
+        step(fighters, DODGE_ONLY)
+        run(fighters, DODGE.duration_frames - 1)
+        behind = fighters["agent"].x - fighters["opponent"].x
+        self.assertGreater(behind, reach)  # Out of range...
+        self.assertLess(behind, 1.2 * reach)  # ...but only just.
+
     def test_a_dodge_bursts_the_way_the_fighter_faces_and_costs_stamina(self) -> None:
         fighters = duel(gap=5.0)
         step(fighters, DODGE_ONLY)

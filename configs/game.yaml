@@ -44,6 +44,13 @@ combat:
       damage: 15 # of each enemy it hits
       range_m: 0.8
       lunge_speed_mps: 6.0 # horizontal speed during the wind-up
+      # After the first active frame (the hit) the lunge carries on for up to this many
+      # frames, until the fighter is lunge_clearance_reaches times the swing's reach (body
+      # width 0.27 m plus range_m, 1.07 m) beyond the enemy it cut through. At 1.25 that is
+      # 1.34 m, outside the enemy's swing range, so the enemy has to walk before it can hit
+      # back. 14 frames at 6 m/s cover 1.4 m, enough for that distance.
+      lunge_carry_frames: 14
+      lunge_clearance_reaches: 1.25
       # Only a counter's hitbox reaches behind the attacker's center, by this much. The lunge
       # passes through bodies, so an opponent can walk through the lunging attacker: in the 13
       # steps up to the first hit it walks 0.87 m, so its body edge can end 0.73 m behind the
@@ -89,7 +96,10 @@ dodge:
   # A dodge is a short burst along the move direction (the facing direction when none is
   # held), fixed when the dodge starts. For the whole burst the fighter takes no damage and
   # passes through other fighters.
-  speed_mps: 8.0
+  # The burst covers speed_mps * duration_frames / 60 = 1.47 m. A dodge started touching an
+  # enemy ends 1.2 m past its center, just outside its swing range (body width 0.27 m plus
+  # the attack range 0.8 m is 1.07 m), so the enemy cannot turn round and hit at once.
+  speed_mps: 11.0
   duration_frames: 8 # frames of invulnerability and movement
   gap_frames: 4 # frames after the dodge ends before the next dodge can start
   max_stamina: 100 # max stamina points

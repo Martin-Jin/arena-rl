@@ -194,7 +194,7 @@ ends at once.
 
 **Counter.** A counter is its own attack type (`combat.attacks.counter` in
 [`configs/game.yaml`](../configs/game.yaml)), with the same fields as `slash` plus
-`lunge_speed_mps` and `hitbox_back_m`. It has a shorter wind-up (`attack_windup_frames`, 12 frames
+`lunge_speed_mps`, `hitbox_back_m`, `lunge_carry_frames` and `lunge_clearance_reaches`. It has a shorter wind-up (`attack_windup_frames`, 12 frames
 instead of 16), so it is harder to react to but still possible to parry. During the
 wind-up the fighter lunges at the counter's `lunge_speed_mps` toward the fighter whose
 swing it parried (the nearest other fighter if that one is gone). The direction is fixed
@@ -203,7 +203,17 @@ over. It cuts through that fighter and goes on to the farthest living enemy in t
 direction that the lunge can still reach (`lunge_speed_mps` times
 `attack_windup_frames`, 1.2 m), stopping at its x, so enemies in a row are all passed
 through and, as the swing hits every enemy it reaches, all damaged. An enemy farther than
-the lunge is not reached. The lunge stays stopped if the opponent walks through it. The counter's hitbox also
+the lunge is not reached. The lunge stays stopped if the opponent walks through it.
+
+**Carry.** The hit is checked on the first active frame, with the lunger level with the
+enemy. The lunge then carries on for up to `lunge_carry_frames` (14) more frames, until the
+fighter is `lunge_clearance_reaches` (1.25) swing reaches beyond the nearest enemy it passed.
+A swing's reach is the body width plus the attack range (0.27 + 0.8 = 1.07 m, the farthest
+center-to-center distance at which a swing hits), so the fighter ends 1.34 m away, outside the
+enemy's swing range. **Why:** without it the counter ended touching the enemy, which could turn
+round and hit back at once. The enemy now has to walk about 0.27 m (four steps) first. **Limits:**
+the carry is cut short by a wall or a parry, and it only counts enemies behind the lunger, so an
+enemy that walks through it toward its front does not pull it back. The counter's hitbox also
 reaches `hitbox_back_m` (0.8 m) behind the attacker's center, so walking
 through the lunging attacker does not dodge it. A normal swing starts at the attacker's
 front edge and never reaches behind it. An opponent who runs away is still hit. One
@@ -217,11 +227,12 @@ After the fighters move, and again after hits and parries, `resolve_collisions`
 ([`sim/collision.py`](../src/arena_ai/sim/collision.py)) pushes any overlapping pair
 apart along x. The overlap is split evenly, so a walker nudges a fighter that stands
 still, and a wall takes the push first. Fighters at different heights do not collide,
-so a jump clears an opponent. The only exception is a counter's lunge (its wind-up and the first active frame),
-which passes through the opponent's body. The lunge stops at the opponent's x, so the
-two are level on that frame, and the opponent can still parry it then. If it is not
-parried, the lunger is pushed out on the far side, the side it was heading toward, and
-the opponent is not moved. A parry stops the lunge, so a parried counter is put back
+so a jump clears an opponent. The only exception is a counter's lunge (its wind-up, the first
+active frame and the carry), which passes through the opponent's body. The lunge stops at the
+opponent's x until the first active frame, so the two are level on that frame, and the opponent
+can still parry it then. If it is not parried, the lunger carries on past it (see Carry) and is
+pushed out on the far side, the side it was heading toward, if the lunge ends inside it. The
+opponent is not moved. A parry stops the lunge, so a parried counter is put back
 on the side it came from and never ends inside the parrier. Once the lunger is past, it
 can no longer be parried, because a parry only blocks an attacker in front of the parrier.
 A fighter that walks into another or into a wall is stopped, and the one standing
@@ -240,8 +251,10 @@ the button does not keep a fighter in the air.
 
 **What it does.** A dodge is a short burst along the ground in the direction the fighter
 faces (a direction held on the same step turns it first, so there is no backward dodge).
-For `dodge.duration_frames` (8) the fighter moves at `speed_mps` (8 m/s, about 1.07 m),
-takes no damage and passes through other fighters. A swing that is still active when the
+For `dodge.duration_frames` (8) the fighter moves at `speed_mps` (11 m/s, about 1.47 m),
+takes no damage and passes through other fighters. A dodge started touching an enemy ends
+about 1.2 m past its center, just outside the 1.07 m a swing reaches (body width plus attack
+range), so the enemy has to walk before it can hit back, not just turn round. A swing that is still active when the
 burst ends can hit it. The facing is locked for the burst.
 
 **Gap and stamina.** After the burst a gap of `gap_frames` (4) follows in which the fighter

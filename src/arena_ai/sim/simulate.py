@@ -131,9 +131,14 @@ def _lunge_target_x(
 
     It starts from the parried fighter (the nearest enemy if that one is gone). The lunge
     then goes on to the farthest living enemy in that direction that the lunge can still
-    reach, so enemies in a row are all passed through and hit.
+    reach, so enemies in a row are all passed through and hit. After the first active frame
+    the lunge carries on to ``lunge_clearance_reaches`` swing reaches beyond the nearest enemy
+    it passed (see ``_carry_target_x``).
     """
     me = fighters[fighter_id]
+    spec = config.combat.spec(AttackType.COUNTER)
+    if me.attack_type is AttackType.COUNTER and me.attack_frame > spec.attack_windup_frames:
+        return _carry_target_x(fighter_id, fighters, config)
     parried = fighters.get(me.counter_target or "")
     if parried is not None and parried.health > 0:
         base = parried.x
@@ -153,6 +158,31 @@ def _lunge_target_x(
     ]
     base_distance = (base - me.x) * direction
     return me.x + direction * max([base_distance, *ahead])
+
+
+def _carry_target_x(
+    fighter_id: str, fighters: Mapping[str, FighterState], config: GameConfig
+) -> float:
+    """Return the x the lunge carries to once the hit is checked: clear of the enemies it passed.
+
+    That is ``lunge_clearance_reaches`` swing reaches (body width plus the counter's range)
+    past the nearest living enemy that is now behind it or level with it, so the enemy must
+    walk to get a swing in range. With no enemy behind it the lunger stops where it is. Note
+    that an enemy that walks through the lunger toward its front is not behind it, so it does
+    not push the target back.
+    """
+    me = fighters[fighter_id]
+    spec = config.combat.spec(AttackType.COUNTER)
+    direction = me.lunge_dir
+    passed = [
+        enemy.x * direction
+        for enemy in enemies_of(fighter_id, fighters).values()
+        if enemy.health > 0 and (enemy.x - me.x) * direction <= 0
+    ]
+    if not direction or not passed:
+        return me.x
+    clearance = spec.lunge_clearance_reaches * (config.fighter.width_m + spec.range_m)
+    return (max(passed) + clearance) * direction
 
 
 def _nearest_opponent_x(fighter_id: str, fighters: Mapping[str, FighterState]) -> float | None:

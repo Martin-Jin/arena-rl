@@ -92,21 +92,42 @@ class CollisionTests(unittest.TestCase):
         fighters = self._counter()
         agent, opponent = fighters["agent"], fighters["opponent"]
         overlapped = False
-        for _ in range(COUNTER.attack_windup_frames + 1):
+        for _ in range(COUNTER.lunge_last_frame):
             step(fighters, agent=ATTACK)
             overlapped = overlapped or bodies_overlap(agent, opponent, GAME)
         self.assertTrue(overlapped)  # The lunge passed through the opponent's body.
         self.assertFalse(bodies_overlap(agent, opponent, GAME))  # The lunge is over.
         self.assertGreater(agent.x, opponent.x)  # Cut through: ends beyond the opponent.
 
+    def test_a_counter_carries_the_fighter_out_of_the_opponents_swing_range(self) -> None:
+        # The opponent cannot turn round and hit the counterer at once: it has to walk first.
+        fighters = self._counter()
+        agent, opponent = fighters["agent"], fighters["opponent"]
+        reach = WIDTH + COUNTER.range_m  # The farthest a swing hits, center to center.
+        health = opponent.health
+        for _ in range(COUNTER.lunge_last_frame):
+            step(fighters, agent=ATTACK)
+        self.assertLess(opponent.health, health)  # The counter still hit on the way through.
+        clearance = COUNTER.lunge_clearance_reaches * reach
+        self.assertGreaterEqual(agent.x - opponent.x, clearance - 1e-6)
+        self.assertGreater(agent.x - opponent.x, reach)  # Out of range, not just apart.
+
+    def test_a_counter_stays_level_with_the_opponent_on_the_hit_frame(self) -> None:
+        # The carry starts after the hit is checked, so it does not make the counter miss.
+        fighters = self._counter()
+        agent, opponent = fighters["agent"], fighters["opponent"]
+        for _ in range(COUNTER.attack_windup_frames + 1):
+            step(fighters, agent=ATTACK)
+        self.assertAlmostEqual(agent.x, opponent.x)
+        self.assertTrue(agent.attack_hit)
+
     def test_a_counter_is_pushed_out_by_the_lunger_and_never_snaps_back(self) -> None:
         fighters = self._counter()
         agent, opponent = fighters["agent"], fighters["opponent"]
         opponent_x = opponent.x
-        for _ in range(COUNTER.attack_windup_frames + 2):
+        for _ in range(COUNTER.lunge_last_frame):
             step(fighters, agent=ATTACK)
-        side = agent.x - opponent.x
-        self.assertGreaterEqual(side, WIDTH - 1e-6)
+        self.assertGreaterEqual(agent.x - opponent.x, WIDTH - 1e-6)
         self.assertEqual(opponent.x, opponent_x)  # The opponent was not shoved.
         for _ in range(COMBAT.attack_total_frames):
             step(fighters, agent=ATTACK)

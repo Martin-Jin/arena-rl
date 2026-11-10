@@ -60,6 +60,19 @@ class AttackSpec:
     # How far behind the attacker's center the hitbox starts. ``None`` starts it at the
     # attacker's front edge, so the swing never reaches behind it.
     hitbox_back_m: float | None = None
+    # Frames the lunge goes on after the first active frame (the one the hit is checked on),
+    # carrying the attacker past the enemies it cut through, until it is
+    # ``lunge_clearance_reaches`` times the swing's reach (body width plus ``range_m``) beyond
+    # the nearest of them. That puts it out of their swing range, so they cannot turn round
+    # and hit it at once. It needs ``lunge_speed_mps`` times these frames to cover the
+    # distance. 0 ends the lunge on the first active frame.
+    lunge_carry_frames: int = 0
+    lunge_clearance_reaches: float = 0.0
+
+    @property
+    def lunge_last_frame(self) -> int:
+        """The last swing frame the lunge moves on: the first active frame plus the carry."""
+        return self.attack_windup_frames + 1 + self.lunge_carry_frames
 
     @property
     def attack_total_frames(self) -> int:
