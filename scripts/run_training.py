@@ -35,11 +35,12 @@ USE_CUDA_GRAPH = True
 # run. The model, optimizer and progress counters are restored and
 # training.iterations more iterations are run on top of the saved ones. Leave as
 # None to start a new run.
-# checkpoints/best.pt was trained before the observation gained opponent slots and a mask
-# and before the attention network, so it no longer loads: train a new one before
-# resuming from it again.
-RESUME_FROM: str | None = None
-# RESUME_FROM = "checkpoints/latest.pt"
+# A checkpoint only loads if it was saved with the current observation layout and network
+# shape, so train a new one after changing either. checkpoints/best.pt currently loads.
+# Opponent behavior is read from the code, not the checkpoint, so a resumed run fights the
+# current scripted opponents.
+# RESUME_FROM: str | None = None
+RESUME_FROM = "checkpoints/latest.pt"
 
 
 def select_training_device() -> torch.device:

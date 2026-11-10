@@ -1,8 +1,8 @@
 # Reward values used by training environments.
 scoring:
   damage_reward_scale: 0.1
-  victory_reward: 2.5
-  defeat_penalty: 1.0
+  victory_reward: 7.5
+  defeat_penalty: 7.5
   edge_margin: 1.0
   edge_penalty_scale: 0.005
   victory_time_bonus: 1.0 # a win only: this times the share of the time limit left (0 if it lost)
