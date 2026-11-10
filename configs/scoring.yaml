@@ -2,15 +2,15 @@
 scoring:
   damage_reward_scale: 0.1
   victory_reward: 5.0
-  defeat_penalty: 2.0
+  defeat_penalty: 1.0
   edge_margin: 1.0
   edge_penalty_scale: 0.005
   victory_time_bonus: 1.0 # a win only: this times the share of the time limit left (0 if it lost)
   health_reward: 1.0 # a win only: this times the agent's health share at the end (health / max)
-  parry_reward: 0.1 # a successful parry
-  counter_reward: 0.125 # a counter attack that hits, on top of the damage reward
+  parry_reward: 0.15 # a successful parry
+  counter_reward: 0.175 # a counter attack that hits, on top of the damage reward
   kill_reward: 1.0 # each opponent the agent finishes off; 0 turns it off
-  timeout_win_reward: 0.25 # a time-out with more health than the opponents' mean: well below a kill
+  timeout_win_reward: 0.3 # a time-out with more health than the opponents' mean: well below a kill
   # A parry that ended without parrying anything. Keep it small: with parry_reward 0.2 a parry
   # only breaks even above penalty / (reward + penalty) accuracy (20% at 0.05, about 5% at 0.01),
   # and a random policy parries far less often than that, so a large penalty discourages the

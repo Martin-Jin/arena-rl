@@ -12,12 +12,15 @@ From the repository root, choose one of the three options below. The project
 dependencies are declared in [`pyproject.toml`](../pyproject.toml). The project
 install provides NumPy, pygame-ce, and PyYAML.
 
+The `--upgrade-deps` flag in the `venv` commands installs the latest pip into the
+new environment; remove it if you don't want that.
+
 ### Option A: CPU only
 
 Create and activate a virtual environment:
 
 ```powershell
-py -m venv .venv
+py -m venv --upgrade-deps .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
@@ -25,7 +28,6 @@ Install the project with its CPU extra, which also installs the standard PyPI
 PyTorch wheel:
 
 ```powershell
-py -m pip install --upgrade pip
 py -m pip install -e ".[cpu]"
 ```
 
@@ -40,14 +42,14 @@ outside any virtual environment (run `deactivate` first if one is active):
 
 ```powershell
 py -m pip install --upgrade pip
-py -m pip install torch --index-url https://download.pytorch.org/whl/cu126
+py -m pip install torch --index-url https://download.pytorch.org/whl/cu132
 ```
 
 Then create the virtual environment with access to global packages and install
 the project:
 
 ```powershell
-py -m venv --system-site-packages .venv
+py -m venv --system-site-packages --upgrade-deps .venv
 .\.venv\Scripts\Activate.ps1
 py -m pip install -e .
 ```
@@ -65,14 +67,13 @@ Install the PyTorch wheel built for CUDA before installing the project. This
 prevents pip from selecting the CPU wheel:
 
 ```powershell
-py -m venv .venv
+py -m venv --upgrade-deps .venv
 .\.venv\Scripts\Activate.ps1
-py -m pip install --upgrade pip
-py -m pip install torch --index-url https://download.pytorch.org/whl/cu126
+py -m pip install torch --index-url https://download.pytorch.org/whl/cu132
 py -m pip install -e .
 ```
 
-The `cu126` index is an example in options B and C. Choose the CUDA wheel index
+The `cu132` index is an example in options B and C. Choose the CUDA wheel index
 matching the PyTorch and NVIDIA driver versions supported by your machine using
 the [official PyTorch installation selector](https://pytorch.org/get-started/locally/).
 Do not install the `cpu` extra in this environment.
@@ -99,25 +100,6 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 .\.venv\Scripts\Activate.ps1
 ```
 
-## Run the viewer
-
-With the virtual environment active:
-
-```powershell
-py -m arena_ai.viewer.game
-```
-
-The viewer opens on a start menu. It defaults to the trained agent as the
-opponent when there is a `.pt` checkpoint in `checkpoints/` (run training to
-create one), and to the scripted opponent otherwise. Change the opponent, audio
-and other options in **Settings**; the [README](../README.md) lists the
-controls.
-
-To watch training rollouts, set `VISUALIZE_TRAINING = True` in
-[`scripts/run_training.py`](../scripts/run_training.py) before running the
-training command. It renders every fixed simulation step without a real-time
-delay.
-
 ## Verify the checkout
 
 Run the compile check and the unit tests:
@@ -127,9 +109,19 @@ py -m compileall src tests scripts
 py -m unittest discover -s tests
 ```
 
-## Removing the environment
-To remove the virtual environment run:
+## Deactivate and delete the environment
+
+Leave the active virtual environment:
+
 ```powershell
 deactivate
+```
+
+Delete it (this removes every package installed in it, including the editable
+install of this project, but not global packages or other environments):
+
+```powershell
 Remove-Item -Recurse -Force .venv
 ```
+
+Then recreate it with the commands in [Install](#install).
