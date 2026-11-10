@@ -10,7 +10,7 @@ from arena_ai.config import Config, load_config
 # An ally counts as in the way when it is no farther than a body width plus this.
 BLOCKED_MARGIN_M = 0.1
 
-Policy = Callable[[list[float], Config | None], int]
+Policy = Callable[..., int]
 
 
 def jumps_over_allies(policy: Policy) -> Policy:
@@ -27,8 +27,8 @@ def jumps_over_allies(policy: Policy) -> Policy:
     """
 
     @wraps(policy)
-    def wrapped(observation: list[float], config: Config | None = None) -> int:
-        action = policy(observation, config)
+    def wrapped(observation: list[float], config: Config | None = None, **options) -> int:
+        action = policy(observation, config, **options)
         config = config or load_config()
         learner, me = learner_and_me(observation)
         allies = living_allies(observation)

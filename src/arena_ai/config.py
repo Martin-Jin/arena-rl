@@ -221,6 +221,15 @@ class TrainingConfig:
     # The most environments training allows; ``opponents`` sets how many run.
     num_envs: int = 1
     randomize_spawns: bool = False
+    # Redraw the scripted opponents' swing-start distance and the hunter's attack chance each
+    # episode (see agents/scripted/episode.py). Tuples, so a checkpoint saved before these
+    # fields existed still reads the defaults.
+    randomize_opponents: bool = False
+    # Offset in meters added to the distance at which approach and parrier start a swing:
+    # negative walks closer first, positive swings early. A range drawn per episode.
+    swing_start_offset_m: tuple = (-0.2, 0.4)
+    # Range of the parrier's per-step chance to attack a learner that is not walking away.
+    hunter_attack_chance: tuple = (0.1, 0.4)
     # None keeps the environment default of ten simulated seconds.
     max_episode_steps: int | None = None
     # Number of recent episodes used for the rolling statistics.

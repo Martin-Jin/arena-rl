@@ -7,7 +7,7 @@ from pathlib import Path
 import torch
 
 from arena_ai.agents.policy import ActorCritic, PolicyAdapter
-from arena_ai.agents.scripted import training_opponents
+from arena_ai.agents.scripted import EpisodePolicy, training_opponents
 from arena_ai.config import Config, load_config
 from arena_ai.envs.training_envs.one_v_many_env import OneVManyEnv
 from arena_ai.envs.vector_env import VectorEnv
@@ -222,10 +222,10 @@ def make_factories(config: Config):
         partial(
             OneVManyEnv,
             config,
-            [(name, partial(policy, config=config)) for name, policy in zip(names, policies)],
+            [(name, EpisodePolicy(name, config)) for name in names],
             max_episode_steps=config.training.max_episode_steps,
         )
-        for names, policies in environments
+        for names, _ in environments
     ]
 
 

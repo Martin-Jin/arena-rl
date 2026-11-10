@@ -55,6 +55,15 @@ training:
     ]
   num_envs: 16 # the most environments allowed: training refuses to start with more entries
   randomize_spawns: true # random fighter start positions each episode
+  # Redraw the scripted opponents' options each episode, so no fixed distance or timing can be
+  # learned. Only approach and parrier have options (see agents/scripted/episode.py).
+  randomize_opponents: true
+  # Meters added to the distance at which approach and parrier start a swing. Drawn uniformly
+  # from this [low, high] range per episode: negative walks closer first, positive swings
+  # early (they keep walking during the wind-up, so the gap still closes).
+  swing_start_offset_m: [-0.2, 0.4]
+  # Range of the parrier's per-step chance to attack a learner that is not walking away.
+  hunter_attack_chance: [0.1, 0.4]
   max_episode_steps: 1500 # episode time limit in sim steps (25 s at 60 Hz); null = 10 s
   stats_window: 100 # recent episodes used for the rolling episode stats (overall and per opponent)
   print_stats: true # print the training statistics (set false for silent training)

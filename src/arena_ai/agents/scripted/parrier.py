@@ -19,11 +19,17 @@ from arena_ai.config import Config, load_config
 # hits with a spamming learner more often.
 HUNTER_ATTACK_CHANCE = 0.2
 
+# The actions that start a swing.
+SWING_STARTS = (Action.ATTACK, Action.MOVE_LEFT_ATTACK, Action.MOVE_RIGHT_ATTACK)
+
 
 @jumps_over_allies
 def parrying_hunter(
     observation: list[float],
     config: Config | None = None,
+    swing_start_offset_m: float = 0.0,
+    attack_chance: float = HUNTER_ATTACK_CHANCE,
+    rng=random,
 ) -> int:
     """Chase the learner, parry every attack it can, and attack a learner that stands still.
 
@@ -35,8 +41,10 @@ def parrying_hunter(
     away or whose swing points at it, because a swing leaves it unable to parry. A learner
     that swings away and turns back while the swing is active can therefore hit it. An
     attack it starts against a still learner can still trade hits with a swing the learner
-    starts right after. It uses the global ``random`` module,
-    like ``random_action``, so it is not reproducible.
+    starts right after. ``swing_start_offset_m`` is passed to ``approach_and_attack``.
+    ``attack_chance`` replaces ``HUNTER_ATTACK_CHANCE``. ``rng`` (anything with ``random()``)
+    draws the chance: it defaults to the global ``random`` module, so the viewer is not
+    reproducible, and training passes a seeded generator.
     It turns to face an attacker that is behind it (for example one that walked past it
     before attacking) and then parries. It only has a chance to beat it while it is busy:
     - It cannot parry or turn while it is attacking or parrying, so a swing that lands
@@ -93,7 +101,7 @@ def parrying_hunter(
     if counter_ready and not self_busy:
         return int(Action.ATTACK)  # The counter after a parry.
     # Otherwise chase and face the learner, and attack only a learner that stands still.
-    action = approach_and_attack(observation, config)
+    action = approach_and_attack(observation, config, swing_start_offset_m=swing_start_offset_m)
     # A swing that reached the branch above is no threat (it points away, or this fighter is
     # busy), so only movement, not swinging, stops the fighter from attacking.
     # Only a learner walking away from this fighter can dodge its swing, so only that
@@ -102,6 +110,6 @@ def parrying_hunter(
     # that wiggled left and right stop it from ever attacking.
     away = 1 if learner_x > self_x else -1
     learner_still = learner["vx"] * away <= 0
-    if action == Action.ATTACK and not (learner_still and random.random() < HUNTER_ATTACK_CHANCE):
+    if action in SWING_STARTS and not (learner_still and rng.random() < attack_chance):
         return int(Action.IDLE)
     return action

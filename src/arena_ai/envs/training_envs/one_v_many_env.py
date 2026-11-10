@@ -52,10 +52,13 @@ class OneVManyEnv(ArenaEnv):
         self.label = matchup_label(self.opponent_names)
 
     def reset(self, seed: int | None = None):
-        """Reseed the spawn RNG only when a seed is given, so later
-        auto-resets keep drawing new positions."""
+        """Reseed the RNG only when a seed is given, so later auto-resets keep drawing new
+        positions and new opponent options. Each ``EpisodePolicy`` redraws its options."""
         if seed is not None:
             self.rng = random.Random(seed)
+        for policy in self.opponent_policies.values():
+            if hasattr(policy, "resample"):
+                policy.resample(self.rng)
         return super().reset(seed)
 
     def step(self, action: int):

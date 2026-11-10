@@ -26,6 +26,16 @@ defines:
   error, if `opponents` lists more entries, or an entry has no names or more than
   `observation.max_opponents`.
 - `randomize_spawns` — start each episode with random fighter positions.
+- `randomize_opponents` — redraw the scripted opponents' options at every episode reset,
+  from the environment's seeded generator, so a learner cannot memorize one fixed distance
+  or timing. Only `approach` and `parrier` have options. The next two keys are the ranges.
+  Off, they use fixed defaults (offset 0, attack chance 0.2). The `parrier` and `random`
+  opponents draw their dice from that generator either way, so training is reproducible.
+- `swing_start_offset_m` — `[low, high]` meters added to the distance at which `approach` and
+  `parrier` start a swing. Negative walks closer first. Positive swings early, while still
+  out of reach: they keep walking during the 16-frame wind-up, so the gap closes.
+- `hunter_attack_chance` — `[low, high]` range of the `parrier`'s per-step chance to attack a
+  learner that is not walking away from it.
 - `max_episode_steps` — episode time limit in simulation steps (1500 is 25
   simulated seconds at 60 Hz). `null` uses the environment default of
   `sim_hz * 10` steps. A fight that reaches the limit is truncated, not won.

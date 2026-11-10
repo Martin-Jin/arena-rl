@@ -24,9 +24,7 @@ class ArenaEnv(ABC):
         """Initialize shared environment configuration and episode bookkeeping."""
         self.config = config
         self.max_episode_steps = (
-            config.game.world.sim_hz * 10
-            if max_episode_steps is None
-            else max_episode_steps
+            config.game.world.sim_hz * 10 if max_episode_steps is None else max_episode_steps
         )
         if self.max_episode_steps < 1:
             raise ValueError("max_episode_steps must be positive")

@@ -93,7 +93,8 @@ The simulation layer is deterministic and independent of rendering. It must not 
   hunter: it parries every attack it can see from the front, so mix it with easier
   opponents in training), `runner.py` (flees the learner), `simple.py` (idle and uniformly
   random), `registry.py` (the `OPPONENTS` registry and `training_opponents`, which checks a
-  `training.opponents` list), `view.py` (how a policy reads its observation by name, and
+  `training.opponents` list), `episode.py` (`EpisodePolicy`, which redraws an opponent's
+  options each training episode), `view.py` (how a policy reads its observation by name, and
   `team_observation`, which builds it: the agent, the opponent, then its allies, from
   `fighter_rows` so each fighter is encoded once per step) and
   `teamwork.py` (`jumps_over_allies`, which lets opponents queued behind an ally hop over

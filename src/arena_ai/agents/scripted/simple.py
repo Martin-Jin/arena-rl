@@ -9,5 +9,6 @@ def idle(observation, config=None) -> int:
     return int(Action.IDLE)
 
 
-def random_action(observation, config=None) -> int:
-    return random.randrange(ACTION_COUNT)
+def random_action(observation, config=None, rng=random) -> int:
+    """Pick any action. ``rng`` is anything with ``randrange``; training passes a seeded one."""
+    return rng.randrange(ACTION_COUNT)

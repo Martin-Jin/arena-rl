@@ -10,12 +10,16 @@ from arena_ai.config import Config, load_config
 def approach_and_attack(
     observation: list[float],
     config: Config | None = None,
+    swing_start_offset_m: float = 0.0,
 ) -> int:
     """Face the learner, approach, jump when it is above, and attack in reach.
 
-    It keeps walking toward a learner in front of it during its swing.
-    Deterministic. The scripted fighter is slot 1 of the learner-perspective observation.
-    It never parries.
+    It keeps walking toward a learner in front of it during its swing, including on the
+    step it starts the swing. ``swing_start_offset_m`` moves the distance at which it starts
+    the swing: positive starts it early, while still out of reach (the walk during the
+    wind-up closes the gap), and negative walks closer first. Training draws it per
+    episode so no fixed distance can be learned. Deterministic. The scripted fighter is slot 1
+    of the learner-perspective observation. It never parries.
     """
     learner, me = learner_and_me(observation)
     config = config or load_config()
@@ -58,10 +62,10 @@ def approach_and_attack(
     if forward < 0:
         return int(move_toward)
 
-    # In horizontal reach of the hitbox (center to front edge + range).
-    if forward <= reach:
+    # In horizontal reach of the hitbox (center to front edge + range), moved by the offset.
+    if forward <= reach + swing_start_offset_m:
         if abs(dy) < fighter_height:
-            return int(Action.ATTACK)
+            return int(Action.MOVE_RIGHT_ATTACK if toward > 0 else Action.MOVE_LEFT_ATTACK)
         if dy > 0 and self_on_ground:
             return int(Action.JUMP)
         return int(Action.IDLE)
