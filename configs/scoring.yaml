@@ -1,14 +1,15 @@
 # Reward values used by training environments.
 scoring:
   damage_reward_scale: 0.1
-  victory_reward: 1.0
+  victory_reward: 2.5
   defeat_penalty: 1.0
   edge_margin: 1.0
-  edge_penalty_scale: 0.002
-  time_penalty_per_step: 0.00067 # every step; about 1.0 over a 1500-step episode
-  parry_reward: 0.5 # a successful parry
-  counter_reward: 0.3 # a counter attack that hits, on top of the damage reward
-  kill_reward: 0.0 # each opponent the agent finishes off; off by default, about 0.5 is a modest start
+  edge_penalty_scale: 0.005
+  victory_time_bonus: 1.0 # a win only: this times the share of the time limit left (0 if it lost)
+  health_reward: 1.0 # a win only: this times the agent's health share at the end (health / max)
+  parry_reward: 0.1 # a successful parry
+  counter_reward: 0.1 # a counter attack that hits, on top of the damage reward
+  kill_reward: 0.85 # each opponent the agent finishes off; 0 turns it off
   timeout_win_reward: 0.25 # a time-out with more health than the opponents' mean: well below a kill
-  missed_parry_penalty: 0.1 # a parry that ended without parrying anything
+  missed_parry_penalty: 0.05 # a parry that ended without parrying anything
   missed_attack_penalty: 0.05 # a swing that finished without hitting or being parried

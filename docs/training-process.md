@@ -96,7 +96,7 @@ flowchart TD
         K --> L["ArenaEnv.step()"]
         L --> M["Convert action to FighterAction"]
         M --> N["step_game(): advance simulation and resolve hits"]
-        N --> O["calculate_reward(): damage, terminal and wall-penalty rewards"]
+        N --> O["calculate_reward(): damage, terminal, win-bonus and wall-penalty rewards"]
         O --> Q{"terminated or truncated?"}
         Q -- "No" --> R["Store transition in Rollout. next_value is the next step's value"]
         Q -- "Yes" --> S["policy.value(final observation) before the reset, and episode metrics"]

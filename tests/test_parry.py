@@ -60,7 +60,7 @@ class ParryTests(unittest.TestCase):
         self.assertEqual((opponent.attack_frame, opponent.attack_hit), (0, False))
         self.assertAlmostEqual(
             calculate_reward(FULL_HEALTH, fighters, CONFIG),
-            CONFIG.scoring.parry_reward - CONFIG.scoring.time_penalty_per_step,
+            CONFIG.scoring.parry_reward,
         )
 
     def test_a_late_parry_takes_the_hit(self) -> None:
@@ -199,7 +199,7 @@ class ParryTests(unittest.TestCase):
                 self.assertAlmostEqual(
                     calculate_reward({"agent": 100, "opponent": 100}, fighters, CONFIG)
                     - CONFIG.scoring.damage_reward_scale * COMBAT.counter_damage,
-                    CONFIG.scoring.counter_reward - CONFIG.scoring.time_penalty_per_step,
+                    CONFIG.scoring.counter_reward,
                 )
         self.assertEqual(hit_steps, 1)
         normal = duel()
@@ -269,7 +269,7 @@ class ParryTests(unittest.TestCase):
         self.assertTrue(fighters["agent"].missed_attack)
         self.assertAlmostEqual(
             calculate_reward(FULL_HEALTH, fighters, CONFIG),
-            -scoring.missed_attack_penalty - scoring.time_penalty_per_step,
+            -scoring.missed_attack_penalty,
         )
         fighters = duel(gap=5.0)
         step(fighters, agent=PARRY)
@@ -277,7 +277,7 @@ class ParryTests(unittest.TestCase):
             step(fighters)
         self.assertAlmostEqual(
             calculate_reward(FULL_HEALTH, fighters, CONFIG),
-            -scoring.missed_parry_penalty - scoring.time_penalty_per_step,
+            -scoring.missed_parry_penalty,
         )
 
     def test_a_parried_attacker_cannot_attack_until_the_stagger_ends(self) -> None:
@@ -317,13 +317,11 @@ class ParryTests(unittest.TestCase):
             step(fighters)
         self.assertEqual(agent.parry_pose_frame, 0)
 
-    def test_every_step_costs_the_time_penalty(self) -> None:
+    def test_an_uneventful_step_costs_nothing(self) -> None:
+        # There is no per-step time cost: it made losing sooner cheaper than a long fight.
         fighters = duel(gap=5.0)
         step(fighters)
-        self.assertAlmostEqual(
-            calculate_reward(FULL_HEALTH, fighters, CONFIG),
-            -CONFIG.scoring.time_penalty_per_step,
-        )
+        self.assertAlmostEqual(calculate_reward(FULL_HEALTH, fighters, CONFIG), 0.0)
 
     def test_observation_exposes_the_parry_state(self) -> None:
         fighters = duel()

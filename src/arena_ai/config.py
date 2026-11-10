@@ -258,7 +258,11 @@ class ScoringConfig:
     defeat_penalty: float
     edge_margin: float = 1.0
     edge_penalty_scale: float = 0.0
-    time_penalty_per_step: float = 0.0
+    # Paid only on a win, scaled by the share of the episode time limit still left. There
+    # is no per-step time cost, because that makes losing sooner cheaper than a long fight.
+    victory_time_bonus: float = 0.0
+    # Paid only on a win, scaled by the agent's health at the end (health / max health).
+    health_reward: float = 0.0
     parry_reward: float = 0.0
     counter_reward: float = 0.0
     missed_parry_penalty: float = 0.0

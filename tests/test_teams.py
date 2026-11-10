@@ -2,7 +2,7 @@ import dataclasses
 import random
 import unittest
 
-from arena_ai.config import load_config
+from arena_ai.config import ScoringConfig, load_config
 from arena_ai.envs.reward import calculate_reward
 from arena_ai.envs.training_envs.one_v_one_env import OneVOneEnv
 from arena_ai.sim.collision import bodies_overlap
@@ -277,7 +277,15 @@ class OutcomeTests(unittest.TestCase):
         some = self._fighters(100, 0, 10)
         done = self._fighters(100, 0, 0)
         gap = calculate_reward(previous, done, CONFIG) - calculate_reward(previous, some, CONFIG)
-        expected = CONFIG.scoring.victory_reward + CONFIG.scoring.damage_reward_scale * 10
+        scoring = CONFIG.scoring
+        # The step that finishes the last opponent also kills it and pays the win bonuses
+        # (this step ends the fight with time_left 0).
+        expected = (
+            scoring.victory_reward
+            + scoring.damage_reward_scale * 10
+            + scoring.kill_reward
+            + scoring.health_reward
+        )
         self.assertAlmostEqual(gap, expected)
 
 
@@ -295,6 +303,55 @@ class TimeoutRewardTests(unittest.TestCase):
         self.assertLess(CONFIG.scoring.timeout_win_reward, CONFIG.scoring.victory_reward)
 
 
+class WinBonusTests(unittest.TestCase):
+    """The health and time bonuses are paid on a win only."""
+
+    def _reward(self, agent_health: int, opponent_health: int, time_left: float) -> float:
+        scoring = dataclasses.replace(
+            CONFIG.scoring, health_reward=1.0, victory_time_bonus=2.0, kill_reward=0.0
+        )
+        config = dataclasses.replace(CONFIG, scoring=scoring)
+        fighters = {
+            AGENT_ID: FighterState(health=agent_health),
+            "opponent": FighterState(health=opponent_health),
+        }
+        previous = {AGENT_ID: agent_health, "opponent": opponent_health}
+        return calculate_reward(previous, fighters, config, time_left)
+
+    def test_a_win_pays_more_the_more_health_the_agent_has(self) -> None:
+        full, half = self._reward(100, 0, 0.0), self._reward(50, 0, 0.0)
+        self.assertAlmostEqual(full - half, 0.5)  # health_reward 1.0 times 50 / 100.
+
+    def test_a_win_pays_more_the_sooner_it_comes(self) -> None:
+        early, late = self._reward(100, 0, 0.75), self._reward(100, 0, 0.25)
+        self.assertAlmostEqual(early - late, 1.0)  # victory_time_bonus 2.0 times 0.5.
+
+    def test_a_loss_never_pays_more_for_losing_sooner_or_with_health(self) -> None:
+        # Regression: a per-step time cost made a quick loss cheaper than a long one. An agent
+        # that is dead has no health to be paid for, and time_left must not matter.
+        self.assertEqual(self._reward(0, 100, 0.9), self._reward(0, 100, 0.0))
+
+    def test_a_fight_that_is_not_won_pays_no_bonus(self) -> None:
+        self.assertEqual(self._reward(100, 50, 0.9), self._reward(100, 50, 0.0))
+        self.assertEqual(self._reward(40, 50, 0.9), self._reward(40, 50, 0.0))
+
+    def test_the_environment_pays_the_time_bonus_by_the_share_of_the_limit_left(self) -> None:
+        def win_reward(limit: int, steps_before_win: int) -> float:
+            env = OneVOneEnv(CONFIG, max_episode_steps=limit)
+            env.reset(seed=1)
+            for _ in range(steps_before_win):
+                env.step(0)
+            env.fighters["opponent"].health = 0
+            _, reward, terminated, _, info = env.step(0)
+            self.assertTrue(terminated)
+            self.assertEqual(info["winner"], "agent")
+            return reward
+
+        scoring = CONFIG.scoring
+        early, late = win_reward(100, 9), win_reward(100, 59)
+        self.assertAlmostEqual(early - late, scoring.victory_time_bonus * 0.5, places=6)
+
+
 class KillRewardTests(unittest.TestCase):
     def _reward(self, kill_reward: float, healths: tuple[int, int]) -> float:
         scoring = dataclasses.replace(CONFIG.scoring, kill_reward=kill_reward)
@@ -307,8 +364,8 @@ class KillRewardTests(unittest.TestCase):
         previous = {AGENT_ID: 100, "opponent": 10, "opponent_1": 100}
         return calculate_reward(previous, fighters, config)
 
-    def test_it_is_off_by_default(self) -> None:
-        self.assertEqual(CONFIG.scoring.kill_reward, 0.0)
+    def test_it_is_off_unless_configured(self) -> None:
+        self.assertEqual(ScoringConfig.kill_reward, 0.0)  # The dataclass default.
 
     def test_each_opponent_finished_off_pays_once_however_the_damage_is_spread(self) -> None:
         base = self._reward(0.0, (0, 100))

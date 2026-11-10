@@ -24,10 +24,14 @@ def calculate_reward(
     previous_health: Mapping[str, int],
     fighters: Mapping[str, FighterState],
     config: Config,
+    time_left: float = 0.0,
 ) -> float:
-    """Reward damage, parries and counter hits; penalise damage taken, misses, walls and time.
+    """Reward damage, parries and counter hits; penalise damage taken, misses and walls.
 
-    The victory bonus is paid once every opponent is dead. The time-out bonus is added by
+    The victory bonus is paid once every opponent is dead, with a bonus for the agent's
+    remaining health and for ``time_left`` (the share of the episode time limit still
+    left, from 0 to 1). Neither extra is paid on a loss or a time-out, so nothing rewards
+    ending a fight sooner unless the agent wins it. The time-out bonus is added by
     ``ArenaEnv.step``, since only it knows the episode timed out.
     """
     scoring = config.scoring
@@ -42,7 +46,6 @@ def calculate_reward(
     kills = sum(previous_health[fid] > 0 and f.health <= 0 for fid, f in opponents.items())
     reward += scoring.kill_reward * kills
     reward -= edge_penalty(agent, config)
-    reward -= scoring.time_penalty_per_step
     reward += scoring.parry_reward * agent.parried
     reward += scoring.counter_reward * agent.counter_hit
     reward -= scoring.missed_parry_penalty * agent.missed_parry
@@ -51,4 +54,6 @@ def calculate_reward(
         reward -= scoring.defeat_penalty
     elif opponents and all(f.health <= 0 for f in opponents.values()):
         reward += scoring.victory_reward
+        reward += scoring.health_reward * agent.health / config.game.fighter.max_health
+        reward += scoring.victory_time_bonus * time_left
     return reward

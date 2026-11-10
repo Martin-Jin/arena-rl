@@ -256,9 +256,10 @@ for each step:
 ```
 reward = damage_reward_scale * (damage dealt - damage taken)
          - edge_penalty
-         - time_penalty_per_step  (every step)
          + kill_reward         (per opponent that reached 0 health this step; 0 by default)
          + victory_reward      (every opponent reached 0 health)
+         + health_reward * (agent health / max health)   (on a win only)
+         + victory_time_bonus * (share of the time limit left)   (on a win only)
          - defeat_penalty      (the learner reached 0 health)
          + parry_reward        (the learner's parry stopped an attack)
          + counter_reward      (the learner's counter attack hit)
@@ -270,9 +271,13 @@ On a time-out the environment adds `timeout_win_reward` (0.25) when the agent is
 on health. It is positive but well below the victory reward, so ending a fight by
 stalling is better than losing and worse than winning.
 
-The time penalty is small on purpose: it only decides between fights the agent
-already wins or parries well, so it pushes the agent to finish them sooner. A
-full-length episode costs 0.3, less than a victory (1.0).
+**Win-only bonuses.** `health_reward` and `victory_time_bonus` are paid only on the step
+that wins the fight. Health pays more for a cleaner win, and the time bonus pays more for a
+faster one. A loss and a time-out get neither, and there is no per-step time cost. The
+earlier per-step cost made a quick loss cheaper than a long fight the agent was losing (a
+loss at step 300 cost about 0.2 in time, one at step 1400 about 0.9), which taught it to
+lose sooner. Now `time_left` (the share of `max_episode_steps` still left, 0 to 1) only
+matters when the agent wins. `ArenaEnv` passes it to `calculate_reward`; the default is 0.
 
 The counter reward pays for finishing a parry with its counter attack, so the agent
 learns the parry is worth more than a block. It pays only when the counter hits, so

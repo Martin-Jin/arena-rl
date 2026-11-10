@@ -151,7 +151,8 @@ class ArenaEnv(ABC):
         """Delegate to the shared reward module."""
         if self.fighters is None:
             return 0.0
-        return calculate_reward(previous_health, self.fighters, self.config)
+        time_left = 1.0 - self.step_count / self.max_episode_steps
+        return calculate_reward(previous_health, self.fighters, self.config, time_left)
 
     def is_terminated(self) -> bool:
         """Return whether the agent or every opponent is dead."""
