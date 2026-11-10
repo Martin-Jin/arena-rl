@@ -1,7 +1,7 @@
 import unittest
 
 from arena_ai.agents.action import Action, to_fighter_action
-from arena_ai.config import load_config
+from arena_ai.config import AttackType, load_config
 from arena_ai.envs.reward import calculate_reward
 from arena_ai.sim.observation import get_observation
 from arena_ai.sim.observation_vector import (
@@ -15,6 +15,7 @@ from arena_ai.sim.state import FighterState
 
 CONFIG = load_config()
 COMBAT = CONFIG.game.combat
+COUNTER = COMBAT.spec(AttackType.COUNTER)
 NONE = FighterAction()
 ATTACK = FighterAction(attack=True)
 PARRY = FighterAction(parry=True)
@@ -167,13 +168,13 @@ class ParryTests(unittest.TestCase):
         step(fighters, agent=PARRY, opponent=ATTACK)
         fighters["opponent"].x += 0.9  # Out of normal reach: only the lunge can hit.
         start_x = fighters["agent"].x
-        for _ in range(COMBAT.counter_windup_frames):
+        for _ in range(COUNTER.attack_windup_frames):
             step(fighters, agent=ATTACK)
             self.assertEqual(fighters["opponent"].health, 100)
         step(fighters, agent=ATTACK)
-        self.assertTrue(fighters["agent"].attack_counter)
+        self.assertIs(fighters["agent"].attack_type, AttackType.COUNTER)
         self.assertGreater(fighters["agent"].x, start_x)
-        self.assertEqual(fighters["opponent"].health, 100 - COMBAT.counter_damage)
+        self.assertEqual(fighters["opponent"].health, 100 - COUNTER.damage)
 
     def test_starting_a_counter_sets_a_one_step_event(self) -> None:
         fighters = duel()
@@ -192,13 +193,13 @@ class ParryTests(unittest.TestCase):
         wind_up_opponent(fighters)
         step(fighters, agent=PARRY, opponent=ATTACK)
         hit_steps = 0
-        for _ in range(COMBAT.counter_windup_frames + 3):
+        for _ in range(COUNTER.attack_windup_frames + 3):
             step(fighters, agent=ATTACK)
             if fighters["agent"].counter_hit:
                 hit_steps += 1
                 self.assertAlmostEqual(
                     calculate_reward({"agent": 100, "opponent": 100}, fighters, CONFIG)
-                    - CONFIG.scoring.damage_reward_scale * COMBAT.counter_damage,
+                    - CONFIG.scoring.damage_reward_scale * COUNTER.damage,
                     CONFIG.scoring.counter_reward,
                 )
         self.assertEqual(hit_steps, 1)
@@ -213,9 +214,9 @@ class ParryTests(unittest.TestCase):
         wind_up_opponent(fighters)
         step(fighters, agent=PARRY, opponent=ATTACK)
         flee = FighterAction(move_dir=1)
-        for _ in range(COMBAT.counter_windup_frames + 1):
+        for _ in range(COUNTER.attack_windup_frames + 1):
             step(fighters, agent=ATTACK, opponent=flee)
-        self.assertEqual(fighters["opponent"].health, 100 - COMBAT.counter_damage)
+        self.assertEqual(fighters["opponent"].health, 100 - COUNTER.damage)
 
     def test_walking_through_the_attacker_does_not_dodge_the_counter(self) -> None:
         for gap in (0.1, 0.5, 0.9):
@@ -224,17 +225,17 @@ class ParryTests(unittest.TestCase):
             step(fighters, agent=PARRY, opponent=ATTACK)
             fighters["opponent"].x = fighters["agent"].x + gap
             walk = FighterAction(move_dir=-1)  # Toward the attacker, and then past it.
-            for _ in range(COMBAT.counter_windup_frames + 1):
+            for _ in range(COUNTER.attack_windup_frames + 1):
                 step(fighters, agent=ATTACK, opponent=walk)
             self.assertEqual(
-                fighters["opponent"].health, 100 - COMBAT.counter_damage, f"gap {gap}"
+                fighters["opponent"].health, 100 - COUNTER.damage, f"gap {gap}"
             )
 
     def test_a_counter_can_be_parried_back(self) -> None:
         fighters = duel()
         wind_up_opponent(fighters)
         step(fighters, agent=PARRY, opponent=ATTACK)
-        for _ in range(COMBAT.counter_windup_frames):
+        for _ in range(COUNTER.attack_windup_frames):
             step(fighters, agent=ATTACK)
         step(fighters, agent=ATTACK, opponent=PARRY)  # The first active frame.
         self.assertTrue(fighters["opponent"].parried)
@@ -262,7 +263,7 @@ class ParryTests(unittest.TestCase):
     def test_misses_are_penalized(self) -> None:
         scoring = CONFIG.scoring
         fighters = duel(gap=5.0)
-        for _ in range(COMBAT.swing_total_frames(False) + 1):
+        for _ in range(COMBAT.swing_total_frames(AttackType.SLASH) + 1):
             step(fighters, agent=ATTACK)
             if fighters["agent"].missed_attack:
                 break

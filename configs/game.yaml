@@ -36,6 +36,21 @@ combat:
       attack_recovery_frames: 14
       damage: 10
       range_m: 0.8
+    # The swing after a successful parry: a shorter wind-up and a lunge toward the
+    # opponent, fixed in direction when the counter starts.
+    counter:
+      attack_windup_frames: 12
+      attack_active_frames: 4
+      attack_recovery_frames: 14
+      damage: 15 # of each enemy it hits
+      range_m: 0.8
+      lunge_speed_mps: 6.0 # horizontal speed during the wind-up
+      # Only a counter's hitbox reaches behind the attacker's center, by this much. The lunge
+      # passes through bodies, so an opponent can walk through the lunging attacker: in the 13
+      # steps up to the first hit it walks 0.87 m, so its body edge can end 0.73 m behind the
+      # attacker's center. A normal swing starts at the attacker's front edge and never
+      # reaches behind it.
+      hitbox_back_m: 0.8
   # Parry: a press opens a protected window, then a fixed recovery. Holding the
   # button parries once. The window halves with every press made soon after the
   # last parry (spam), down to a minimum, and resets after a success or a pause.
@@ -62,23 +77,10 @@ combat:
   # Frames after a successful air parry during which gravity is scaled by
   # parry_hover_gravity_scale. Ends early on landing.
   parry_hover_frames: 30
-  # After a successful parry the next attack is a counter: a shorter wind-up and a
-  # lunge toward the opponent, fixed in direction when the counter starts.
+  # After a successful parry the next attack is a counter (the ``counter`` attack above):
   # Frames after a successful parry in which the parrying fighter's next attack is a
   # counter. The window ends when it attacks or when the frames run out.
   counter_window_frames: 24
-  # damage of each enemy a counter attack hits, in place of attack_damage
-  counter_damage: 15
-  # Wind-up frames of a counter, in place of attack_windup_frames. The active and
-  # recovery frames are the same as a normal swing.
-  counter_windup_frames: 12
-  counter_lunge_speed_mps: 6.0 # horizontal speed during the counter's wind-up
-  # Only a counter's hitbox reaches behind the attacker's center, by this much. The lunge
-  # passes through bodies, so an opponent can walk through the lunging attacker: in the 13
-  # steps up to the first hit it walks 0.87 m, so its body edge can end 0.73 m behind the
-  # attacker's center. A normal swing starts at the attacker's front edge and never
-  # reaches behind it.
-  counter_hitbox_back_m: 0.8
   # Frames after its swing is parried in which the attacker cannot start an attack. It
   # replaces the rest of the swing, so compare it with attack_recovery_frames. The
   # attacker can still move and parry. The viewer plays the swing backwards over these.
@@ -88,7 +90,7 @@ observation:
   # spec_version is saved in checkpoints, which refuse to load at another version.
   # TODO: reaction_delay_frames is loaded but not used yet. It will be the frames an
   # observation lags behind the game.
-  spec_version: 4
+  spec_version: 5
   reaction_delay_frames: 0
   max_observed_height_m: 1.3
   # Opponent slots in the observation (the network input is padded and masked to this many).

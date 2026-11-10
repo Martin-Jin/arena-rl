@@ -30,7 +30,6 @@ class FighterObservation(TypedDict):
     attack_windup_left: int
     attack_active_left: int
     attack_recovery_left: int
-    attack_counter: bool
     parry_window_left: int
     parry_recovery_left: int
     parry_window: int
@@ -65,7 +64,6 @@ def fighter_observation(
         "attack_windup_left": windup,
         "attack_active_left": active,
         "attack_recovery_left": recovery,
-        "attack_counter": fighter.attack_counter,
         "parry_window_left": parry_window,
         "parry_recovery_left": parry_recovery,
         # Protected frames of the running parry, or of the next one: shows the spam penalty.

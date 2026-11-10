@@ -6,7 +6,7 @@ import math
 
 import pygame
 
-from arena_ai.config import Config
+from arena_ai.config import AttackType, Config
 from arena_ai.sim.state import AGENT_ID, FighterState, enemies_of, is_opponent
 from arena_ai.viewer.render.layout import ToScreen
 from arena_ai.viewer.ui.theme import Color, Theme
@@ -216,7 +216,7 @@ class Hud:
                 if target is not None:
                     slash.end_x = target.x - slash.direction * fighter_config.width_m / 2
                 slash.ended_for = 0.0
-            elif not attacker.attack_counter:
+            elif attacker.attack_type is not AttackType.COUNTER:
                 slash.ended_for = 0.0
             else:
                 slash.end_x = attacker.x
@@ -302,14 +302,14 @@ class Hud:
         """Draw a thin meter under the bar while the fighter is mid-attack."""
         if not fighter.attack_frame:
             return
-        combat = self.config.game.combat
-        if fighter.attack_frame <= combat.attack_windup_frames:
+        spec = self.config.game.combat.spec(fighter.attack_type)
+        if fighter.attack_frame <= spec.attack_windup_frames:
             color = "swing_windup"
-        elif fighter.attack_frame <= combat.attack_windup_frames + combat.attack_active_frames:
+        elif fighter.attack_frame <= spec.attack_windup_frames + spec.attack_active_frames:
             color = "swing_active"
         else:
             color = "swing_recovery"
-        progress = fighter.attack_frame / combat.attack_total_frames
+        progress = fighter.attack_frame / spec.attack_total_frames
         width = round(bar.width * min(1.0, progress))
         x = bar.right - width if mirrored else bar.x
         meter = pygame.Rect(x, bar.bottom + 5, width, SWING_HEIGHT)

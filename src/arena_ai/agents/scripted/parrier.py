@@ -6,7 +6,7 @@ from arena_ai.agents.action import Action
 from arena_ai.agents.scripted.approach import approach_and_attack
 from arena_ai.agents.scripted.teamwork import jumps_over_allies
 from arena_ai.agents.scripted.view import is_attacking, learner_and_me
-from arena_ai.config import Config, load_config
+from arena_ai.config import AttackType, Config, load_config
 
 # Chance per step that the perfect-parry opponent attacks a learner that stands still. It cannot
 # tell a learner that is passive from one that is spamming attack: a spamming learner
@@ -69,7 +69,7 @@ def parrying_hunter(
     learner_x = learner["x"] * arena_width
     learner_y = learner["y"] * max_height
     learner_facing = int(learner["facing_dir"])
-    learner_is_counter = learner["attack_counter"] > 0.5
+    learner_is_counter = learner[f"attack_type_{AttackType.COUNTER.value}"] > 0.5
     learner_swinging = is_attacking(learner)
     # Wind-up frames left: 1 is the last one, so a parry pressed now is up on the first hit.
     windup_left = round(learner["attack_windup_left"] * combat.longest_windup_frames)
@@ -93,7 +93,9 @@ def parrying_hunter(
         # A counter also reaches behind its attacker, as far back as its hitbox touches the
         # body of this fighter.
         behind = (
-            combat.counter_hitbox_back_m + game.fighter.width_m / 2 if learner_is_counter else 0.0
+            combat.spec(AttackType.COUNTER).hitbox_back_m + game.fighter.width_m / 2
+            if learner_is_counter
+            else 0.0
         )
         in_reach = -behind - slack <= to_self <= reach + slack
         level = abs(self_y - learner_y) < game.fighter.height_m

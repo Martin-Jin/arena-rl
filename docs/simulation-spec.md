@@ -37,7 +37,7 @@ attack press made at the same time. The viewer maps `Q` to parry.
 ## Observation
 
 `encode_observation` returns one flat vector from the acting fighter's point of view
-(`spec_version` 4):
+(`spec_version` 5):
 
 ```
 [acting fighter: F values] [opponent slot 0: F] ... [opponent slot K-1: F] [mask: K values]
@@ -71,18 +71,17 @@ the single source for this table:
 | 7      | `attack_windup_left` | wind-up frames of the running swing still to run, divided by the longest wind-up of any attack type. 1 frame (not 0) is the last wind-up frame, the one a parry must be pressed on |
 | 8      | `attack_active_left` | damaging frames still to run, divided by the longest active phase. Full length until the phase starts |
 | 9      | `attack_recovery_left` | recovery frames still to run, divided by the longest recovery. Full length until the phase starts |
-| 10     | `attack_counter` | 1.0 while the swing is a counter, else 0.0     |
-| 11     | `parry_window_left` | protected frames of the running parry still to run, divided by `parry_window_frames` |
-| 12     | `parry_recovery_left` | parry recovery frames still to run, divided by `parry_recovery_frames`. Full length until the window ends |
-| 13     | `parry_window` | divided by `parry_window_frames`: the protected frames of the running parry, or of the next one when idle. Below 1.0 means spam is shrinking it |
-| 14     | `counter_frames` | frames left to counter, divided by `counter_window_frames` |
-| 15     | `stagger_frames` | frames left in which a parried fighter cannot attack, divided by `parried_stagger_frames` |
-| 16     | `parry_held` | 1.0 if the fighter's parry input was held on the previous step. Only a new press starts a parry, so a policy that keeps parry on never starts another one, and needs this to know it must release first |
-| 17     | `busy_frames_left` | frames until the fighter can start an attack or a parry again (the larger of the attack and parry countdowns), divided by the longer of `longest_attack_frames` and `parry_total_frames` |
-| 18     | `attack_type_<name>` | one-hot of the attack in progress, one value per `AttackType` (only `slash` for now), all 0 when not attacking |
-| 19     | `rel_x_ahead` | horizontal distance from the acting fighter, positive in front of it (along its facing), divided by 3 attack reaches (`width_m + attack_range_m`) |
-| 20     | `rel_y` | height above the acting fighter, divided by 2 fighter heights |
-| 21     | `rel_x_aimed` | horizontal distance, positive when this fighter faces the acting fighter (its swing points at it), divided by 3 attack reaches |
+| 10     | `parry_window_left` | protected frames of the running parry still to run, divided by `parry_window_frames` |
+| 11     | `parry_recovery_left` | parry recovery frames still to run, divided by `parry_recovery_frames`. Full length until the window ends |
+| 12     | `parry_window` | divided by `parry_window_frames`: the protected frames of the running parry, or of the next one when idle. Below 1.0 means spam is shrinking it |
+| 13     | `counter_frames` | frames left to counter, divided by `counter_window_frames` |
+| 14     | `stagger_frames` | frames left in which a parried fighter cannot attack, divided by `parried_stagger_frames` |
+| 15     | `parry_held` | 1.0 if the fighter's parry input was held on the previous step. Only a new press starts a parry, so a policy that keeps parry on never starts another one, and needs this to know it must release first |
+| 16     | `busy_frames_left` | frames until the fighter can start an attack or a parry again (the larger of the attack and parry countdowns), divided by the longer of `longest_attack_frames` and `parry_total_frames` |
+| 17     | `attack_type_<name>` | one-hot of the attack in progress, one value per `AttackType` (`slash` and `counter`), all 0 when not attacking |
+| 18     | `rel_x_ahead` | horizontal distance from the acting fighter, positive in front of it (along its facing), divided by 3 attack reaches (`width_m + attack_range_m`) |
+| 19     | `rel_y` | height above the acting fighter, divided by 2 fighter heights |
+| 20     | `rel_x_aimed` | horizontal distance, positive when this fighter faces the acting fighter (its swing points at it), divided by 3 attack reaches |
 
 The three `rel_*` features are measured from the acting fighter, so they are 0 in its own
 row. They exist because each opponent row is encoded on its own: without them the network
@@ -117,7 +116,7 @@ A scripted opponent sees the vector built from the agent's side: slot 0 is the a
   box extending from the attacker's front edge to `width / 2 + attack_range_m` in
   front of its center, and that vertically overlaps by less than one fighter height. Each
   swing hits each enemy at most once, nearest first, and deals `attack_damage` (10) to
-  each, or `counter_damage` (15) if it is a counter attack. An enemy that parries the swing cancels it for everyone not yet hit. The box never reaches behind the
+  each, or the `damage` of its attack type if that differs (a counter deals 15). An enemy that parries the swing cancels it for everyone not yet hit. The box never reaches behind the
   attacker, except for a counter (see Counter).
 - Fighters have `max_health` (100) health. Fighters on the same team never hit each other,
   and a dead fighter cannot attack or be hit. Who is alive is fixed at the start of the
@@ -184,17 +183,19 @@ if the counter is parried. Their size, opacity and duration are the `parry_*` an
 other: a fighter can only attack once its parry is over, which a successful parry
 ends at once.
 
-**Counter.** A counter has a shorter wind-up (`counter_windup_frames`, 12 frames
+**Counter.** A counter is its own attack type (`combat.attacks.counter` in
+[`configs/game.yaml`](../configs/game.yaml)), with the same fields as `slash` plus
+`lunge_speed_mps` and `hitbox_back_m`. It has a shorter wind-up (`attack_windup_frames`, 12 frames
 instead of 16), so it is harder to react to but still possible to parry. During the
-wind-up the fighter lunges at `counter_lunge_speed_mps` toward the fighter whose
+wind-up the fighter lunges at the counter's `lunge_speed_mps` toward the fighter whose
 swing it parried (the nearest other fighter if that one is gone). The direction is fixed
 when the swing starts, so the lunge does not follow an opponent who moves away or jumps
 over. It cuts through that fighter and goes on to the farthest living enemy in that
-direction that the lunge can still reach (`counter_lunge_speed_mps` times
-`counter_windup_frames`, 1.2 m), stopping at its x, so enemies in a row are all passed
+direction that the lunge can still reach (`lunge_speed_mps` times
+`attack_windup_frames`, 1.2 m), stopping at its x, so enemies in a row are all passed
 through and, as the swing hits every enemy it reaches, all damaged. An enemy farther than
 the lunge is not reached. The lunge stays stopped if the opponent walks through it. The counter's hitbox also
-reaches `counter_hitbox_back_m` (0.8 m) behind the attacker's center, so walking
+reaches `hitbox_back_m` (0.8 m) behind the attacker's center, so walking
 through the lunging attacker does not dodge it. A normal swing starts at the attacker's
 front edge and never reaches behind it. An opponent who runs away is still hit. One
 who times a jump as the lunge begins is not. A counter can be parried like any attack

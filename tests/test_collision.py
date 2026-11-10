@@ -1,6 +1,6 @@
 import unittest
 
-from arena_ai.config import load_config
+from arena_ai.config import AttackType, load_config
 from arena_ai.sim.collision import bodies_overlap
 from arena_ai.sim.simulate import FighterAction, step_game
 from arena_ai.sim.state import FighterState
@@ -8,6 +8,7 @@ from arena_ai.sim.state import FighterState
 CONFIG = load_config()
 GAME = CONFIG.game
 COMBAT = GAME.combat
+COUNTER = COMBAT.spec(AttackType.COUNTER)
 WIDTH = GAME.fighter.width_m
 ATTACK = FighterAction(attack=True)
 PARRY = FighterAction(parry=True)
@@ -91,7 +92,7 @@ class CollisionTests(unittest.TestCase):
         fighters = self._counter()
         agent, opponent = fighters["agent"], fighters["opponent"]
         overlapped = False
-        for _ in range(COMBAT.counter_windup_frames + 1):
+        for _ in range(COUNTER.attack_windup_frames + 1):
             step(fighters, agent=ATTACK)
             overlapped = overlapped or bodies_overlap(agent, opponent, GAME)
         self.assertTrue(overlapped)  # The lunge passed through the opponent's body.
@@ -102,7 +103,7 @@ class CollisionTests(unittest.TestCase):
         fighters = self._counter()
         agent, opponent = fighters["agent"], fighters["opponent"]
         opponent_x = opponent.x
-        for _ in range(COMBAT.counter_windup_frames + 2):
+        for _ in range(COUNTER.attack_windup_frames + 2):
             step(fighters, agent=ATTACK)
         side = agent.x - opponent.x
         self.assertGreaterEqual(side, WIDTH - 1e-6)
@@ -113,7 +114,7 @@ class CollisionTests(unittest.TestCase):
 
     def test_a_counter_can_still_be_parried_when_it_reaches_the_opponent(self) -> None:
         fighters = self._counter()
-        for _ in range(COMBAT.counter_windup_frames):
+        for _ in range(COUNTER.attack_windup_frames):
             step(fighters, agent=ATTACK)
         health = fighters["opponent"].health
         step(fighters, agent=ATTACK, opponent=PARRY)  # The lunger is level with the opponent.
@@ -122,7 +123,7 @@ class CollisionTests(unittest.TestCase):
 
     def test_a_parried_counter_stops_at_the_parrier_and_does_not_end_inside_it(self) -> None:
         fighters = self._counter()
-        for _ in range(COMBAT.counter_windup_frames):
+        for _ in range(COUNTER.attack_windup_frames):
             step(fighters, agent=ATTACK)
         step(fighters, agent=ATTACK, opponent=PARRY)
         agent, opponent = fighters["agent"], fighters["opponent"]

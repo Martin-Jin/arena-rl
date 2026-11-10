@@ -8,7 +8,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
 from arena_ai.sim.state import FighterState
-from arena_ai.config import load_config
+from arena_ai.config import AttackType, load_config
 from arena_ai.viewer.render import animation
 from arena_ai.viewer.render.scene import draw_scene
 from arena_ai.viewer.ui.hud import Hud
@@ -163,7 +163,9 @@ class ParryAnimationTests(unittest.TestCase):
         config = load_config()
         hud = Hud(config, Theme(config.viewer.ui), lambda x, y: (100 + 100 * x, 150 - 100 * y))
         fighters = {
-            "agent": FighterState(x=1.0, facing_dir=1, attack_frame=1, attack_counter=True),
+            "agent": FighterState(
+                x=1.0, facing_dir=1, attack_frame=1, attack_type=AttackType.COUNTER
+            ),
             "opponent": FighterState(x=2.0, facing_dir=-1),
         }
         hud.reset(fighters)
@@ -202,7 +204,7 @@ class ParryAnimationTests(unittest.TestCase):
         config, hud, fighters = self._counter_hud()
         fighters["agent"].x = 1.8
         fighters["agent"].attack_frame = 0  # A parry cancels the swing and staggers it.
-        fighters["agent"].attack_counter = False
+        fighters["agent"].attack_type = AttackType.SLASH
         fighters["agent"].stagger_frames = 20
         hud.update(0.02, fighters)
         slash = hud._slashes[0]
@@ -219,7 +221,7 @@ class ParryAnimationTests(unittest.TestCase):
         hud.draw(surface, fighters, {"agent": "You", "opponent": "Bot"}, 0)
         painted = surface.get_bounding_rect()
         self.assertGreater(painted.width, 0)
-        fighters["agent"].attack_counter = False  # The swing ended without a hit.
+        fighters["agent"].attack_type = AttackType.SLASH  # The swing ended without a hit.
         hud.update(0.02, fighters)
         hud.update(config.viewer.ui.counter_effect_seconds, fighters)
         self.assertEqual(hud._slashes, [])
@@ -232,9 +234,9 @@ class ParryAnimationTests(unittest.TestCase):
             animation.draw_fighter(surface, fighter, 0, lambda x, y: (200, 250))
             return pygame.image.tobytes(surface, "RGBA")
 
-        countering = FighterState(attack_frame=3, attack_counter=True)
+        countering = FighterState(attack_frame=3, attack_type=AttackType.COUNTER)
         with_bubble = FighterState(
-            attack_frame=3, attack_counter=True, parry_pose_frame=3, parry_window=8
+            attack_frame=3, attack_type=AttackType.COUNTER, parry_pose_frame=3, parry_window=8
         )
         self.assertNotEqual(draw(with_bubble), draw(countering))  # The bubble is still drawn.
         # The sprite is the attack pose, not the shield pose.

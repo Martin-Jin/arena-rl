@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from collections.abc import Mapping
 
-from arena_ai.config import Config, GameConfig
+from arena_ai.config import AttackType, Config, GameConfig
 from arena_ai.sim.collision import resolve_collisions
 from arena_ai.sim.rules import LEVEL_TOLERANCE_M, end_attack, step_fighter
 from arena_ai.sim.state import FighterState, enemies_of
@@ -105,11 +105,11 @@ def step_game(
             if parry_blocks(target, attacker):
                 apply_parry(target, attacker, fighter_id, config.game)
                 break
-            damage = config.game.combat.damage(attacker.attack_counter)
+            damage = config.game.combat.damage(attacker.attack_type)
             target.health = max(0, target.health - damage)
             attacker.hit_targets.add(target_id)
             attacker.attack_hit = True
-            attacker.counter_hit = attacker.attack_counter
+            attacker.counter_hit = attacker.attack_type is AttackType.COUNTER
 
     # A counter that was not parried ends its lunge here, so it is pushed out the far side. A
     # parry cancels it, so a parried fighter is pushed out the near side, not left inside.
@@ -144,11 +144,8 @@ def _lunge_target_x(
     direction = me.lunge_dir or (base > me.x) - (base < me.x)
     if direction == 0:
         return base
-    reach = (
-        config.combat.counter_lunge_speed_mps
-        * config.combat.counter_windup_frames
-        * config.world.dt_seconds
-    )
+    counter = config.combat.spec(AttackType.COUNTER)
+    reach = counter.lunge_speed_mps * counter.attack_windup_frames * config.world.dt_seconds
     ahead = [
         (enemy.x - me.x) * direction
         for enemy in enemies_of(fighter_id, fighters).values()
@@ -192,7 +189,7 @@ def apply_parry(
         # below, so put it there now, or the collision step could put it on the far side.
         attacker.x = target.x - attacker.lunge_dir * config.fighter.width_m
     attacker.stagger_from_frame = combat.normal_swing_frame(
-        attacker.attack_frame, attacker.attack_counter
+        attacker.attack_frame, attacker.attack_type
     )
     end_attack(attacker)
     attacker.stagger_frames = combat.parried_stagger_frames
@@ -214,12 +211,9 @@ def apply_parry(
 
 def attacker_is_active(fighter: FighterState, config: GameConfig) -> bool:
     """Return whether a fighter is in the active attack frames."""
-    combat = config.combat
-    return (
-        combat.windup_frames(fighter.attack_counter)
-        < fighter.attack_frame
-        <= combat.windup_frames(fighter.attack_counter) + combat.attack_active_frames
-    )
+    spec = config.combat.spec(fighter.attack_type)
+    windup = spec.attack_windup_frames
+    return windup < fighter.attack_frame <= windup + spec.attack_active_frames
 
 
 def attack_hits(
@@ -229,14 +223,12 @@ def attack_hits(
 ) -> bool:
     """Return whether an attacker's forward hitbox overlaps a target."""
     fighter_width = config.fighter.width_m
-    attack_range = config.combat.attack_range_m
+    spec = config.combat.spec(attacker.attack_type)
+    attack_range = spec.range_m
     # Bodies cannot overlap, so the hitbox starts at the attacker's front edge and a swing
-    # never reaches a fighter behind it. Only a counter also reaches back, for an opponent
-    # that walked through its lunge.
-    if attacker.attack_counter:
-        behind = config.combat.counter_hitbox_back_m
-    else:
-        behind = -fighter_width / 2
+    # never reaches a fighter behind it. Only an attack with a ``hitbox_back_m`` (the
+    # counter) also reaches back, for an opponent that walked through its lunge.
+    behind = -fighter_width / 2 if spec.hitbox_back_m is None else spec.hitbox_back_m
     attack_start = attacker.x - attacker.facing_dir * behind
     attack_end = attacker.x + attacker.facing_dir * (fighter_width / 2 + attack_range)
     hitbox_left = min(attack_start, attack_end)

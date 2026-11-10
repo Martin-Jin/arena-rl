@@ -26,7 +26,6 @@ class FighterState:
     attack_frame: int = 0
     attack_hit: bool = False  # The current swing hit someone.
     hit_targets: set[str] = field(default_factory=set)  # Who the current swing already hit.
-    attack_counter: bool = False  # The current swing is a counter (shorter wind-up).
     lunge_dir: int = 0  # Direction of the counter lunge, fixed when the swing starts.
     parry_frame: int = 0  # 0 when not parrying, else 1 at the press and counting up.
     parry_window: int = 0  # Protected frames of the current parry.
@@ -50,9 +49,8 @@ class FighterState:
     counter_hit: bool = False  # This fighter's counter attack hit.
     missed_attack: bool = False  # A swing finished without hitting or being parried.
     missed_parry: bool = False  # A parry ended without parrying anything.
-    attack_type: AttackType = (
-        AttackType.SLASH
-    )  # The type of attack the fighter is performing currently.
+    # The type of the current swing. SLASH when not attacking (``end_attack`` resets it).
+    attack_type: AttackType = AttackType.SLASH
     # TODO attacks: list[AttackType] = field(default_factory=lambda: [AttackType.SLASH])
     # TODO The types of attacks the fighter can perform.
 

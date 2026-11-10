@@ -44,6 +44,12 @@ class AttackSpec:
     attack_recovery_frames: int
     damage: int
     range_m: float
+    # Horizontal speed during the wind-up, toward the target fixed when the swing starts.
+    # 0 means no lunge. A lunging swing passes through bodies (see ``sim.collision``).
+    lunge_speed_mps: float = 0.0
+    # How far behind the attacker's center the hitbox starts. ``None`` starts it at the
+    # attacker's front edge, so the swing never reaches behind it.
+    hitbox_back_m: float | None = None
 
     @property
     def attack_total_frames(self) -> int:
@@ -55,6 +61,8 @@ class AttackType(str, Enum):
     """The type of attack a fighter is performing."""
 
     SLASH = "slash"
+    # The swing after a successful parry (see ``CombatConfig.counter_window_frames``).
+    COUNTER = "counter"
     # HEAVY = "heavy"
 
 
@@ -79,12 +87,9 @@ class CombatConfig:
     parry_hover_gravity_scale: float
     parry_hover_frames: int
     parried_stagger_frames: int
-    # For counters
-    counter_damage: int
+    # Frames after a successful parry in which the next attack is a counter. The counter
+    # swing itself is the ``counter`` entry of ``attacks``.
     counter_window_frames: int
-    counter_windup_frames: int
-    counter_lunge_speed_mps: float
-    counter_hitbox_back_m: float
 
     def spec(self, attack_type: AttackType) -> AttackSpec:
         """Return the attack spec for this type of attack."""
@@ -95,25 +100,21 @@ class CombatConfig:
         """Return the basic attack spec."""
         return self.attacks[DEFAULT_ATTACK]
 
-    def damage(self, counter: bool) -> int:
-        return self.counter_damage if counter else self.basic.damage
+    def damage(self, attack_type: AttackType) -> int:
+        return self.spec(attack_type).damage
 
-    def windup_frames(self, counter: bool) -> int:
-        return self.counter_windup_frames if counter else self.basic.attack_windup_frames
+    def windup_frames(self, attack_type: AttackType) -> int:
+        return self.spec(attack_type).attack_windup_frames
 
-    def normal_swing_frame(self, frame: int, counter: bool) -> int:
-        if counter:
-            return frame + self.basic.attack_windup_frames - self.counter_windup_frames
-        return frame
+    def normal_swing_frame(self, frame: int, attack_type: AttackType) -> int:
+        """Return the frame of a basic swing that looks like ``frame`` of this attack.
 
-    def swing_total_frames(
-        self,
-        counter: bool,
-    ) -> int:
-        basic = self.basic
-        return (
-            self.windup_frames(counter) + basic.attack_active_frames + basic.attack_recovery_frames
-        )
+        An attack with a shorter wind-up skips the start of the basic swing's animation.
+        """
+        return frame + self.basic.attack_windup_frames - self.windup_frames(attack_type)
+
+    def swing_total_frames(self, attack_type: AttackType) -> int:
+        return self.spec(attack_type).attack_total_frames
 
     @property
     def attack_total_frames(self) -> int:

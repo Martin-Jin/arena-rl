@@ -1,6 +1,6 @@
 """Define the game rules and physics: fighter behavior and game-state updates."""
 
-from arena_ai.config import CombatConfig, GameConfig
+from arena_ai.config import AttackType, CombatConfig, GameConfig
 from arena_ai.sim.state import FighterState
 
 # Positions that differ by less than this are level: it absorbs float rounding after
@@ -42,7 +42,7 @@ def attack_frames_left(f: FighterState, combat: CombatConfig) -> tuple[int, int,
     if not f.attack_frame:
         return 0, 0, 0
     spec = combat.spec(f.attack_type)
-    windup = combat.counter_windup_frames if f.attack_counter else spec.attack_windup_frames
+    windup = spec.attack_windup_frames
     active_end = windup + spec.attack_active_frames
     recovery_end = active_end + spec.attack_recovery_frames
     return (
@@ -64,15 +64,18 @@ def parry_frames_left(f: FighterState, combat: CombatConfig) -> tuple[int, int]:
 
 
 def is_lunging(f: FighterState, combat: CombatConfig, hits_checked: bool = False) -> bool:
-    """Return whether a counter is lunging, so it moves by the lunge and passes through bodies.
+    """Return whether a swing is lunging, so it moves by the lunge and passes through bodies.
+
+    Only an attack type with a ``lunge_speed_mps`` lunges (the counter).
 
     The lunge lasts the wind-up plus the first active frame, the one the hit and any parry
     are checked on, so the lunger is still level with the opponent (in front of it) then.
     ``hits_checked`` is for after that check, when only the wind-up counts: the lunger left
     inside an opponent is pushed out the far side.
     """
-    last = combat.counter_windup_frames + (0 if hits_checked else 1)
-    return f.attack_counter and f.attack_frame <= last
+    spec = combat.spec(f.attack_type)
+    last = spec.attack_windup_frames + (0 if hits_checked else 1)
+    return bool(f.attack_frame) and spec.lunge_speed_mps > 0 and f.attack_frame <= last
 
 
 def end_attack(f: FighterState) -> None:
@@ -80,7 +83,7 @@ def end_attack(f: FighterState) -> None:
     f.attack_frame = 0
     f.attack_hit = False
     f.hit_targets = set()
-    f.attack_counter = False
+    f.attack_type = AttackType.SLASH
     f.lunge_dir = 0
     f.counter_target = None
 
@@ -129,7 +132,7 @@ def step_fighter(
     if f.attack_frame:
         f.attack_frame += 1
         # Reset the attack state after the full attack animation has completed.
-        if f.attack_frame > combat.swing_total_frames(f.attack_counter):
+        if f.attack_frame > combat.swing_total_frames(f.attack_type):
             f.missed_attack = not f.attack_hit
             end_attack(f)
     if f.parry_frame:
@@ -146,7 +149,7 @@ def step_fighter(
             f.parry_pose_frame = 0
     f.stagger_frames = max(0, f.stagger_frames - 1)
     f.counter_frames = max(0, f.counter_frames - 1)
-    if not f.counter_frames and not f.attack_counter:
+    if not f.counter_frames and f.attack_type is not AttackType.COUNTER:
         f.counter_target = None  # The window passed without a counter.
     f.hover_frames = max(0, f.hover_frames - 1)
 
@@ -165,7 +168,7 @@ def step_fighter(
             f.attack_hit = False
             f.hit_targets = set()
             if f.counter_frames:
-                f.attack_counter = True
+                f.attack_type = AttackType.COUNTER
                 f.counter_started = True
                 f.counter_frames = 0
                 if target_x is not None:
@@ -177,10 +180,11 @@ def step_fighter(
     if f.parry_frame:
         f.vx = 0.0
     elif is_lunging(f, combat):
-        f.vx = f.lunge_dir * combat.counter_lunge_speed_mps
+        lunge_speed = combat.spec(f.attack_type).lunge_speed_mps
+        f.vx = f.lunge_dir * lunge_speed
         if target_x is not None:
             ahead = (target_x - f.x) * f.lunge_dir  # Not positive once the target is reached.
-            f.vx = f.lunge_dir * max(0.0, min(combat.counter_lunge_speed_mps, ahead / dt))
+            f.vx = f.lunge_dir * max(0.0, min(lunge_speed, ahead / dt))
     else:
         f.vx = move_dir * fc.move_speed_mps  # -1, 0, or 1
     # Apply gravity and jump mechanics.

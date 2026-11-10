@@ -87,12 +87,30 @@ class ObservationVectorTests(unittest.TestCase):
 
     def test_a_counter_has_a_shorter_windup_but_the_same_recovery(self) -> None:
         combat = CONFIG.game.combat
-        counter = FighterState(attack_frame=1, attack_counter=True)
+        counter = FighterState(attack_frame=1, attack_type=AttackType.COUNTER)
+        spec = combat.spec(AttackType.COUNTER)
         self.assertEqual(
             attack_frames_left(counter, combat),
-            (combat.counter_windup_frames, combat.basic.attack_active_frames,
+            (spec.attack_windup_frames, combat.basic.attack_active_frames,
              combat.basic.attack_recovery_frames),
         )
+
+    def test_a_counter_is_its_own_attack_type_in_the_vector(self) -> None:
+        # The counter used to be a separate attack_counter flag beside the attack type.
+        row = fighter_features(
+            encode_observation(
+                get_observation(
+                    FighterState(attack_frame=1, attack_type=AttackType.COUNTER),
+                    {"opponent": FighterState(x=3.0)},
+                    CONFIG,
+                ),
+                CONFIG,
+            ),
+            0,
+        )
+        self.assertEqual(row[f"attack_type_{AttackType.COUNTER.value}"], 1.0)
+        self.assertEqual(row[f"attack_type_{AttackType.SLASH.value}"], 0.0)
+        self.assertNotIn("attack_counter", row)
 
     def test_the_vector_shows_the_countdowns_busy_frames_and_attack_type(self) -> None:
         combat = CONFIG.game.combat

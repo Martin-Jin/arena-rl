@@ -41,7 +41,7 @@ the [simulation spec](simulation-spec.md#observation)). `F` is 22 features per f
 flowchart TB
     subgraph IN["Observation: 14 x (1 + 3) + 3 = 59 values"]
         direction LR
-        S["Own row (F = 22)<br/>x, y, vx, vy, on_ground, facing,<br/>health, attack_*_left (3), attack_counter,<br/>parry_*_left (2), parry_window, counter_frames,<br/>stagger_frames, parry_held, busy_frames_left,<br/>attack_type (one-hot),<br/>rel_x_ahead, rel_y, rel_x_aimed"]
+        S["Own row (F = 22)<br/>x, y, vx, vy, on_ground, facing,<br/>health, attack_*_left (3),<br/>parry_*_left (2), parry_window, counter_frames,<br/>stagger_frames, parry_held, busy_frames_left,<br/>attack_type (one-hot: slash, counter),<br/>rel_x_ahead, rel_y, rel_x_aimed"]
         O1["Opponent slot 0 (F = 22)"]
         O2["Opponent slot 1 (F = 22)"]
         O3["Opponent slot 2 (F = 22)"]

@@ -254,7 +254,7 @@ def draw_fighter(
         animation_name = "attack"
         # A counter has a shorter wind-up: skip the start of the swing to match it.
         animation_tick = config.game.combat.normal_swing_frame(
-            fighter.attack_frame, fighter.attack_counter
+            fighter.attack_frame, fighter.attack_type
         )
     elif fighter.stagger_frames:
         animation_name = "attack"
