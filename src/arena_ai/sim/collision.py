@@ -1,5 +1,4 @@
-# collision.py
-# This module keeps fighters' bodies from overlapping. Pure simulation: no pygame.
+"""Keep fighters' bodies from overlapping. Pure simulation: no pygame."""
 
 from collections.abc import Mapping
 

@@ -1,7 +1,7 @@
 import dataclasses
 import unittest
 
-from arena_ai.agents.scripted import OPPONENTS, training_opponents
+from arena_ai.agents.scripted import training_opponents
 from arena_ai.config import load_config
 
 
@@ -16,11 +16,7 @@ class TrainingOpponentsTests(unittest.TestCase):
     def test_each_entry_becomes_one_environment_in_order(self) -> None:
         entries = [["approach"], ["idle", "random"], "approach", ["random"]]
         result = run(entries)
-        self.assertEqual(
-            [names for names, _ in result],
-            [["approach"], ["idle", "random"], ["approach"], ["random"]],
-        )
-        self.assertEqual(result[1][1], [OPPONENTS["idle"], OPPONENTS["random"]])
+        self.assertEqual(result, [["approach"], ["idle", "random"], ["approach"], ["random"]])
 
     def test_more_environments_than_the_maximum_is_an_error(self) -> None:
         with self.assertRaisesRegex(ValueError, "at most 2"):
@@ -42,8 +38,7 @@ class TrainingOpponentsTests(unittest.TestCase):
             run([["idle", "idle"]], max_opponents=1)
 
     def test_the_perfect_parry_opponent_can_be_trained_against(self) -> None:
-        names = [names for names, _ in run([["parrier"], ["idle"]])]
-        self.assertEqual(names, [["parrier"], ["idle"]])
+        self.assertEqual(run([["parrier"], ["idle"]]), [["parrier"], ["idle"]])
 
     def test_the_shipped_config_is_valid(self) -> None:
         training = load_config().training

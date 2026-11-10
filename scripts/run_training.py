@@ -255,7 +255,7 @@ def run_training(config: Config | None = None) -> TrainingState:
 
 def make_factories(config: Config):
     """Create a list of environment factories for the training loop."""
-    environments = training_opponents(
+    opponent_names = training_opponents(
         config.training.opponents,
         config.training.num_envs,
         config.game.observation.max_opponents,
@@ -267,7 +267,7 @@ def make_factories(config: Config):
             [(name, EpisodePolicy(name, config)) for name in names],
             max_episode_steps=config.training.max_episode_steps,
         )
-        for names, _ in environments
+        for names in opponent_names
     ]
 
 

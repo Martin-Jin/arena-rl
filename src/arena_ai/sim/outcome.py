@@ -1,5 +1,4 @@
-# outcome.py
-# This module decides when an episode or match is over and who won it.
+"""Decide when an episode or match is over and who won it."""
 
 from collections.abc import Mapping
 

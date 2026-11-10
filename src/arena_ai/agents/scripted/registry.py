@@ -1,7 +1,5 @@
 """The scripted opponents by name, and the check of a training opponent list."""
 
-from collections.abc import Callable
-
 from arena_ai.agents.scripted.approach import approach_and_attack
 from arena_ai.agents.scripted.parrier import parrying_hunter
 from arena_ai.agents.scripted.runner import runner
@@ -20,10 +18,8 @@ OPPONENTS = {
 }
 
 
-def training_opponents(
-    entries: list, max_envs: int, max_opponents: int
-) -> list[tuple[list[str], list[Callable]]]:
-    """Return the (names, policies) of each training environment, in the order of ``entries``.
+def training_opponents(entries: list, max_envs: int, max_opponents: int) -> list[list[str]]:
+    """Return the opponent names of each training environment, in the order of ``entries``.
 
     Each entry lists the opponents of one environment (a bare name means one opponent).
     Raises ``ValueError`` for no entries, more entries than ``max_envs``, an entry with no
@@ -50,5 +46,5 @@ def training_opponents(
             raise ValueError(
                 f"Unknown training opponents {unknown}; choose from {sorted(OPPONENTS)}"
             )
-        environments.append((names, [OPPONENTS[name] for name in names]))
+        environments.append(names)
     return environments

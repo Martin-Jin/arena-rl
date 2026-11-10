@@ -1,6 +1,4 @@
-# state.py
-# This module defines the sprite states that are updated in the game loop.
-
+"""Define the fighter state that the game loop updates, and spawning helpers."""
 
 import random
 from collections.abc import Mapping

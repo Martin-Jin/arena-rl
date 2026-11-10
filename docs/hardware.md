@@ -107,18 +107,28 @@ being recorded.
 
 ## Measured effect
 
-A profiled run of 4 iterations (4 environments, 512 steps each, 1 PyTorch
-thread, CUDA available) went from about 7.6 s to about 4.8 s after moving GAE
-and returns to the CPU and replacing `Categorical` sampling in the rollout.
-These figures include one-off start-up costs (imports and CUDA initialization),
-so a long run will differ. The remaining rollout time is mostly the network
-forward passes and the Python simulation, which are CPU-bound.
+Twenty iterations of 512 steps over 16 environments (12 cores, 1 PyTorch thread, CUDA
+available) took 107 s with everything in one process. Each later change cut that time:
+
+| Change | 20 iterations |
+| --- | --- |
+| Environments in 8 worker processes ([training-process.md](training-process.md)) | 88 s |
+| Plus one stacked actor-critic pass per rollout step | about 78 s |
+| Plus the CUDA graph for the PPO update | about 49 s |
+
+The second and third rows were measured separately, in runs of the same seed, so they are
+close but not exact. Earlier, moving GAE and returns to the CPU and replacing `Categorical`
+sampling in the rollout took a 4-iteration profile from about 7.6 s to about 4.8 s. These
+figures include one-off start-up costs (imports, CUDA initialization and spawning workers),
+so a long run will differ. What remains is mostly the rollout's network passes and the
+simulation in the workers.
 
 ## Things not yet measured
 
 - Whether running the PPO update on the CPU is as fast as on the GPU for this
   network size. Try `TRAINING_DEVICE = "cpu"` and compare the iteration time.
   A larger network or a larger `batch_size` favors the GPU.
-- Whether more parallel environments (`num_envs`) help. The simulation runs
-  sequentially in one Python process, so more environments add CPU time per step
-  even though they give larger batches.
+- Whether more parallel environments (`num_envs`) help. The workers step their
+  environments at the same time, so more environments add little time per step until there
+  are more of them than cores, and they give larger batches to the network. Keep
+  `env_workers` a divisor of the environment count.
