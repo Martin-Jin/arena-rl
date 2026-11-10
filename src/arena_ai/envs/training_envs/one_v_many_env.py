@@ -3,8 +3,8 @@
 from collections.abc import Callable, Mapping, Sequence
 import random
 
+from arena_ai.agents import selfplay
 from arena_ai.agents.action import to_fighter_action
-from arena_ai.agents.scripted.episode import EpisodePolicy
 from arena_ai.agents.scripted.registry import OpponentMixture
 from arena_ai.agents.scripted.view import team_observation
 from arena_ai.config import Config
@@ -57,7 +57,10 @@ class OneVManyEnv(ArenaEnv):
 
     def _draw_mixture(self) -> list[tuple[str, OpponentPolicy]]:
         """Draw this episode's opponents from the mixture."""
-        return [(name, EpisodePolicy(name, self.config)) for name in self.mixture.draw(self.rng)]
+        return [
+            (name, selfplay.make_opponent_policy(name, self.config))
+            for name in self.mixture.draw(self.rng)
+        ]
 
     def _set_opponents(self, opponents: Sequence[tuple[str, OpponentPolicy]]) -> None:
         self.opponent_names = [name for name, _ in opponents]
@@ -78,6 +81,13 @@ class OneVManyEnv(ArenaEnv):
                 policy.resample(self.rng)
         return super().reset(seed)
 
+    def set_opponent_weights(self, weights) -> None:
+        """Give the self-play opponents the learner's weights (see ``agents/selfplay.py``).
+
+        The network is shared by the whole process, so one call serves every environment in it.
+        """
+        selfplay.load_weights(weights, self.config)
+
     def step(self, action: int):
         """Advance one step and tag the info mapping with the matchup."""
         observation, reward, terminated, truncated, info = super().step(action)
@@ -92,8 +102,9 @@ class OneVManyEnv(ArenaEnv):
     def get_actions(self, agent_action: int) -> Mapping[str, FighterAction]:
         """Convert the learner's and every living opponent's decision into actions.
 
-        Each opponent builds its own view from the fighters, so that it is the second
-        fighter in it, followed by its allies. The fighters are encoded once for all views.
+        Each scripted opponent builds its own view from the fighters, so that it is the second
+        fighter in it, followed by its allies. The fighters are encoded once for all views. A
+        self-play opponent sees the game from its own side instead (``own_observation``).
         """
         assert self.fighters is not None
         actions = {AGENT_ID: to_fighter_action(agent_action)}
@@ -103,7 +114,9 @@ class OneVManyEnv(ArenaEnv):
             if fighter.health <= 0:
                 actions[fighter_id] = FighterAction()
                 continue
-            actions[fighter_id] = to_fighter_action(
-                policy(team_observation(self.fighters, fighter_id, self.config, rows))
-            )
+            if isinstance(policy, selfplay.SelfPlayPolicy):
+                view = selfplay.own_observation(self.fighters, fighter_id, self.config)
+            else:
+                view = team_observation(self.fighters, fighter_id, self.config, rows)
+            actions[fighter_id] = to_fighter_action(policy(view))
         return actions

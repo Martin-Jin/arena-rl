@@ -32,6 +32,7 @@ simulation for cores.
 | Step                                          | Device         | Why                                                                                                          |
 | --------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------ |
 | Game simulation, rewards, scripted opponents  | CPU            | Pure Python, deterministic, one fighter at a time. It must not depend on a GPU or on pygame. `training.env_workers` worker processes step the environments in parallel. |
+| Self-play opponent (`agent`) moves            | CPU, in the workers | One observation per step per opponent, so launch costs would exceed the arithmetic. Each worker holds a copy of the network, refreshed after every update (see [training-process.md](training-process.md#self-play-opponent)). |
 | Observation encoding                          | CPU            | Plain Python lists, built for each step.                                                                     |
 | Action selection and value estimates (rollout) | CPU            | Batches are one to a few observations. Launch and transfer costs would exceed the arithmetic.                |
 | Rollout storage                               | CPU, then GPU  | Transitions are stored as Python lists. `Rollout.as_batch` converts them to tensors on the training device once per iteration. |

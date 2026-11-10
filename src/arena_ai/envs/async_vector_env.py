@@ -41,6 +41,9 @@ def _worker(connection, factories: Sequence[Callable[[], ArenaEnv]]) -> None:
             command, payload = connection.recv()
             if command == "reset":
                 connection.send(("ok", [env.reset(seed=seed) for env, seed in zip(envs, payload)]))
+            elif command == "weights":
+                envs[0].set_opponent_weights(payload)  # Shared by the worker's environments.
+                connection.send(("ok", None))
             elif command == "step":
                 connection.send(
                     ("ok", [step_and_reset(env, action) for env, action in zip(envs, payload)])
@@ -116,6 +119,12 @@ class AsyncVectorEnv(VectorEnv):
         results = self._collect()
         # Transpose the per-environment tuples into the five parallel lists.
         return tuple(list(column) for column in zip(*results))
+
+    def set_opponent_weights(self, weights) -> None:
+        """Give every worker the learner's weights for its self-play opponents."""
+        for connection in self._connections:
+            connection.send(("weights", weights))
+        self._gather()
 
     def close(self) -> None:
         """Stop the workers. Safe to call more than once."""

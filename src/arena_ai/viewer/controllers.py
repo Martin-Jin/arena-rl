@@ -10,10 +10,9 @@ from pathlib import Path
 from typing import Protocol
 
 from arena_ai.agents.scripted import OPPONENTS, EpisodePolicy
+from arena_ai.agents.selfplay import own_observation
 from arena_ai.agents.scripted.view import team_observation
 from arena_ai.config import Config
-from arena_ai.sim.observation import get_observation
-from arena_ai.sim.observation_vector import encode_observation
 from arena_ai.sim.state import AGENT_ID, FighterState, enemies_of, opponent_id
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -122,10 +121,8 @@ class TrainedController:
         self.model.eval()
 
     def action(self, fighters: Mapping[str, FighterState]) -> int:
-        enemies = enemies_of(self.fighter_id, fighters)
-        structured = get_observation(fighters[self.fighter_id], enemies, self.config)
         observation = self._torch.tensor(
-            encode_observation(structured, self.config), dtype=self._torch.float32
+            own_observation(fighters, self.fighter_id, self.config), dtype=self._torch.float32
         ).unsqueeze(0)
         with self._torch.no_grad():
             logits = self.model.policy_network(observation)

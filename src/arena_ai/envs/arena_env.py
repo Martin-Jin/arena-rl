@@ -136,6 +136,9 @@ class ArenaEnv(ABC):
         structured = get_observation(agent, opponents, self.config)
         return encode_observation(structured, self.config)
 
+    def set_opponent_weights(self, weights) -> None:
+        """Share the learner's weights with self-play opponents. The base scenario has none."""
+
     @abstractmethod
     def create_initial_fighters(self) -> dict[str, FighterState]:
         """Create the initial fighter states for this scenario."""

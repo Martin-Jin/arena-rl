@@ -95,13 +95,18 @@ The simulation layer is deterministic and independent of rendering. It must not 
   hunter: it parries every attack it can see from the front, so mix it with easier
   opponents in training), `dodger.py` (approach-and-attack that rolls through every swing
   it can see, until its stamina runs out), `runner.py` (flees the learner), `simple.py` (idle and uniformly
-  random), `registry.py` (the `OPPONENTS` registry and `training_opponents`, which checks a
+  random), `registry.py` (the `OPPONENTS` registry, `SELF_PLAY` and `training_opponents`, which checks a
   `training.opponents` list), `episode.py` (`EpisodePolicy`, which redraws an opponent's
   options each training episode), `view.py` (how a policy reads its observation by name, and
   `team_observation`, which builds it: the agent, the opponent, then its allies, from
   `fighter_rows` so each fighter is encoded once per step) and
   `teamwork.py` (`jumps_over_allies`, which lets opponents queued behind an ally hop over
   it).
+- `src/arena_ai/agents/selfplay.py` — `SelfPlayPolicy`, the `agent` training opponent: a copy
+  of the learner's network that plays an opponent from its own side. It keeps one network per
+  process, loaded from a flat weight vector (`weights_of`, `load_weights`) that training sends
+  after every update. `make_opponent_policy` builds the policy for a training opponent name.
+  Torch is imported only when it is used.
 - `src/arena_ai/agents/attention.py` — `EntityAttention`, the input block of both
   networks: it encodes the acting fighter and each opponent, attends over the opponents
   with a mask and returns `[e_self ; context]`.

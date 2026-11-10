@@ -62,7 +62,8 @@ defines:
 
 Environment `i` plays `opponents[i]`. The names come from `OPPONENTS` in
 [`agents/scripted/registry.py`](../src/arena_ai/agents/scripted/registry.py) (`approach`, `parrier`, `dodger`, `idle`,
-`runner`, `random`). `dodger` is `approach` that rolls through every swing it can see, so
+`runner`, `random`), plus `agent`, the learner itself (see
+[Self-play opponent](#self-play-opponent)). `dodger` is `approach` that rolls through every swing it can see, so
 the learner has to bait out its stamina (a full bar is two dodges) before a swing lands. `parrier` parries every attack it can see from the front, so the learner
 cannot win against it by attacking head on. It earns only parry rewards until it finds
 another way past, so give it a share of the environments, not all of them, and keep
@@ -205,6 +206,54 @@ and two for values) and the PPO update, which this does not touch.
 `VISUALIZE_TRAINING` falls back to `VectorEnv`. Environment factories must be picklable
 (module-level functions and `partial`, not lambdas). A failure in a worker is raised in the
 training process with the worker's traceback.
+
+## Self-play opponent
+
+Put `agent` in a `training.opponents` entry (`[agent]`, or `[agent, approach]` for a two-opponent
+fight) and the opponent plays with a copy of the learner's own network. Train against the
+scripted opponents first: self-play is only recommended once the agent has already been trained
+on them. A fresh network plays almost at random, so two of them teach each other very little,
+and a learner that has never seen a scripted opponent can settle into tricks that only work
+against itself. Resume a run that has already learned the basics (see
+[Resuming a run](#resuming-a-run)), keep some scripted entries beside the `agent` ones, and watch
+the per-opponent win rate: against a copy of itself it should sit near 50%.
+
+**Why it exists.** A scripted opponent is a fixed target, so the learner can only get as good
+as the best script. A copy of itself is always as strong as the learner and gets stronger with
+it. **What it does.** The `agent` opponent samples its moves from the learner's current weights.
+Only the learner's own transitions are trained on. The opponent's moves are never stored, so
+there is no second network to update and no extra data in the rollout.
+
+**Why this approach.** The opponent copy follows the learner after every update, not an older
+snapshot. A pool of old checkpoints would resist cycling better, but it needs a pool to manage,
+and this is the smallest thing that gives the learner a changing opponent.
+
+**How it works in code.** [`agents/selfplay.py`](../src/arena_ai/agents/selfplay.py) holds the
+rule:
+
+1. `run_training.py` sends the learner's weights to the environments once before the first
+   rollout (the restored ones when resuming) and again after every PPO update, as one flat
+   array (`weights_of`).
+2. Each process loads them into one network that all its `agent` opponents share
+   (`load_weights`). With `AsyncVectorEnv` every worker has its own copy, so the weights go
+   through the pipe to each worker (`set_opponent_weights`).
+3. The opponent sees the game from its own side (`own_observation`): itself first, then the
+   learner as its only enemy, as the viewer's trained opponent does.
+4. Its moves are sampled with a generator seeded from the environment's, at every episode reset,
+   so a run with the same `seed` still repeats.
+
+**Limits.**
+
+- **Never drawn at random.** `agent` is an exception to the random draw: a `null` slot is
+  never the learner, and `random_opponent_pool` refuses it. Name it in an entry to use it.
+- **Not mirrored.** The opponent sees its own position and facing as they are, which differ
+  from the left-side view the learner mostly trains on.
+- **No teamwork.** An `agent` opponent does not see its allies, so several of them do not
+  coordinate, and scripted allies do not hop over it.
+- **Lag.** It acts on the weights of the latest update, so it can be one update behind.
+- **Cost.** Each `agent` opponent runs the network once per step on the CPU inside its
+  worker, so an environment with one steps slower than a scripted one. Workers import PyTorch
+  only when an entry uses `agent`.
 
 ## Resuming a run
 

@@ -23,6 +23,13 @@ OPPONENTS = {
 }
 
 
+# The learner's own network as an opponent (see ``agents/selfplay.py``). It is a training
+# opponent only, so it is not in ``OPPONENTS``, which the viewer lists. It is an exception to
+# the random draw: a ``null`` slot is never drawn as it, so it appears only where an entry
+# names it.
+SELF_PLAY = "agent"
+
+
 @dataclass(frozen=True)
 class OpponentMixture:
     """The opponents of a training environment where some are drawn again each episode.
@@ -60,6 +67,11 @@ def random_opponent_pool(names: list) -> list[str]:
     """
     if not names:
         return sorted(OPPONENTS)
+    if SELF_PLAY in names:
+        raise ValueError(
+            f"{SELF_PLAY!r} cannot be in training.random_opponent_pool: a drawn slot is never "
+            f"the learner itself. Name it in a training.opponents entry instead"
+        )
     unknown = [name for name in names if name not in OPPONENTS]
     if unknown:
         raise ValueError(
@@ -67,6 +79,13 @@ def random_opponent_pool(names: list) -> list[str]:
             f"choose from {sorted(OPPONENTS)}"
         )
     return list(names)
+
+
+def uses_self_play(entries: list) -> bool:
+    """Return whether any ``training.opponents`` entry names the learner's own network."""
+    return any(
+        SELF_PLAY in ([entry] if isinstance(entry, str) else entry or []) for entry in entries
+    )
 
 
 def training_opponents(
@@ -99,10 +118,12 @@ def training_opponents(
                 f"each training.opponents entry needs 1 to {max_opponents} opponents "
                 f"(observation.max_opponents), got {names}"
             )
-        unknown = [name for name in names if name is not None and name not in OPPONENTS]
+        known = {*OPPONENTS, SELF_PLAY, None}
+        unknown = [name for name in names if name not in known]
         if unknown:
             raise ValueError(
-                f"Unknown training opponents {unknown}; choose from {sorted(OPPONENTS)}"
+                f"Unknown training opponents {unknown}; "
+                f"choose from {sorted([*OPPONENTS, SELF_PLAY])}"
             )
         environments.append(names)
     return environments

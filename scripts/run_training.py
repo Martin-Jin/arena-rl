@@ -8,11 +8,12 @@ import torch
 
 from arena_ai.agents.policy import ActorCritic, PolicyAdapter
 from arena_ai.agents.scripted import (
-    EpisodePolicy,
     OpponentMixture,
     random_opponent_pool,
     training_opponents,
+    uses_self_play,
 )
+from arena_ai.agents.selfplay import make_opponent_policy, weights_of
 from arena_ai.config import Config, load_config
 from arena_ai.envs.training_envs.one_v_many_env import OneVManyEnv
 from arena_ai.envs.async_vector_env import AsyncVectorEnv
@@ -44,8 +45,8 @@ USE_CUDA_GRAPH = True
 # shape, so train a new one after changing either.
 # Opponent behavior is read from the code, not the checkpoint, so a resumed run fights the
 # current scripted opponents.
-RESUME_FROM: str | None = None
-# RESUME_FROM = "checkpoints/latest.pt"
+# RESUME_FROM: str | None = None
+RESUME_FROM = "checkpoints/latest.pt"
 
 
 def select_training_device() -> torch.device:
@@ -224,6 +225,20 @@ def run_training(config: Config | None = None) -> TrainingState:
         environment = AsyncVectorEnv(factories, workers)
     else:
         environment = VectorEnv(factories)
+    if uses_self_play(config.training.opponents):
+        # The self-play opponents play with a copy of the learner: give it the starting
+        # weights (restored ones when resuming), then the new ones after every update.
+        def share_weights() -> None:
+            environment.set_opponent_weights(weights_of(model))
+
+        share_weights()
+        train_policy = update_policy
+
+        def update_policy(*args, **kwargs):
+            metrics = train_policy(*args, **kwargs)
+            share_weights()
+            return metrics
+
     loop = TrainingLoop(
         environment,
         policy,
@@ -262,14 +277,12 @@ def run_training(config: Config | None = None) -> TrainingState:
 def make_factories(config: Config):
     """Create a list of environment factories for the training loop."""
     max_opponents = config.game.observation.max_opponents
-    entries = training_opponents(
-        config.training.opponents, config.training.num_envs, max_opponents
-    )
+    entries = training_opponents(config.training.opponents, config.training.num_envs, max_opponents)
     pool = tuple(random_opponent_pool(config.training.random_opponent_pool))
     factories = []
     for entry in entries:
         if entry is not None and None not in entry:
-            fixed = [(name, EpisodePolicy(name, config)) for name in entry]
+            fixed = [(name, make_opponent_policy(name, config)) for name in entry]
             mixture = None
         else:  # Some slots (or all of them) are drawn again each episode.
             fixed = []

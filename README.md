@@ -16,7 +16,8 @@ opponents only: there is no self-play, behavior cloning or fine-tuning.
 - **Training works today:** hand-written PPO, rollout, checkpoint, and environment
   modules, run with `py scripts/run_training.py`. Choose the opponents of each parallel
   environment (one to three at once) with `training.opponents` in
-  [`configs/agent.yaml`](configs/agent.yaml).
+  [`configs/agent.yaml`](configs/agent.yaml). Naming `agent` as an opponent trains the
+  learner against a copy of itself, recommended only after it has trained on the scripted ones.
   See [Training](#training) and the [training guide](docs/training-process.md).
 - Scripted opponents for the viewer and training, including one that hunts you and
   parries every attack it can see, and one that runs away from you.

@@ -11,9 +11,11 @@ from arena_ai.agents.scripted.episode import EpisodePolicy
 from arena_ai.agents.scripted.parrier import HUNTER_ATTACK_CHANCE, parrying_hunter
 from arena_ai.agents.scripted.registry import (
     OPPONENTS,
+    SELF_PLAY,
     OpponentMixture,
     random_opponent_pool,
     training_opponents,
+    uses_self_play,
 )
 from arena_ai.agents.scripted.runner import runner
 from arena_ai.agents.scripted.simple import idle, random_action
@@ -23,6 +25,7 @@ __all__ = [
     "HUNTER_ATTACK_CHANCE",
     "OPPONENTS",
     "OpponentMixture",
+    "SELF_PLAY",
     "approach_and_attack",
     "dodging_approacher",
     "idle",
@@ -31,4 +34,5 @@ __all__ = [
     "random_opponent_pool",
     "runner",
     "training_opponents",
+    "uses_self_play",
 ]

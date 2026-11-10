@@ -75,5 +75,12 @@ class VectorEnv:
             infos.append(info)
         return observations, rewards, terminated, truncated, infos
 
+    def set_opponent_weights(self, weights) -> None:
+        """Give the self-play opponents the learner's weights.
+
+        The network is shared by every environment of this process, so the first one loads it.
+        """
+        self.envs[0].set_opponent_weights(weights)
+
     def close(self) -> None:
         """Release resources. Nothing to release in this process."""

@@ -31,7 +31,7 @@ training:
   seed: null
   # One environment per entry, in order. Each entry lists the opponents the agent faces at
   # once in that environment (1 to game.yaml observation.max_opponents names from approach,
-  # parrier, dodger, idle, runner, random). A bare name means one opponent. Opponents are
+  # parrier, dodger, idle, runner, random, or agent). A bare name means one opponent. Opponents are
   # allies: they never hurt each other, and a fight ends when the agent or all of them are
   # dead. Repeat an entry to run several environments with it.
   #
@@ -41,6 +41,10 @@ training:
   #   [parrier, null]              a parrier plus one drawn opponent
   #   [null, null]                 two drawn opponents
   #   null                         a whole mixture: 1 to 3 drawn opponents, count included
+  # "agent" is the learner itself: the opponent plays with a copy of the network being trained
+  # (see docs/training-process.md, "Self-play opponent"). Only use it once the agent has
+  # already been trained on the scripted opponents, and keep some scripted entries beside it.
+  # It is never drawn for a null slot, so name it in an entry to use it.
   # The report keeps one line of stats per entry, so drawn slots show as "*"
   # ("parrier+*"), and a null entry shows as "random".
   #
