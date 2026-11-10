@@ -228,7 +228,7 @@ def step_fighter(
     elif f.dodge_frames_left:
         f.vx = f.dodge_dir * dodge_config.speed_mps
     elif is_lunging(f, combat):
-        lunge_speed = combat.spec(f.attack_type).lunge_speed_mps
+        lunge_speed = combat.spec(f.attack_type).lunge_speed_at(f.attack_frame)
         f.vx = f.lunge_dir * lunge_speed
         if target_x is not None:
             ahead = (target_x - f.x) * f.lunge_dir  # Not positive once the target is reached.

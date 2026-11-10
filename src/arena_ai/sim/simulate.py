@@ -167,9 +167,10 @@ def _carry_target_x(
 
     That is ``lunge_clearance_reaches`` swing reaches (body width plus the counter's range)
     past the nearest living enemy that is now behind it or level with it, so the enemy must
-    walk to get a swing in range. With no enemy behind it the lunger stops where it is. Note
-    that an enemy that walks through the lunger toward its front is not behind it, so it does
-    not push the target back.
+    walk to get a swing in range. The target is where the enemy was at the start of the step,
+    and a chasing enemy walks one step before the lunger moves, so one step of walking is added.
+    With no enemy behind it the lunger stops where it is. Note that an enemy that walks through
+    the lunger toward its front is not behind it, so it does not push the target back.
     """
     me = fighters[fighter_id]
     spec = config.combat.spec(AttackType.COUNTER)
@@ -182,7 +183,8 @@ def _carry_target_x(
     if not direction or not passed:
         return me.x
     clearance = spec.lunge_clearance_reaches * (config.fighter.width_m + spec.range_m)
-    return (max(passed) + clearance) * direction
+    chase = config.fighter.move_speed_mps * config.world.dt_seconds
+    return (max(passed) + clearance + chase) * direction
 
 
 def _nearest_opponent_x(fighter_id: str, fighters: Mapping[str, FighterState]) -> float | None:

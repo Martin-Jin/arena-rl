@@ -194,7 +194,8 @@ ends at once.
 
 **Counter.** A counter is its own attack type (`combat.attacks.counter` in
 [`configs/game.yaml`](../configs/game.yaml)), with the same fields as `slash` plus
-`lunge_speed_mps`, `hitbox_back_m`, `lunge_carry_frames` and `lunge_clearance_reaches`. It has a shorter wind-up (`attack_windup_frames`, 12 frames
+`lunge_speed_mps`, `hitbox_back_m`, `lunge_carry_frames`, `lunge_carry_speed_mps` and
+`lunge_clearance_reaches`. It has a shorter wind-up (`attack_windup_frames`, 12 frames
 instead of 16), so it is harder to react to but still possible to parry. During the
 wind-up the fighter lunges at the counter's `lunge_speed_mps` toward the fighter whose
 swing it parried (the nearest other fighter if that one is gone). The direction is fixed
@@ -206,12 +207,18 @@ through and, as the swing hits every enemy it reaches, all damaged. An enemy far
 the lunge is not reached. The lunge stays stopped if the opponent walks through it.
 
 **Carry.** The hit is checked on the first active frame, with the lunger level with the
-enemy. The lunge then carries on for up to `lunge_carry_frames` (14) more frames, until the
-fighter is `lunge_clearance_reaches` (1.25) swing reaches beyond the nearest enemy it passed.
+enemy. The lunge then carries on for up to `lunge_carry_frames` (10) more frames at
+`lunge_carry_speed_mps` (14 m/s), until the fighter is `lunge_clearance_reaches` (1.25) swing
+reaches beyond the nearest enemy it passed.
 A swing's reach is the body width plus the attack range (0.27 + 0.8 = 1.07 m, the farthest
 center-to-center distance at which a swing hits), so the fighter ends 1.34 m away, outside the
 enemy's swing range. **Why:** without it the counter ended touching the enemy, which could turn
-round and hit back at once. The enemy now has to walk about 0.27 m (four steps) first. **Limits:**
+round and hit back at once. The enemy now has to walk about 0.27 m (four steps) first.
+**Why so fast:** a parried enemy can still walk, and the carry's target follows it. At the lunge's
+6 m/s the lunger gained only 2 m/s on an enemy chasing it at 4 m/s, and ended 0.5 m away, so
+the carry runs at 14 m/s (a gain of 10 m/s). The carry's target also adds one step of the
+enemy's walking (`move_speed_mps` times one timestep), because the enemy moves before the
+lunger does. **Limits:**
 the carry is cut short by a wall or a parry, and it only counts enemies behind the lunger, so an
 enemy that walks through it toward its front does not pull it back. The counter's hitbox also
 reaches `hitbox_back_m` (0.8 m) behind the attacker's center, so walking

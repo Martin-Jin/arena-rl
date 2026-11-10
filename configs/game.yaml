@@ -44,12 +44,15 @@ combat:
       damage: 15 # of each enemy it hits
       range_m: 0.8
       lunge_speed_mps: 6.0 # horizontal speed during the wind-up
-      # After the first active frame (the hit) the lunge carries on for up to this many
-      # frames, until the fighter is lunge_clearance_reaches times the swing's reach (body
-      # width 0.27 m plus range_m, 1.07 m) beyond the enemy it cut through. At 1.25 that is
-      # 1.34 m, outside the enemy's swing range, so the enemy has to walk before it can hit
-      # back. 14 frames at 6 m/s cover 1.4 m, enough for that distance.
-      lunge_carry_frames: 14
+      # After the first active frame (the hit) the lunge carries on for up to
+      # lunge_carry_frames, at lunge_carry_speed_mps, until the fighter is
+      # lunge_clearance_reaches times the swing's reach (body width 0.27 m plus range_m, 1.07 m)
+      # beyond the enemy it cut through. At 1.25 that is 1.34 m, outside the enemy's swing
+      # range, so the enemy has to walk before it can hit back. The target follows the enemy,
+      # which can still walk (4 m/s) after the lunger while staggered, so the carry is fast:
+      # it gains 10 m/s on a chasing enemy and needs about 9 of the 10 frames for 1.34 m.
+      lunge_carry_frames: 10
+      lunge_carry_speed_mps: 14.0
       lunge_clearance_reaches: 1.25
       # Only a counter's hitbox reaches behind the attacker's center, by this much. The lunge
       # passes through bodies, so an opponent can walk through the lunging attacker: in the 13

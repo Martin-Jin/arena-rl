@@ -179,7 +179,7 @@ class TeamCombatTests(unittest.TestCase):
         fighters[AGENT_ID].counter_frames = COMBAT.counter_window_frames
         for _ in range(COUNTER.attack_windup_frames + COMBAT.attack_active_frames + 1):
             step(fighters, **{AGENT_ID: ATTACK})
-        self.assertLess(fighters[AGENT_ID].x, 3.5)
+        self.assertLess(fighters[AGENT_ID].x, 6.0)  # Nowhere near the far opponent.
         self.assertEqual(fighters["opponent_1"].health, 100)
 
     def test_a_dead_fighter_cannot_attack_or_be_hit(self) -> None:

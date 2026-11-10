@@ -65,9 +65,19 @@ class AttackSpec:
     # ``lunge_clearance_reaches`` times the swing's reach (body width plus ``range_m``) beyond
     # the nearest of them. That puts it out of their swing range, so they cannot turn round
     # and hit it at once. It needs ``lunge_speed_mps`` times these frames to cover the
-    # distance. 0 ends the lunge on the first active frame.
+    # distance. 0 ends the lunge on the first active frame. The carry moves at
+    # ``lunge_carry_speed_mps`` (0 keeps ``lunge_speed_mps``). It must be well above the
+    # enemy's walking speed: a staggered enemy can still walk after the lunger, and the
+    # lunger only gains the difference of the two speeds on it.
     lunge_carry_frames: int = 0
     lunge_clearance_reaches: float = 0.0
+    lunge_carry_speed_mps: float = 0.0
+
+    def lunge_speed_at(self, frame: int) -> float:
+        """The lunge speed on swing ``frame``: the carry speed once the hit frame has passed."""
+        if frame > self.attack_windup_frames + 1 and self.lunge_carry_speed_mps:
+            return self.lunge_carry_speed_mps
+        return self.lunge_speed_mps
 
     @property
     def lunge_last_frame(self) -> int:

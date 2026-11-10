@@ -112,6 +112,20 @@ class CollisionTests(unittest.TestCase):
         self.assertGreaterEqual(agent.x - opponent.x, clearance - 1e-6)
         self.assertGreater(agent.x - opponent.x, reach)  # Out of range, not just apart.
 
+    def test_a_counter_still_clears_an_opponent_that_chases_the_lunger(self) -> None:
+        # Regression: a parried opponent can still walk, and at the lunge's own speed the
+        # lunger gained so little on one chasing it that it ended 0.5 m away, in range.
+        fighters = self._counter()
+        agent, opponent = fighters["agent"], fighters["opponent"]
+        reach = WIDTH + COUNTER.range_m
+        for _ in range(COUNTER.attack_windup_frames + 1):
+            step(fighters, agent=ATTACK)  # Up to the hit, with the opponent standing.
+        for _ in range(COUNTER.lunge_last_frame - COUNTER.attack_windup_frames - 1):
+            step(fighters, agent=ATTACK, opponent=RIGHT)  # Now it walks after the lunger.
+        self.assertGreaterEqual(
+            agent.x - opponent.x, COUNTER.lunge_clearance_reaches * reach - 1e-6
+        )
+
     def test_a_counter_stays_level_with_the_opponent_on_the_hit_frame(self) -> None:
         # The carry starts after the hit is checked, so it does not make the counter miss.
         fighters = self._counter()
