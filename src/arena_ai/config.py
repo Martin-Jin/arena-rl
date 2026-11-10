@@ -372,6 +372,7 @@ class ViewerUiConfig:
     dodge_trail_alpha: int
     dodge_trail_seconds: float
     dodge_trail_spacing_seconds: float
+    death_fade_seconds: float
 
 
 @dataclass(frozen=True)

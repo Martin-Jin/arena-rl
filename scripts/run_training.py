@@ -41,7 +41,7 @@ USE_CUDA_GRAPH = True
 # training.iterations more iterations are run on top of the saved ones. Leave as
 # None to start a new run.
 # A checkpoint only loads if it was saved with the current observation layout and network
-# shape, so train a new one after changing either. checkpoints/best.pt currently loads.
+# shape, so train a new one after changing either.
 # Opponent behavior is read from the code, not the checkpoint, so a resumed run fights the
 # current scripted opponents.
 RESUME_FROM: str | None = None

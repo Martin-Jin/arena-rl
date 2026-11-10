@@ -1,6 +1,6 @@
 # Arena AI Modules Reference
 
-This document describes the intended purpose of each module and project directory.
+This document describes the purpose of each module and project directory.
 
 ## Project configuration
 
@@ -14,8 +14,8 @@ This document describes the intended purpose of each module and project director
 - `configs/game.yaml` — Defines gameplay and observation constants, including
   attack timing and damage, fighter dimensions, arena dimensions and the
   observation scaling limits, and the parry and counter timings. The observation
-  `spec_version` and `reaction_delay_frames` values are loaded but not used by
-  the simulation yet.
+  `spec_version` is checked when a checkpoint loads. `reaction_delay_frames` is loaded
+  but has no effect: observations are never delayed.
 - `configs/agent.yaml` — Defines neural-network settings, PPO hyperparameters
   and training-loop defaults, including hidden-layer sizes, rollout length,
   checkpoint interval, number of parallel environments and spawn
@@ -115,9 +115,8 @@ The simulation layer is deterministic and independent of rendering. It must not 
 
 ### Training
 
-- `src/arena_ai/training/` — Contains the first learner-versus-scripted-opponent
-  workflow and later self-play, fine-tuning, curriculum, and opponent-pool
-  workflows.
+- `src/arena_ai/training/` — Contains the learner-versus-scripted-opponent
+  workflow. It has no self-play, fine-tuning, curriculum or opponent-pool workflow.
 - `src/arena_ai/training/rollout.py` — Stores observations, actions, rewards,
   termination flags, and policy values/log probabilities collected from rollouts.
 - `src/arena_ai/training/ppo.py` — Calculates GAE and bootstrapped critic
@@ -140,7 +139,7 @@ The simulation layer is deterministic and independent of rendering. It must not 
 
 ### Viewer
 
-The viewer layer is the only layer intended to depend on `pygame`.
+The viewer layer is the only layer that depends on `pygame`.
 
 - `src/arena_ai/viewer/` — Provides rendering and interactive display functionality.
 - `src/arena_ai/viewer/game.py` — Entry point (`py -m arena_ai.viewer.game`); opens the app.
@@ -180,12 +179,8 @@ The viewer layer is the only layer intended to depend on `pygame`.
   focus-handling `Menu`) and `hud.py` (health bars, swing and stamina meters and damage
   numbers).
 - `src/arena_ai/viewer/render/` — Drawing helpers: `layout.py` (meters to pixels),
-  `animation.py` (sprite animations), `trail.py` (the dodge's afterimages) and `scene.py` (arena, shadows and
+  `animation.py` (sprite animations), `trail.py` (the dodge's afterimages), `fade.py` (`DeathFade`, which times how long a dead fighter has been fading) and `scene.py` (arena, shadows and
   fighters, shared by the menus, matches and the training view).
-
-### Utilities
-
-- `src/arena_ai/utils/` — Planned home for logging, random seeding, and replay recording. It is empty for now.
 
 ## Assets
 
@@ -194,9 +189,9 @@ The viewer layer is the only layer intended to depend on `pygame`.
 - `assets/sprites/fighter/` — Stores ordered idle, run, attack, and turn frames
   extracted from the credited Knight Hero Platformer sprite pack. The viewer
   scales the source cells to the 0.9 m fighter hitbox. The attack action uses
-  only the pack's single-slash `Attack 1` sequence until combo mechanics exist.
+  only the pack's single-slash `Attack 1` sequence, since the game has no combo actions.
 - `assets/sprites/fighter/deferred/` — Preserves source sheets and extracted
-  combo/recovery frames that are not loaded until their actions exist.
+  combo/recovery frames that the viewer does not load, since no action uses them.
 - `assets/audio/` — Stores music and sound effects.
 - `assets/audio/effects/` — Stores one-shot and looping fighter sound effects
   for attacks, movement, jumping, landing, and hits.
@@ -209,7 +204,6 @@ The viewer layer is the only layer intended to depend on `pygame`.
 - `scripts/run_training.py` — Runs headless PPO training.
 - `scripts/evaluate_agent.py` — Plays a checkpoint against each scripted opponent and prints
   win count, remaining health and fight length.
-- Further evaluation and play scripts are planned under `scripts/`.
 
 ## Tests
 
@@ -220,9 +214,8 @@ The viewer layer is the only layer intended to depend on `pygame`.
 
 ## Documentation and experiments
 
-- `notebooks/` — Contains exploratory analysis, experiments, and visualizations.
 - `docs/` — Contains project specifications and reference documentation.
-- `docs/modules-reference.md` — Describes the current and planned responsibility of each project module and directory.
+- `docs/modules-reference.md` — Describes the responsibility of each project module and directory.
 - `docs/simulation-spec.md` — Documents the action set, observation layout, rewards and timing.
 - `docs/training-process.md` — Documents the training loop and PPO data flow.
 - `docs/setup.md` — Documents installation.

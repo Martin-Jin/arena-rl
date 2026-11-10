@@ -1,11 +1,11 @@
 # Arena AI
 
-Arena AI is a Python 2D arena-fighting prototype with a deterministic fighter
+Arena AI is a Python 2D arena-fighting project with a deterministic fighter
 simulation, reinforcement-learning components, and a pygame viewer.
 
-The project is under active development. The simulation, manual viewer, and
-initial headless PPO training workflow are available now; Gymnasium/PettingZoo
-compatibility and more advanced training workflows remain future work.
+It includes the simulation, a manual viewer and a headless PPO training workflow.
+It has no Gymnasium/PettingZoo adapters, and training is learner versus scripted
+opponents only: there is no self-play, behavior cloning or fine-tuning.
 
 ## Current features
 
@@ -65,7 +65,8 @@ Choices are saved to `data/viewer_settings.json` (gitignored) and restored on th
 next launch. Text that is too long for its box, such as a long checkpoint name,
 scrolls sideways by itself instead of running outside it. In a match, `Esc` opens a pause menu with a way back to Settings,
 and the result screen offers to play again. The opponent uses the same animated
-sprites as the player with a light-red tint.
+sprites as the player with a light-red tint. A fighter that dies fades away, even
+behind the result screen.
 
 A match ends when a fighter is defeated, or after `match.time_limit_seconds` in
 [`configs/viewer.yaml`](configs/viewer.yaml) (60 by default; 0 removes the limit). When
@@ -118,24 +119,21 @@ Controls:
 - [`assets/sprites/fighter/`](assets/sprites/fighter/) — active animation
   frames.
 - [`assets/sprites/fighter/deferred/`](assets/sprites/fighter/deferred/) —
-  preserved source sheets and animations not yet connected to game actions.
+  preserved source sheets and animations that no game action uses.
 - [`docs/`](docs/) — project documentation, indexed below.
 
 ## Trained agent
 
-The repository includes the best weights so far, `checkpoints/best.pt`, so the viewer's
-trained opponent works straight after a clone with no training. Every other file in
-`checkpoints/` is gitignored. These weights come from a run of 1,702 iterations (about
-13.9 million steps). Over the whole run the agent won 97% of its 27,982 episodes. In the last 100 episodes it won
-every one against the approach, idle and perfect-parry opponents and 99 against the
-random one. It was trained before the runner opponent existed, so it has not been
-measured against it. **Retrain it:** the observation now has opponent slots and a mask
-(it is now at spec version 4: frames-left countdowns, relative distances and an attack
-type) and the network has an attention input block with four heads, so this checkpoint no
-longer loads and the viewer's trained agent needs a new one. Its figures above are for the
-old network. `checkpoints/best.pt` is left as it was until a new run replaces it. The viewer picks it up automatically when there is no `latest.pt`,
-or you can choose it in Settings. Replace `best.pt` only when a run is clearly better,
-and update these figures when you do.
+The repository does not include trained weights, so the viewer's trained agent needs a
+checkpoint first: run training (see [Training](#training)). The viewer then loads
+`checkpoints/latest.pt`, or any file you pick under **Checkpoint** in Settings. To keep
+a run's weights, copy the file out of the run folder and rename it (for example to
+`best.pt`). `.gitignore` lets `checkpoints/best.pt` be committed, and every other file in
+`checkpoints/` stays ignored.
+
+A checkpoint loads only if it was saved with the current observation layout and network
+shape (observation spec version 6, attention input block with four heads), so train a new
+one after changing either.
 
 ## Training
 
@@ -188,8 +186,8 @@ training run.
 ## Animation assets
 
 The active attack animation uses only the single-slash `Attack 1` sequence.
-Combo and recovery animations are preserved for later mechanics but are not
-played because the game does not have combo actions yet.
+Combo and recovery animations are kept in the repository but are not played,
+because the game has no combo actions.
 
 Animation credit: [Knight Hero Platformer by
 Pixivan](https://pixivan.itch.io/knight-hero-platfor).
@@ -225,5 +223,5 @@ headlessly by the training environments. Keep pygame-dependent code inside
 
 ## License
 
-No project license has been selected yet. The third-party sprite asset is
+No project license has been selected. The third-party sprite asset is
 credited above and remains subject to its creator's license and terms.

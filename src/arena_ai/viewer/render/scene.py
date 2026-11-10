@@ -31,13 +31,17 @@ def _draw_shadow(
     config: Config,
     fighter: FighterState,
     to_screen: ToScreen,
+    strength: float = 1.0,
 ) -> None:
-    """Draw a soft shadow that shrinks and fades as the fighter jumps."""
+    """Draw a soft shadow that shrinks and fades as the fighter jumps.
+
+    ``strength`` (0 to 1) fades it further, with a dying fighter.
+    """
     pixels_per_meter = config.viewer.rendering.pixels_per_meter
     lift = min(max(fighter.y, 0.0) / 1.2, 1.0)
     width = max(8, round(config.game.fighter.width_m * pixels_per_meter * 1.8 * (1 - 0.45 * lift)))
     height = max(4, round(width * 0.22))
-    alpha = round(70 * (1 - 0.6 * lift))
+    alpha = round(70 * (1 - 0.6 * lift) * strength)
     shadow = pygame.Surface((width, height), pygame.SRCALPHA)
     pygame.draw.ellipse(
         shadow, (*config.viewer.ui.colors["shadow"], alpha), shadow.get_rect()
@@ -55,24 +59,26 @@ def draw_scene(
     turning: bool = False,
     hurt: Mapping[str, float] | None = None,
     ghosts: Sequence[tuple[str, FighterState, float]] = (),
+    death_fade: Mapping[str, float] | None = None,
 ) -> None:
     """Draw the arena and every fighter. Only the agent can show a turn frame.
 
     ``hurt`` gives each fighter's hurt flash strength (0 to 1), as ``Hud.hurt_strength``.
     ``ghosts`` are the dodge afterimages (see ``DodgeTrail.ghosts``), drawn under the fighters.
+    ``death_fade`` gives each dead fighter's opacity, as ``DeathFade.strengths``. A dead fighter
+    missing from it is not drawn, so a view without the fade drops the dead at once.
     """
     colors = config.viewer.ui.colors
     draw_arena(screen, config, to_screen)
-    # With several opponents a dead one disappears, so the fight is not crowded by bodies.
-    # A one-on-one match keeps showing the fallen fighter behind its result screen.
-    hide_dead = sum(is_opponent(fighter_id) for fighter_id in fighters) > 1
-    shown = {
-        fighter_id: fighter
-        for fighter_id, fighter in fighters.items()
-        if not (hide_dead and is_opponent(fighter_id) and fighter.health <= 0)
-    }
-    for fighter in shown.values():
-        _draw_shadow(screen, config, fighter, to_screen)
+    # A dead fighter fades away and is then gone, so the fight is not crowded by bodies.
+    fade = death_fade or {}
+    shown: dict[str, tuple[FighterState, float]] = {}
+    for fighter_id, fighter in fighters.items():
+        strength = fade.get(fighter_id, 0.0) if fighter.health <= 0 else 1.0
+        if strength > 0:
+            shown[fighter_id] = (fighter, strength)
+    for fighter, strength in shown.values():
+        _draw_shadow(screen, config, fighter, to_screen, strength)
     pixels_per_meter = config.viewer.rendering.pixels_per_meter
     for fighter_id, ghost, strength in ghosts:
         draw_fighter(
@@ -83,7 +89,7 @@ def draw_scene(
             shade=colors["opponent_tint"] if is_opponent(fighter_id) else None,
             alpha=round(config.viewer.ui.dodge_trail_alpha * strength),
         )
-    for fighter_id, fighter in shown.items():
+    for fighter_id, (fighter, strength) in shown.items():
         opponent = is_opponent(fighter_id)
         drawn = draw_fighter(
             screen,
@@ -94,10 +100,14 @@ def draw_scene(
             shade=colors["opponent_tint"] if opponent else None,
             hurt=(hurt or {}).get(fighter_id, 0.0),
             effect_color=colors["opponent_health"] if opponent else None,
+            alpha=round(255 * strength),
         )
         if not drawn:  # No sprite frames available: draw a plain box instead.
             height = config.game.fighter.height_m * pixels_per_meter
             width = config.game.fighter.width_m * pixels_per_meter
             x, y = to_screen(fighter.x, fighter.y)
             color = colors["fallback_opponent" if opponent else "fallback_agent"]
-            pygame.draw.rect(screen, color, (x - width / 2, y - height, width, height))
+            box = pygame.Surface((round(width), round(height)))
+            box.fill(color)
+            box.set_alpha(round(255 * strength))
+            screen.blit(box, (x - width / 2, y - height))

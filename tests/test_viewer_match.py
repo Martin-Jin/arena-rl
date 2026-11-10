@@ -60,6 +60,37 @@ class MatchTimeLimitTests(unittest.TestCase):
     def tearDown(self) -> None:
         pygame.quit()
 
+    def test_the_loser_keeps_fading_behind_the_result_screen_while_all_else_is_frozen(self) -> None:
+        scene = MatchScene(_app(time_limit=0.0))
+        scene.update(1 / 60)
+        scene.phase = "playing"
+        scene.fighters["opponent"].health = 0
+        scene.update(1 / 60)
+        self.assertEqual(scene.phase, "over")
+        scene.update(1 / 60)
+        tick, strength = scene.render_tick, scene.death_fade.strengths()["opponent"]
+        for _ in range(10):
+            scene.update(1 / 60)
+        self.assertEqual(scene.render_tick, tick)  # Frozen...
+        self.assertLess(scene.death_fade.strengths()["opponent"], strength)  # ...but fading.
+        for _ in range(int(scene.death_fade.seconds * 60) + 5):
+            scene.update(1 / 60)
+        self.assertEqual(scene.death_fade.strengths()["opponent"], 0.0)
+
+    def test_the_fade_waits_while_paused_and_restarts_with_a_new_round(self) -> None:
+        scene = MatchScene(_app(time_limit=0.0))
+        scene.update(1 / 60)
+        scene.phase = "playing"
+        scene.fighters["opponent"].health = 0
+        scene.update(1 / 60)
+        scene.update(1 / 60)
+        scene.phase = "paused"
+        before = scene.death_fade.strengths()
+        scene.update(0.5)
+        self.assertEqual(scene.death_fade.strengths(), before)
+        scene.restart()
+        self.assertEqual(scene.death_fade.strengths(), {})
+
     def test_a_match_with_no_winner_ends_as_a_draw_at_the_limit(self) -> None:
         scene = MatchScene(_app(time_limit=1.0))  # Nobody fights, so health is equal.
         _play(scene)

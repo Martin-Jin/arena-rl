@@ -255,7 +255,7 @@ def draw_fighter(
 
     ``hurt`` (0 to 1) flashes the fighter: it is tinted toward the damage color and made
     partly transparent, by that fraction. ``alpha`` (0 to 255) makes the whole sprite
-    translucent, for the dodge's afterimages.
+    more translucent, for the dodge's afterimages and a dying fighter.
     """
     effect_color = effect_color or config.viewer.ui.colors["accent"]
     # After a successful parry the shield effects play on to the end of the window, even
@@ -283,10 +283,8 @@ def draw_fighter(
     elif turning:
         animation_name = "turn"
         animation_tick = 0
-    # TODO: Use the simulation's support-contact state here once platforms
-    # exist; airborne animation should depend on contact, not floor height.
-    # TODO: "falling" is not in viewer.yaml yet, so airborne fighters currently
-    # fall back to the idle animation.
+    # The arena has only a floor, so airborne means off the floor. "falling" is not in
+    # viewer.yaml, so airborne fighters use the idle animation.
     elif not fighter.on_ground:
         falling_animation = anims.get("falling")
         animation_name = (
@@ -335,7 +333,7 @@ def draw_fighter(
         img.set_alpha(round(255 - (255 - ui.hurt_flash_min_alpha) * hurt))
     if alpha < 255:
         img = img.copy()
-        img.set_alpha(alpha)
+        img.set_alpha(round(img.get_alpha() * alpha / 255))  # On top of any hurt flash.
     x_px, y_px = to_screen(fighter.x, fighter.y)
     rect = img.get_rect(midbottom=(x_px, y_px))
     screen.blit(img, rect)

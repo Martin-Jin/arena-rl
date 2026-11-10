@@ -182,7 +182,9 @@ shrinks from both ends, and particles shed from the ends flow backward along the
 bubble's surface and fade. When the window ends the outline is gone at once. Every
 effect uses its fighter's side color: blue for the agent and red for the opponent. A
 fighter that takes damage flashes: it fades down toward red and back to normal over
-`hurt_flash_seconds`. A successful parry adds a ring with sparks and a "Parry" text at
+`hurt_flash_seconds`. A fighter that dies fades out over `death_fade_seconds` and is then
+gone. The fade keeps running behind the result screen, which stops every other animation,
+and waits only while the match is paused. A successful parry adds a ring with sparks and a "Parry" text at
 the point of contact. Starting a counter attack adds a "Counter" text and cuts a
 straight line that follows the fighter. The line carries on through the opponent if the counter hits, and stops at the parrying fighter
 if the counter is parried. Their size, opacity and duration are the `parry_*` and

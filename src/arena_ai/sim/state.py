@@ -18,8 +18,7 @@ class FighterState:
     y: float = 0.0
     vx: float = 0.0  # m/s
     vy: float = 0.0
-    # TODO: Rename or generalize this to a support-contact state when platform
-    # collisions exist; it should mean supported by any walkable surface.
+    # True when standing on the floor (the arena has no platforms).
     on_ground: bool = True
     facing_dir: int = 1
     health: int = 100

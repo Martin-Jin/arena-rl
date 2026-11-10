@@ -247,9 +247,7 @@ def step_fighter(
     f.x += f.vx * dt  # velocity changes position
     f.y += f.vy * dt
 
-    # TODO: Replace this floor-only check with collision resolution against the
-    # arena floor and platforms, then derive on_ground from the resulting
-    # walkable support contact rather than from one fixed y level.
+    # The only surface is the floor, so on_ground is "at the floor's y level".
     # Apply collision mechanics.
     if f.y <= w.floor_y_m:  # floor
         f.y, f.vy, f.on_ground = w.floor_y_m, 0.0, True

@@ -66,8 +66,8 @@ py -m arena_ai.viewer.game
 ```
 
 The viewer opens on a start menu. It defaults to the trained agent as the
-opponent when there is a `.pt` checkpoint in `checkpoints/` (the repository includes
-`best.pt`), and to the scripted opponent otherwise. Change the opponent, audio and other options in **Settings**; the
+opponent when there is a `.pt` checkpoint in `checkpoints/` (run training to create one),
+and to the scripted opponent otherwise. Change the opponent, audio and other options in **Settings**; the
 [README](../README.md) lists the controls.
 
 To watch training rollouts, set `VISUALIZE_TRAINING = True` in

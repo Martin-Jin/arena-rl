@@ -4,10 +4,11 @@
 that beat it every time, so training gives each episode's opponent slightly different
 numbers. **What:** ``EpisodePolicy`` wraps a policy from ``OPPONENTS`` and, when the
 environment resets, draws that policy's options from the environment's seeded generator.
-**Limits:** only ``approach``, ``parrier``, ``dodger`` and ``random`` have options. The others are
-wrapped but never change. The viewer wraps its scripted opponents the same way, with
-randomizing set by its own setting instead of ``training.randomize_opponents``, and never
-calls ``resample`` when that setting is off, so they keep the fixed defaults.
+**Limits:** only ``approach``, ``parrier`` and ``dodger`` have options (``parrier`` and
+``random`` also take the seeded generator). The others are wrapped but never change.
+The viewer wraps its scripted opponents the same way, with randomizing set by its own setting
+instead of ``training.randomize_opponents``, and never calls ``resample`` when that setting is
+off, so they keep the fixed defaults.
 """
 
 from collections.abc import Callable

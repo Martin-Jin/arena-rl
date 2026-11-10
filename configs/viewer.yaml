@@ -128,6 +128,9 @@ ui:
   dodge_trail_alpha: 90
   dodge_trail_seconds: 0.25
   dodge_trail_spacing_seconds: 0.03
+  # A fighter that dies fades out over this many seconds, then is gone. It keeps fading
+  # behind the result screen, which stops every other animation.
+  death_fade_seconds: 1.0
   colors:
     background: [244, 245, 247]
     floor: [226, 229, 234]

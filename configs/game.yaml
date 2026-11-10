@@ -98,8 +98,7 @@ dodge:
 
 observation:
   # spec_version is saved in checkpoints, which refuse to load at another version.
-  # TODO: reaction_delay_frames is loaded but not used yet. It will be the frames an
-  # observation lags behind the game.
+  # reaction_delay_frames is loaded but has no effect: observations are never delayed.
   spec_version: 6
   reaction_delay_frames: 0
   max_observed_height_m: 1.3

@@ -20,6 +20,7 @@ from arena_ai.sim.state import (
 )
 from arena_ai.viewer.audio import FighterSnapshot
 from arena_ai.viewer.controllers import Controller, make_controller
+from arena_ai.viewer.render.fade import DeathFade
 from arena_ai.viewer.render.scene import draw_scene
 from arena_ai.viewer.render.trail import DodgeTrail
 from arena_ai.viewer.scenes.settings_menu import SettingsScene
@@ -62,6 +63,7 @@ class MatchScene:
         self.rng = random.Random()
         self.hud = Hud(self.config, app.theme, app.to_screen)
         self.trail = DodgeTrail(self.config)
+        self.death_fade = DeathFade(self.config)
         self.notice = ""
         self.age = 0.0  # Real seconds since the first round, for the controls hint.
         self.controllers: dict[str, Controller] = {}
@@ -125,6 +127,7 @@ class MatchScene:
                     controller.resample(self.rng)
         self.hud.reset(self.fighters)
         self.trail.reset()
+        self.death_fade.reset()
         self.phase = INTRO
         self.menu: Menu | None = None
         self.intro_elapsed = 0.0
@@ -298,6 +301,9 @@ class MatchScene:
         elif self.phase == PLAYING:
             self.fight_elapsed += dt
             self._simulate(dt)
+        if self.phase != PAUSED:
+            # Before the result screen's freeze below: a dying fighter fades out behind it.
+            self.death_fade.update(dt, self.fighters)
         if self.phase == OVER:
             # Freeze every animation behind the result screen. One zero-length update
             # first shows the final hit (its number and the empty health bar).
@@ -333,6 +339,7 @@ class MatchScene:
             turning=self.turn_timer > 0,
             hurt={fid: self.hud.hurt_strength(fid) for fid in self.fighters},
             ghosts=self.trail.ghosts(),
+            death_fade=self.death_fade.strengths(),
         )
         timer_seconds, urgent = self._timer()
         self.hud.draw(screen, self.fighters, self.labels, timer_seconds, urgent)

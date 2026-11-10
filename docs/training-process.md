@@ -1,8 +1,8 @@
 # Training process
 
-Arena AI uses an on-policy PPO workflow. The current implementation trains one
-learner in a headless environment against the environment's configured
-opponent. The training loop is reusable: it receives an environment factory, a
+Arena AI uses an on-policy PPO workflow. It trains one learner in headless
+environments against scripted opponents (one to three per environment, see
+`opponents` below). The training loop is reusable: it receives an environment factory, a
 policy adapter, an update callback, and an optional checkpoint callback.
 
 ## Configuration
@@ -14,7 +14,6 @@ defines:
 - `iterations` — number of rollout-and-update cycles.
 - `rollout_steps` — environment transitions collected in each cycle.
 - `checkpoint_interval` — cycles between checkpoint callbacks.
-- `seed` — optional seed for the initial environment reset.
 - `opponents` — one entry per parallel environment, in order. Each entry lists the
   opponents the agent faces at once in that environment (1 to `observation.max_opponents`
   names; a bare name means one). The number of entries is the number of environments, so
@@ -75,7 +74,7 @@ transitions, resetting the environment whenever an episode terminates or is
 truncated. A rollout can therefore contain multiple episodes or end in the
 middle of an episode.
 
-## Current loop
+## Training loop
 
 [`TrainingLoop.run`](../src/arena_ai/training/train.py) performs this sequence:
 
@@ -356,15 +355,15 @@ the time limit is ending episodes before the fight is decided, so raise
 ## PPO update boundary
 
 PPO is on-policy. The batch collected before an update belongs to the old
-policy and must not be reused indefinitely after the policy changes. The
-intended update callback computes advantages and returns, runs the configured
+policy and must not be reused after the policy changes. The
+update callback computes advantages and returns, runs the configured
 PPO epochs/minibatches, and returns scalar metrics. The next iteration then
 creates a fresh [`Rollout`](../src/arena_ai/training/rollout.py).
 
-The current repository exposes the reusable loop and PPO building blocks;
-[`scripts/run_training.py`](../scripts/run_training.py) now wires those components into a
+The repository exposes the reusable loop and PPO building blocks;
+[`scripts/run_training.py`](../scripts/run_training.py) wires those components into a
 single runnable workflow. It creates the actor-critic model and optimizer,
-constructs the one-versus-one environment, computes PPO advantages and
+constructs one environment per `opponents` entry, computes PPO advantages and
 returns, performs minibatch updates, and saves `checkpoints/latest.pt` at the
 configured interval. Run it from the repository root with:
 

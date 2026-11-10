@@ -267,8 +267,7 @@ class AudioManager:
         Call it for every fighter each step, with ``previous`` taken before the
         step, so the opponent's sounds play as well as the player's.
         """
-        # TODO: Gate running audio on walkable support contact, not a
-        # floor-specific flag, when platform collision state is available.
+        # Running audio is gated on the floor-only ``on_ground`` flag (the arena has no platforms).
         # Footsteps follow the fighter's actual speed, not the key held: a fighter that is
         # parrying, or pressed against nothing, makes no steps.
         moving = fighter.vx != 0 and fighter.on_ground

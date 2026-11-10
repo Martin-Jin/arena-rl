@@ -123,7 +123,7 @@ figures include one-off start-up costs (imports, CUDA initialization and spawnin
 so a long run will differ. What remains is mostly the rollout's network passes and the
 simulation in the workers.
 
-## Things not yet measured
+## Not measured
 
 - Whether running the PPO update on the CPU is as fast as on the GPU for this
   network size. Try `TRAINING_DEVICE = "cpu"` and compare the iteration time.

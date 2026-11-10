@@ -75,7 +75,7 @@ training:
   num_envs: 16 # the most environments allowed: training refuses to start with more entries
   randomize_spawns: true # random fighter start positions each episode
   # Redraw the scripted opponents' options each episode, so no fixed distance or timing can be
-  # learned. Only approach and parrier have options (see agents/scripted/episode.py).
+  # learned. Only approach, parrier and dodger have options (see agents/scripted/episode.py).
   randomize_opponents: true
   # Meters added to the distance at which approach and parrier start a swing. Drawn uniformly
   # from this [low, high] range per episode: negative walks closer first, positive swings

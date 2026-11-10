@@ -94,7 +94,7 @@ def load_settings(config: Config, path: Path = SETTINGS_PATH) -> ViewerSettings:
     try:
         saved = json.loads(path.read_text(encoding="utf-8"))
         # Settings saved before several opponents existed had a single "opponent" key.
-        # TODO: remove this migration once no saved settings file has the key.
+        # It is moved to the first slot.
         if isinstance(saved.get("opponent"), str) and "opponents" not in saved:
             legacy = saved.pop("opponent")
             if legacy == "none":

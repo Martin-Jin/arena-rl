@@ -50,7 +50,7 @@ class ArenaEnv(ABC):
 
     def reset(self, seed: int | None = None) -> tuple[list[float], dict[str, Any]]:
         """Reset the scenario and return its initial observation."""
-        del seed  # Randomized starts can be added by concrete scenarios later.
+        del seed  # The base scenario is not random; a scenario that randomizes starts uses it.
         self.fighters = self.create_initial_fighters()
         self.step_count = 0
         self._episode_done = False
