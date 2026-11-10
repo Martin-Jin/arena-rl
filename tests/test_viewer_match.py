@@ -84,3 +84,39 @@ class MatchTimeLimitTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RandomizedOpponentTests(unittest.TestCase):
+    def tearDown(self) -> None:
+        pygame.quit()
+
+    def _scene(self, randomize: bool, kind: str = "approach") -> MatchScene:
+        app = _app(time_limit=0.0)
+        app.settings.opponents = [kind] * app.config.game.observation.max_opponents
+        app.settings.randomize_opponents = randomize
+        return MatchScene(app)
+
+    def test_each_round_draws_new_behavior_when_the_setting_is_on(self) -> None:
+        scene = self._scene(True)
+        controller = scene.controllers["opponent"]
+        seen = {controller.policy.options["swing_start_offset_m"]}
+        for _ in range(5):
+            scene.restart()
+            seen.add(controller.policy.options["swing_start_offset_m"])
+        self.assertGreater(len(seen), 1)
+        low, high = scene.config.training.swing_start_offset_m
+        self.assertTrue(all(low <= offset <= high for offset in seen))
+
+    def test_the_parrier_gets_an_attack_chance_in_range(self) -> None:
+        scene = self._scene(True, "parrier")
+        low, high = scene.config.training.hunter_attack_chance
+        options = scene.controllers["opponent"].policy.options
+        self.assertTrue(low <= options["attack_chance"] <= high)
+
+    def test_the_default_behavior_is_unchanged_when_the_setting_is_off(self) -> None:
+        scene = self._scene(False, "parrier")
+        scene.restart()
+        self.assertEqual(scene.controllers["opponent"].policy.options, {})
+
+    def test_the_setting_is_off_by_default(self) -> None:
+        self.assertFalse(App(load_config()).settings.randomize_opponents)

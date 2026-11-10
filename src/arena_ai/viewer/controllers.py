@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Protocol
 
-from arena_ai.agents.scripted import OPPONENTS
+from arena_ai.agents.scripted import OPPONENTS, EpisodePolicy
 from arena_ai.agents.scripted.view import team_observation
 from arena_ai.config import Config
 from arena_ai.sim.observation import get_observation
@@ -67,10 +67,17 @@ def trained_available(config: Config) -> bool:
 class ScriptedController:
     """A scripted policy playing an opponent's side, or the agent's side in a one-on-one."""
 
-    def __init__(self, name: str, config: Config, fighter_id: str) -> None:
-        self.policy = OPPONENTS[name]
+    def __init__(
+        self, name: str, config: Config, fighter_id: str, randomize: bool = False
+    ) -> None:
+        # The wrapper keeps the fixed defaults until ``resample`` is called.
+        self.policy = EpisodePolicy(name, config, randomize)
         self.config = config
         self.fighter_id = fighter_id
+
+    def resample(self, rng) -> None:
+        """Draw new behavior options for the next round (a no-op unless randomizing)."""
+        self.policy.resample(rng)
 
     def action(self, fighters: Mapping[str, FighterState]) -> int:
         # Scripted policies read the learner-first observation used in training: the agent,
@@ -80,8 +87,8 @@ class ScriptedController:
             # the first opponent and its enemy as the learner.
             (enemy,) = enemies_of(AGENT_ID, fighters).values()
             fighters = {AGENT_ID: enemy, opponent_id(0): fighters[AGENT_ID]}
-            return self.policy(team_observation(fighters, opponent_id(0), self.config), self.config)
-        return self.policy(team_observation(fighters, self.fighter_id, self.config), self.config)
+            return self.policy(team_observation(fighters, opponent_id(0), self.config))
+        return self.policy(team_observation(fighters, self.fighter_id, self.config))
 
 
 class TrainedController:
@@ -128,14 +135,20 @@ class TrainedController:
 
 
 def make_controller(
-    kind: str, config: Config, greedy: bool, fighter_id: str, checkpoint: str = ""
+    kind: str,
+    config: Config,
+    greedy: bool,
+    fighter_id: str,
+    checkpoint: str = "",
+    randomize: bool = False,
 ) -> Controller:
     """Build the controller for a scripted opponent name or ``"trained"``.
 
     ``checkpoint`` names the file the trained agent loads ("" for automatic).
+    ``randomize`` lets a scripted opponent vary its behavior each round (``resample``).
     """
     if kind == TRAINED:
         return TrainedController(config, greedy, fighter_id, checkpoint)
     if kind in OPPONENTS:
-        return ScriptedController(kind, config, fighter_id)
+        return ScriptedController(kind, config, fighter_id, randomize)
     raise ValueError(f"Unknown controller: {kind}")

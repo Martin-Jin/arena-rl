@@ -37,6 +37,7 @@ class ViewerSettingsTests(unittest.TestCase):
         settings.opponents[0] = "idle"
         settings.opponent_count = 2
         settings.random_spawns = True
+        settings.randomize_opponents = True
         save_settings(settings, self.path)
         loaded = load_settings(self.config, self.path)
         self.assertEqual(loaded, settings)

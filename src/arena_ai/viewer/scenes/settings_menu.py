@@ -166,6 +166,11 @@ class SettingsScene:
                 set_attr("random_spawns"),
             ),
             Toggle(
+                "Randomize opponent behavior",
+                lambda: settings.randomize_opponents,
+                set_attr("randomize_opponents"),
+            ),
+            Toggle(
                 "Show controls hint",
                 lambda: settings.show_controls_hint,
                 set_attr("show_controls_hint"),

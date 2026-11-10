@@ -48,6 +48,9 @@ class ViewerSettings:
     trained_greedy: bool = True  # False samples from the policy for variety
     checkpoint: str = ""  # File the trained agent loads. "" means automatic.
     random_spawns: bool = False
+    # Scripted opponents draw new behavior each round (swing distance, the parrier's attack
+    # chance), within the ranges in agent.yaml, as they do in training.
+    randomize_opponents: bool = False
     show_controls_hint: bool = True
 
 

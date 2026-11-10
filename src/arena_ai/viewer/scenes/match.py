@@ -76,7 +76,12 @@ class MatchScene:
         if self.player_kind != "human":
             try:
                 self.controllers[AGENT_ID] = make_controller(
-                    self.player_kind, self.config, greedy, AGENT_ID, settings.checkpoint
+                    self.player_kind,
+                    self.config,
+                    greedy,
+                    AGENT_ID,
+                    settings.checkpoint,
+                    settings.randomize_opponents,
                 )
             except Exception as error:  # Missing checkpoint, torch not installed...
                 self.notice = f"Could not load the trained agent ({error}). You play instead."
@@ -85,7 +90,12 @@ class MatchScene:
             fighter_id = opponent_id(index)
             try:
                 self.controllers[fighter_id] = make_controller(
-                    kind, self.config, greedy, fighter_id, settings.checkpoint
+                    kind,
+                    self.config,
+                    greedy,
+                    fighter_id,
+                    settings.checkpoint,
+                    settings.randomize_opponents,
                 )
             except Exception as error:
                 # Each trained slot loads on its own, so each one falls back.
@@ -104,6 +114,10 @@ class MatchScene:
     def restart(self) -> None:
         """Start a fresh round with the same opponents."""
         self.fighters = self._new_fighters()
+        if self.app.settings.randomize_opponents:
+            for controller in self.controllers.values():
+                if hasattr(controller, "resample"):  # Scripted: new behavior each round.
+                    controller.resample(self.rng)
         self.hud.reset(self.fighters)
         self.phase = INTRO
         self.menu: Menu | None = None

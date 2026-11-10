@@ -56,7 +56,10 @@ mouse, or the arrow keys with `Enter`. The settings menu has:
   uses `latest.pt` if it exists, otherwise the newest `.pt` file, so a checkpoint
   you renamed to keep it (for example `best.pt`) is found. The list shows up to 8
   files.
-- **Random starting positions** and whether to show the controls hint.
+- **Random starting positions**, **Randomize opponent behavior** and whether to show the
+  controls hint. Randomizing makes each scripted opponent draw new behavior every round (how
+  far away it starts its swing, and how often the perfect-parry fighter attacks), within the
+  ranges in `configs/agent.yaml`, as in training. Off, they behave the same every round.
 
 Choices are saved to `data/viewer_settings.json` (gitignored) and restored on the
 next launch. Text that is too long for its box, such as a long checkpoint name,

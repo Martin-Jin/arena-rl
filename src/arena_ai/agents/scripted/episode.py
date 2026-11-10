@@ -5,7 +5,9 @@ that beat it every time, so training gives each episode's opponent slightly diff
 numbers. **What:** ``EpisodePolicy`` wraps a policy from ``OPPONENTS`` and, when the
 environment resets, draws that policy's options from the environment's seeded generator.
 **Limits:** only ``approach``, ``parrier`` and ``random`` have options. The others are
-wrapped but never change. The viewer uses the plain policies, so it is not randomized.
+wrapped but never change. The viewer wraps its scripted opponents the same way, with
+randomizing set by its own setting instead of ``training.randomize_opponents``, and never
+calls ``resample`` when that setting is off, so they keep the fixed defaults.
 """
 
 from collections.abc import Callable
@@ -36,16 +38,18 @@ SEEDED = {"parrier", "random"}
 class EpisodePolicy:
     """A scripted policy with options redrawn by ``resample`` at the start of an episode."""
 
-    def __init__(self, name: str, config: Config) -> None:
+    def __init__(self, name: str, config: Config, randomize: bool | None = None) -> None:
+        """``randomize`` defaults to ``config.training.randomize_opponents``."""
         self.name = name
         self.policy = OPPONENTS[name]
         self.config = config
+        self.randomize = config.training.randomize_opponents if randomize is None else randomize
         self.options: dict = {}
 
     def resample(self, rng) -> None:
         """Draw this episode's options from ``rng`` (the environment's seeded generator)."""
         self.options = {}
-        if self.config.training.randomize_opponents and self.name in RANDOMIZED_OPTIONS:
+        if self.randomize and self.name in RANDOMIZED_OPTIONS:
             self.options.update(RANDOMIZED_OPTIONS[self.name](rng, self.config))
         if self.name in SEEDED:
             self.options["rng"] = rng
