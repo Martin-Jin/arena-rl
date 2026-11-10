@@ -109,6 +109,8 @@ The simulation layer is deterministic and independent of rendering. It must not 
   layers and an output layer each, with a `signature` that checkpoints must match), and `PolicyAdapter`, which
   samples actions and estimates values for rollouts from a CPU copy of the
   network that is synchronized after each update.
+- `src/arena_ai/agents/stacked_actor.py` — `StackedActor`: the inference-only copy that runs
+  the policy and value networks together in one pass, built from the `ActorCritic` weights.
 
 ### Training
 

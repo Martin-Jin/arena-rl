@@ -35,6 +35,10 @@ class _BatchedValuePolicy(_ValuePolicy):
     def act(self, observations):
         return [0] * len(observations), [-1.0] * len(observations)
 
+    def act_and_value(self, observations):
+        actions, log_probs = self.act(observations)
+        return actions, log_probs, self.value(observations)
+
     def value(self, observations):
         self.value_calls += 1
         return [float(observation[0]) for observation in observations]

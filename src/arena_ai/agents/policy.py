@@ -1,12 +1,11 @@
 """Actor-critic policy used by the training entry point."""
 
-import copy
-
 import torch
 from torch import nn
 
 from arena_ai.agents.action import LOGIT_COUNT
 from arena_ai.agents.distribution import sample_with_log_prob
+from arena_ai.agents.stacked_actor import StackedActor
 from arena_ai.config import Config
 from arena_ai.agents.attention import EntityAttention, activation
 from arena_ai.sim.observation_vector import FEATURES_PER_FIGHTER
@@ -89,11 +88,12 @@ class PolicyAdapter:
         self.model = model
         self.device = device
         self.act_device = torch.device(act_device)
-        self.actor = copy.deepcopy(model).to(self.act_device).eval()
+        # The acting copy runs the policy and value networks together, for rollouts only.
+        self.actor = StackedActor(model, self.act_device)
 
     def sync(self) -> None:
         """Copy updated weights into the acting copy."""
-        self.actor.load_state_dict(self.model.state_dict())
+        self.actor.load(self.model)
 
     def _to_tensor(
         self, observation: list[float] | list[list[float]]
@@ -110,7 +110,7 @@ class PolicyAdapter:
         observation_tensor, batched = self._to_tensor(observation)
         with torch.no_grad():
             # use the policy network to compute the action logits for the given observation.
-            logits = self.actor.policy_network(observation_tensor)
+            logits, _ = self.actor(observation_tensor)
             action, log_prob = sample_with_log_prob(logits)
         if batched:
             return (
@@ -127,10 +127,24 @@ class PolicyAdapter:
         with torch.no_grad():
             # uses the value network that is part of the actor-critic model to estimate
             # the value of the given observation.
-            value = self.actor.value_network(observation_tensor)
+            _, value = self.actor(observation_tensor)
         if batched:
-            return [float(item) for item in value.squeeze(-1).tolist()]
+            return [float(item) for item in value.tolist()]
         return float(value.squeeze().item())
+
+    def act_and_value(
+        self, observations: list[list[float]]
+    ) -> tuple[list[int], list[float], list[float]]:
+        """Sample actions and estimate values for a batch with one network pass."""
+        observation_tensor, _ = self._to_tensor(observations)
+        with torch.no_grad():
+            logits, values = self.actor(observation_tensor)
+            action, log_prob = sample_with_log_prob(logits)
+        return (
+            [int(item) for item in action.tolist()],
+            [float(item) for item in log_prob.tolist()],
+            [float(item) for item in values.tolist()],
+        )
 
     def forward(self, observations: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Expose the gradient-tracked actor-critic forward pass for PPO."""

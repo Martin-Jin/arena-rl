@@ -91,17 +91,15 @@ flowchart TD
     G -- "Yes" --> H["collect_rollout(observation, rollout_steps)"]
 
     subgraph Rollout["Fixed-size on-policy rollout"]
-        H --> I["policy.act(observation)"]
-        I --> J["policy.value(observation)"]
-        J --> K["environment.step(action)"]
+        H --> I["policy.act_and_value(observation): one network pass"]
+        I --> K["environment.step(action)"]
         K --> L["ArenaEnv.step()"]
         L --> M["Convert action to FighterAction"]
         M --> N["step_game(): advance simulation and resolve hits"]
         N --> O["calculate_reward(): damage, terminal and wall-penalty rewards"]
-        O --> P["Evaluate next_value before any reset"]
-        P --> Q{"terminated or truncated?"}
-        Q -- "No" --> R["Store transition in Rollout"]
-        Q -- "Yes" --> S["Store final observation/value and episode metrics"]
+        O --> Q{"terminated or truncated?"}
+        Q -- "No" --> R["Store transition in Rollout. next_value is the next step's value"]
+        Q -- "Yes" --> S["policy.value(final observation) before the reset, and episode metrics"]
         S --> T["Reset environment"]
         T --> R
         R --> U{"rollout_steps reached?"}
@@ -144,8 +142,12 @@ separate from the PPO forward interface:
   log-probability. With a batch of observations it returns lists of each.
 - `policy.value(observation)` returns a Python `float` critic estimate (a list
   for a batch).
-- `PolicyAdapter` runs both on a CPU copy of the network and refreshes it with
-  `sync()` after every PPO update.
+- `policy.act_and_value(observations)` is what the vector rollout calls: a batch's actions,
+  log-probabilities and values from one network pass. A step's next value is the value the
+  next step's pass computes, and only a step in which an episode ended calls `value` on the
+  final observations, because a reset replaces them.
+- `PolicyAdapter` runs these on a CPU copy of the network (a stacked actor and critic, see
+  [hardware.md](hardware.md)) and refreshes it with `sync()` after every PPO update.
 - The PPO update callback can use its own callable network interface returning
   `(logits, values)` for [`train_step`](../src/arena_ai/training/ppo.py).
 

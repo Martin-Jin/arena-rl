@@ -31,6 +31,14 @@ class Policy(Protocol):
     def value(self, observation: list[float] | list[list[float]]) -> float | list[float]:
         """Return critic estimates for one or more observations."""
 
+    def act_and_value(
+        self, observations: list[list[float]]
+    ) -> tuple[list[int], list[float], list[float]]:
+        """Return actions, their log probabilities and values for a batch, in one pass.
+
+        Only the vector rollout calls it. The values are those of ``observations``.
+        """
+
 
 class UpdatePolicy(Protocol):
     """Apply one PPO update using explicit bootstrap and episode masks."""
@@ -228,8 +236,8 @@ class TrainingLoop:
                 next_value = _require_python_float(
                     self.policy.value(next_observation), "value"
                 )
-                act_seconds += act_done - started
-                value_seconds += (acted - act_done) + (perf_counter() - stepped)
+                act_seconds += acted - started
+                value_seconds += perf_counter() - stepped
                 env_seconds += stepped - acted
                 rollout.add(
                     observation,
@@ -288,43 +296,52 @@ class TrainingLoop:
             self._vector_episode_returns = [0.0] * environment_count
 
         act_seconds = value_seconds = env_seconds = 0.0
-        # The values of ``observations`` when they were already computed as the last step's
-        # final values. Reusing them saves a network pass per step. They are only reusable
-        # while no environment reset, because a reset replaces that environment's observation.
-        carried_values: list[float] | None = None
+        # True while the last entry of ``next_values`` is a placeholder. When no environment
+        # ended on a step, its next observation is the next step's observation, so its value
+        # is the one the next step's pass computes anyway. Reusing it saves a network pass
+        # per step. It is only reusable while no environment reset, because a reset replaces
+        # that environment's observation, so a step with an ended episode computes the value
+        # of its final observations separately.
+        pending = False
         with torch.no_grad():
             for _ in range(steps):
                 started = perf_counter()
-                action_result = self.policy.act(observations)
+                result = self.policy.act_and_value(observations)
                 if not (
-                    isinstance(action_result[0], list)
-                    and isinstance(action_result[1], list)
+                    isinstance(result[0], list)
+                    and isinstance(result[1], list)
+                    and isinstance(result[2], list)
                 ):
                     raise TypeError(
-                        "batched policy must return lists of actions and log probabilities"
+                        "batched policy must return lists of actions, log probabilities "
+                        "and values"
                     )
-                actions, log_probabilities = action_result
-                act_done = perf_counter()
-                if carried_values is not None:
-                    values = carried_values
-                else:
-                    values = self.policy.value(observations)
-                    if not isinstance(values, list):
-                        raise TypeError("batched policy must return a list of values")
+                actions, log_probabilities, values = result
                 acted = perf_counter()
+                if pending:
+                    next_values[-1] = values
                 next_observations, rewards, terminated, truncated, infos = (
                     self.environment.step(actions)
                 )
                 stepped = perf_counter()
-                final_observations = [
-                    info.get("final_observation", observation)
-                    for info, observation in zip(infos, next_observations)
-                ]
-                final_values = self.policy.value(final_observations)
-                if not isinstance(final_values, list):
-                    raise TypeError("batched policy must return a list of values")
-                act_seconds += act_done - started
-                value_seconds += (acted - act_done) + (perf_counter() - stepped)
+                ended_any = any(
+                    ended or timed_out for ended, timed_out in zip(terminated, truncated)
+                )
+                if ended_any:
+                    final_values = self.policy.value(
+                        [
+                            info.get("final_observation", observation)
+                            for info, observation in zip(infos, next_observations)
+                        ]
+                    )
+                    if not isinstance(final_values, list):
+                        raise TypeError("batched policy must return a list of values")
+                    next_values.append(final_values)
+                else:
+                    next_values.append([])  # Placeholder: the next step's values fill it.
+                pending = not ended_any
+                act_seconds += acted - started
+                value_seconds += perf_counter() - stepped
                 env_seconds += stepped - acted
                 rollout.add(
                     observations,
@@ -334,12 +351,6 @@ class TrainingLoop:
                     truncated,
                     values,
                     log_probabilities,
-                )
-                next_values.append(final_values)
-                carried_values = (
-                    None
-                    if any(ended or timed_out for ended, timed_out in zip(terminated, truncated))
-                    else final_values
                 )
                 for index, (reward, ended, timed_out, info) in enumerate(
                     zip(rewards, terminated, truncated, infos)
@@ -362,6 +373,13 @@ class TrainingLoop:
                     self.step_callback(self.environment.envs[best_index])
                 observations = next_observations
                 self.state.environment_steps += environment_count
+            started = perf_counter()
+            last_value = self.policy.value(observations)
+            if not isinstance(last_value, list):
+                raise TypeError("batched policy must return a list of values")
+            if pending:
+                next_values[-1] = last_value  # The last step's placeholder.
+            value_seconds += perf_counter() - started
         self._env_seconds = env_seconds
         self._act_seconds, self._value_seconds = act_seconds, value_seconds
 
@@ -372,12 +390,6 @@ class TrainingLoop:
                 next_values, dtype=batch.values.dtype, device=batch.values.device
             ),
         )
-        if carried_values is not None:
-            return batch, observations, carried_values
-        with torch.no_grad():
-            last_value = self.policy.value(observations)
-        if not isinstance(last_value, list):
-            raise TypeError("batched policy must return a list of values")
         return batch, observations, last_value
 
     def run(self, config: TrainingConfig) -> TrainingState:

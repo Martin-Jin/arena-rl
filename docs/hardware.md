@@ -46,10 +46,17 @@ simulation for cores.
 `PolicyAdapter` keeps two copies of the network:
 
 - `model` is on the training device and is the one PPO updates.
-- `actor` is a CPU copy used by `act` and `value` during rollouts.
+- `actor` is a CPU copy used by `act`, `value` and `act_and_value` during rollouts. It is a
+  [`StackedActor`](../src/arena_ai/agents/stacked_actor.py), not a second `ActorCritic`:
+  the policy and value networks have the same shapes except the output layer, so their
+  weights are stacked into tensors with a leading dimension of 2 and one pass runs both
+  (the critic's output layer is padded with zeros). With a batch of 16 the time is the
+  overhead of about 230 small operations per network, not the arithmetic, so one stacked pass
+  costs about the same as one network. The stacked copy only reads weights and matches the
+  networks to float rounding.
 
-After every PPO update, `PolicyAdapter.sync()` copies the new weights into
-`actor`. The rollout therefore always acts with the same weights the update
+After every PPO update, `PolicyAdapter.sync()` rebuilds the stacked tensors from the new
+weights of `model`. The rollout therefore always acts with the same weights the update
 started from, which PPO requires, while avoiding a GPU round trip for every
 simulation step. Without the copy, each step would move an observation to the
 GPU, run the network, and move the result back. That is thousands of transfers
