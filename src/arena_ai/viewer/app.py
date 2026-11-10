@@ -27,7 +27,7 @@ class App:
         self.screen = pygame.display.set_mode(
             (rendering.screen_width, rendering.screen_height), pygame.SCALED
         )
-        pygame.display.set_caption("Arena AI")
+        pygame.display.set_caption("RL Arena")
         self.clock = pygame.time.Clock()
         self.theme = Theme(config.viewer.ui)
         self.to_screen = make_to_screen(config)

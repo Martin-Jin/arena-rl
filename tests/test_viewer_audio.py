@@ -1,5 +1,6 @@
 import os
 import unittest
+import unittest.mock
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
@@ -69,6 +70,47 @@ class FighterSoundTests(unittest.TestCase):
         fighter.parry_frame = 2  # Still parrying: no new sound.
         self.audio.update_fighter("agent", fighter, before)
         self.assertEqual(self.played, ["shield_raise"])
+
+    def test_starting_a_dodge_plays_the_dodge_sound_once(self) -> None:
+        fighter = FighterState()
+        before = FighterSnapshot.of(fighter)
+        fighter.dodge_frames_left = 10
+        self.audio.update_fighter("agent", fighter, before)
+        self.assertEqual(self.played, ["dodge"])
+        before = FighterSnapshot.of(fighter)
+        fighter.dodge_frames_left = 9  # Still dodging: no new sound.
+        self.audio.update_fighter("agent", fighter, before)
+        self.assertEqual(self.played, ["dodge"])
+
+    def test_dying_plays_the_death_sound_once_after_the_hit_sound(self) -> None:
+        fighter = FighterState(health=10)
+        before = FighterSnapshot.of(fighter)
+        fighter.health = 0
+        self.audio.update_fighter("agent", fighter, before)
+        self.assertEqual(self.played, ["hit", "death"])
+        self.audio.update_fighter("agent", fighter, FighterSnapshot.of(fighter))
+        self.assertEqual(self.played, ["hit", "death"])  # Already dead: nothing more.
+
+    def test_the_match_end_fade_leaves_the_death_sound_alone(self) -> None:
+        death = self.audio.effects["death"]
+        faded: list[int] = []
+
+        class FakeChannel:
+            def __init__(self, index: int) -> None:
+                self.index = index
+
+            def get_sound(self):
+                return death if self.index == 1 else None
+
+            def fadeout(self, milliseconds: int) -> None:
+                faded.append(self.index)
+
+        with (
+            unittest.mock.patch.object(pygame.mixer, "Channel", FakeChannel),
+            unittest.mock.patch.object(pygame.mixer, "get_num_channels", return_value=3),
+        ):
+            self.audio.fade_out_effects()
+        self.assertEqual(faded, [0, 2])
 
     def test_a_counter_plays_its_own_sound_instead_of_the_attack_sound(self) -> None:
         fighter = FighterState()

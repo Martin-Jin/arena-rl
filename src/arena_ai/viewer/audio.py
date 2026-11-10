@@ -89,10 +89,17 @@ class FighterSnapshot:
     attack_frame: int
     health: int
     parry_frame: int
+    dodge_frames_left: int
 
     @classmethod
     def of(cls, fighter: FighterState) -> "FighterSnapshot":
-        return cls(fighter.on_ground, fighter.attack_frame, fighter.health, fighter.parry_frame)
+        return cls(
+            fighter.on_ground,
+            fighter.attack_frame,
+            fighter.health,
+            fighter.parry_frame,
+            fighter.dodge_frames_left,
+        )
 
 
 class _RunningLoop:
@@ -229,9 +236,17 @@ class AudioManager:
             self.start_music()
 
     def fade_out_effects(self) -> None:
-        """Fade every sound effect that is still playing out over ``match_end_fade_ms``."""
+        """Fade every sound effect that is still playing out over ``match_end_fade_ms``.
+
+        The death sound is left alone: the match ends on the step a fighter dies, so fading
+        it would swallow the one sound the ending is for.
+        """
         self.silence()
-        pygame.mixer.fadeout(self.match_end_fade_ms)
+        death = self.effects.get("death")
+        for index in range(pygame.mixer.get_num_channels()):
+            channel = pygame.mixer.Channel(index)
+            if death is None or channel.get_sound() is not death:
+                channel.fadeout(self.match_end_fade_ms)
 
     def stop_music(self) -> None:
         """Stop the battle music."""
@@ -277,12 +292,16 @@ class AudioManager:
             self.play("counter" if fighter.counter_started else "attack")
         if previous.parry_frame == 0 and fighter.parry_frame > 0:
             self.play("shield_raise")
+        if previous.dodge_frames_left == 0 and fighter.dodge_frames_left > 0:
+            self.play("dodge")
         if previous.on_ground and not fighter.on_ground:
             self.play("jump")
         elif not previous.on_ground and fighter.on_ground:
             self.play("landing")
         if fighter.health < previous.health:
             self.play("hit")
+        if previous.health > 0 >= fighter.health:
+            self.play("death")
         if fighter.parried:
             self.play(self._parry_sounds[self._next_parry])
             self._next_parry = (self._next_parry + 1) % len(self._parry_sounds)

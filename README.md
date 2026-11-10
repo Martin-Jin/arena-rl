@@ -203,8 +203,8 @@ Soundtrack*. Attribution is required. Source:
 
 Sound effects are normalized in memory using configurable RMS and peak targets
 before the master effects volume is applied. Every fighter, including the
-opponent, plays attack, jump, landing and running sounds, and a hit sound when it
-takes damage. Each fighter's running audio fades on start, stop, and direction
+opponent, plays attack, dodge, jump, landing and running sounds, a hit sound when it
+takes damage and a death sound when it dies. Each fighter's running audio fades on start, stop, and direction
 changes, and is only active while that fighter is supported. The source audio
 files are not modified by normalization or fades.
 

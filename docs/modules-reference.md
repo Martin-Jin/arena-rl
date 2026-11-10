@@ -163,8 +163,8 @@ The viewer layer is the only layer that depends on `pygame`.
 - `src/arena_ai/viewer/audio.py` — Loads configured music and sound effects
   and plays them from viewer state transitions. Effects are normalized in
   memory using configurable RMS and peak targets. It plays sounds for every
-  fighter, including the opponent: attack, jump, landing, running and a hit
-  sound when a fighter loses health. It reserves two mixer channels per fighter
+  fighter, including the opponent: attack, dodge, jump, landing, running, a hit
+  sound when a fighter loses health and a death sound when it dies. It reserves two mixer channels per fighter
   (`max_opponents + 1` fighters) and refuses a count the mixer cannot cover. Each fighter has its own running loop,
   which fades on start, stop, and direction changes and is gated by support
   state. Volumes can be changed while running.

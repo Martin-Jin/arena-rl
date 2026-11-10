@@ -62,7 +62,7 @@ class MainMenuScene:
             screen, self.app.config, self.app.to_screen, self.fighters, self.tick
         )
         center_x = screen.get_width() // 2
-        theme.text(screen, "ARENA AI", "title", theme.color("text"), (center_x, 150), "center")
+        theme.text(screen, "RL ARENA", "title", theme.color("text"), (center_x, 150), "center")
         theme.text(
             screen,
             "A 2D duel against a reinforcement-learning opponent",

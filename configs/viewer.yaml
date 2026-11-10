@@ -49,6 +49,8 @@ audio:
     landing: jump_landing.mp3
     running: running.mp3
     shield_raise: shield_raise.mp3 # played when a fighter starts a parry
+    dodge: dodge.mp3 # played when a fighter starts a dodge
+    death: death.mp3 # played when a fighter dies, and not faded out when the match ends
     # Every name starting with "parry" is one of the sounds a parry alternates between.
     parry_1: parry1.mp3
     parry_2: parry2.mp3
