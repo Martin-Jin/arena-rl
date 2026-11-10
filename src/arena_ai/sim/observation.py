@@ -38,6 +38,10 @@ class FighterObservation(TypedDict):
     parry_held: bool
     busy_frames_left: int
     attack_type: AttackType | None
+    dodge_frames_left: int
+    dodge_gap_left: int
+    dodge_held: bool
+    stamina: float
 
 
 class Observation(TypedDict):
@@ -71,9 +75,16 @@ def fighter_observation(
         "counter_frames": fighter.counter_frames,
         "stagger_frames": fighter.stagger_frames,
         "parry_held": fighter.parry_held,
-        # Frames until the fighter can start an attack or a parry again.
-        "busy_frames_left": max(windup + active + recovery, parry_window + parry_recovery),
+        # Frames until the fighter can start an attack or a parry again. A dodge burst
+        # blocks both, so it counts too.
+        "busy_frames_left": max(
+            windup + active + recovery, parry_window + parry_recovery, fighter.dodge_frames_left
+        ),
         "attack_type": fighter.attack_type if fighter.attack_frame else None,
+        "dodge_frames_left": fighter.dodge_frames_left,
+        "dodge_gap_left": fighter.dodge_gap_left,
+        "dodge_held": fighter.dodge_held,
+        "stamina": fighter.stamina,
     }
 
 

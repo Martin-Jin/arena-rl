@@ -39,6 +39,32 @@ class Action(IntEnum):
     JUMP_ATTACK_PARRY = 21
     MOVE_LEFT_JUMP_ATTACK_PARRY = 22
     MOVE_RIGHT_JUMP_ATTACK_PARRY = 23
+    # Dodge versions of the 24 actions above: index + 24. A dodge press wins over an attack
+    # or a parry press: the simulation starts the dodge, which blocks both.
+    DODGE = 24
+    MOVE_LEFT_DODGE = 25
+    MOVE_RIGHT_DODGE = 26
+    JUMP_DODGE = 27
+    MOVE_LEFT_JUMP_DODGE = 28
+    MOVE_RIGHT_JUMP_DODGE = 29
+    ATTACK_DODGE = 30
+    MOVE_LEFT_ATTACK_DODGE = 31
+    MOVE_RIGHT_ATTACK_DODGE = 32
+    JUMP_ATTACK_DODGE = 33
+    MOVE_LEFT_JUMP_ATTACK_DODGE = 34
+    MOVE_RIGHT_JUMP_ATTACK_DODGE = 35
+    PARRY_DODGE = 36
+    MOVE_LEFT_PARRY_DODGE = 37
+    MOVE_RIGHT_PARRY_DODGE = 38
+    JUMP_PARRY_DODGE = 39
+    MOVE_LEFT_JUMP_PARRY_DODGE = 40
+    MOVE_RIGHT_JUMP_PARRY_DODGE = 41
+    ATTACK_PARRY_DODGE = 42
+    MOVE_LEFT_ATTACK_PARRY_DODGE = 43
+    MOVE_RIGHT_ATTACK_PARRY_DODGE = 44
+    JUMP_ATTACK_PARRY_DODGE = 45
+    MOVE_LEFT_JUMP_ATTACK_PARRY_DODGE = 46
+    MOVE_RIGHT_JUMP_ATTACK_PARRY_DODGE = 47
 
 
 ACTION_COUNT = len(Action)
@@ -65,13 +91,21 @@ _FIGHTER_ACTIONS.update(
     }
 )
 
+# The dodge half of the table is the first 24 with dodge set.
+_FIGHTER_ACTIONS.update(
+    {
+        Action(int(action) + 24): replace(fighter_action, dodge=True)
+        for action, fighter_action in list(_FIGHTER_ACTIONS.items())
+    }
+)
+
 # Head 0: index -> move_dir. The only place the move ordering is defined.
 MOVE_DIRS = (0, -1, 1)
-# Head order: move (none/left/right), jump, attack, parry.
-HEAD_SIZES = (len(MOVE_DIRS), 2, 2, 2)
-HEAD_NAMES = ("move", "jump", "attack", "parry")
+# Head order: move (none/left/right), jump, attack, parry, dodge.
+HEAD_SIZES = (len(MOVE_DIRS), 2, 2, 2, 2)
+HEAD_NAMES = ("move", "jump", "attack", "parry", "dodge")
 LOGIT_COUNT = sum(HEAD_SIZES)
-# Mixed-radix strides, e.g. (3, 2, 2, 2) -> (1, 3, 6, 12).
+# Mixed-radix strides, e.g. (3, 2, 2, 2, 2) -> (1, 3, 6, 12, 24).
 HEAD_STRIDES = tuple(math.prod(HEAD_SIZES[:i]) for i in range(len(HEAD_SIZES)))
 
 
@@ -92,13 +126,19 @@ assert ACTION_COUNT == math.prod(HEAD_SIZES)
 assert all(
     int(a)
     == encode_parts(
-        (MOVE_DIRS.index(fa.move_dir), int(fa.jump), int(fa.attack), int(fa.parry))
+        (
+            MOVE_DIRS.index(fa.move_dir),
+            int(fa.jump),
+            int(fa.attack),
+            int(fa.parry),
+            int(fa.dodge),
+        )
     )
     for a, fa in _FIGHTER_ACTIONS.items()
 )
 # Reverse lookup so human input maps to the same indices the policy uses.
-_ACTION_FROM_PARTS: dict[tuple[int, bool, bool, bool], int] = {
-    (fa.move_dir, fa.jump, fa.attack, fa.parry): int(action)
+_ACTION_FROM_PARTS: dict[tuple[int, bool, bool, bool, bool], int] = {
+    (fa.move_dir, fa.jump, fa.attack, fa.parry, fa.dodge): int(action)
     for action, fa in _FIGHTER_ACTIONS.items()
 }
 
@@ -112,6 +152,8 @@ def to_fighter_action(action: Action | int) -> FighterAction:
     return _FIGHTER_ACTIONS[selected_action]
 
 
-def from_parts(move_dir: int, jump: bool, attack: bool, parry: bool = False) -> int:
-    """Return the action index for a move, jump, attack and parry combination."""
-    return _ACTION_FROM_PARTS[(move_dir, bool(jump), bool(attack), bool(parry))]
+def from_parts(
+    move_dir: int, jump: bool, attack: bool, parry: bool = False, dodge: bool = False
+) -> int:
+    """Return the action index for a move, jump, attack, parry and dodge combination."""
+    return _ACTION_FROM_PARTS[(move_dir, bool(jump), bool(attack), bool(parry), bool(dodge))]

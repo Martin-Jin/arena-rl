@@ -51,8 +51,11 @@ class FighterState:
     missed_parry: bool = False  # A parry ended without parrying anything.
     # The type of the current swing. SLASH when not attacking (``end_attack`` resets it).
     attack_type: AttackType = AttackType.SLASH
-    # TODO attacks: list[AttackType] = field(default_factory=lambda: [AttackType.SLASH])
-    # TODO The types of attacks the fighter can perform.
+    dodge_frames_left: int = 0  # Frames left of invulnerability and movement during a dodge.
+    dodge_gap_left: int = 0  # Frames left before the next dodge
+    dodge_dir: int = 0  # Direction of the current dodge, fixed when the dodge starts.
+    dodge_held: bool = False  # Dodge input of the previous step, so holding dodges once.
+    stamina: float = 100.0  # Current stamina points, capped at max_stamina.
 
 
 AGENT_ID = "agent"
@@ -124,11 +127,15 @@ def create_initial_fighters(
         raise ValueError("opponent_count must be at least 1")
     fighters = {
         AGENT_ID: FighterState(
-            x=config.world.arena_width_m * 0.25, health=config.fighter.max_health
+            x=config.world.arena_width_m * 0.25,
+            health=config.fighter.max_health,
+            stamina=config.dodge.max_stamina,
         )
     }
     for index, x in enumerate(_opponent_x_positions(config, opponent_count)):
-        fighters[opponent_id(index)] = FighterState(x=x, health=config.fighter.max_health)
+        fighters[opponent_id(index)] = FighterState(
+            x=x, health=config.fighter.max_health, stamina=config.dodge.max_stamina
+        )
     if rng is not None:
         margin = config.fighter.width_m / 2
         for fighter in fighters.values():

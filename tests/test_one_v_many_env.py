@@ -1,7 +1,12 @@
 import unittest
 
 from arena_ai.agents.action import Action
-from arena_ai.agents.scripted import approach_and_attack, idle, parrying_hunter
+from arena_ai.agents.scripted import (
+    OpponentMixture,
+    approach_and_attack,
+    idle,
+    parrying_hunter,
+)
 from arena_ai.config import load_config
 from arena_ai.envs.training_envs.one_v_many_env import OneVManyEnv, matchup_label
 from arena_ai.sim.observation_vector import fighter_features, opponent_mask
@@ -94,3 +99,40 @@ class OneVManyEnvTests(unittest.TestCase):
             if terminated or truncated:
                 break
         self.assertTrue(e.fighters["agent"].health <= 100)
+
+
+class MixtureTests(unittest.TestCase):
+    def mixture_env(self, mixture: OpponentMixture) -> OneVManyEnv:
+        return OneVManyEnv(CONFIG, [], max_episode_steps=2, mixture=mixture)
+
+    def test_the_opponents_are_drawn_again_at_every_reset_and_fighters_follow(self) -> None:
+        e = self.mixture_env(OpponentMixture(None, ("idle", "approach", "runner"), SLOTS))
+        seen = set()
+        for seed in range(40):
+            observation, _ = e.reset(seed=seed)
+            seen.add(tuple(e.opponent_names))
+            self.assertEqual(len(e.fighters), len(e.opponent_names) + 1)
+            living = int(sum(opponent_mask(observation, SLOTS)))
+            self.assertEqual(living, len(e.opponent_names))
+        self.assertGreater(len(seen), 5)
+
+    def test_a_fixed_slot_stays_and_stats_use_the_mixture_label(self) -> None:
+        e = self.mixture_env(OpponentMixture(("parrier", None), ("idle", "approach"), SLOTS))
+        for seed in range(10):
+            e.reset(seed=seed)
+            self.assertEqual(e.opponent_names[0], "parrier")
+            self.assertEqual(len(e.opponent_names), 2)
+        _, _, _, _, info = e.step(0)
+        self.assertEqual(info["opponent"], "parrier+*")
+
+    def test_the_same_seed_draws_the_same_opponents(self) -> None:
+        mixture = OpponentMixture(None, ("idle", "approach", "runner", "random"), SLOTS)
+        first, second = self.mixture_env(mixture), self.mixture_env(mixture)
+        for seed in (3, 4, 5):
+            first.reset(seed=seed)
+            second.reset(seed=seed)
+            self.assertEqual(first.opponent_names, second.opponent_names)
+
+
+if __name__ == "__main__":
+    unittest.main()

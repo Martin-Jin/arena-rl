@@ -1,6 +1,6 @@
 """Draw the arena and its fighters. Used by the match, menus and training view."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 import pygame
 
@@ -54,10 +54,12 @@ def draw_scene(
     tick: int,
     turning: bool = False,
     hurt: Mapping[str, float] | None = None,
+    ghosts: Sequence[tuple[str, FighterState, float]] = (),
 ) -> None:
     """Draw the arena and every fighter. Only the agent can show a turn frame.
 
     ``hurt`` gives each fighter's hurt flash strength (0 to 1), as ``Hud.hurt_strength``.
+    ``ghosts`` are the dodge afterimages (see ``DodgeTrail.ghosts``), drawn under the fighters.
     """
     colors = config.viewer.ui.colors
     draw_arena(screen, config, to_screen)
@@ -72,6 +74,15 @@ def draw_scene(
     for fighter in shown.values():
         _draw_shadow(screen, config, fighter, to_screen)
     pixels_per_meter = config.viewer.rendering.pixels_per_meter
+    for fighter_id, ghost, strength in ghosts:
+        draw_fighter(
+            screen,
+            ghost,
+            tick,
+            to_screen,
+            shade=colors["opponent_tint"] if is_opponent(fighter_id) else None,
+            alpha=round(config.viewer.ui.dodge_trail_alpha * strength),
+        )
     for fighter_id, fighter in shown.items():
         opponent = is_opponent(fighter_id)
         drawn = draw_fighter(

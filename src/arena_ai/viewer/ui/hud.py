@@ -13,6 +13,7 @@ from arena_ai.viewer.ui.theme import Color, Theme
 
 BAR_RADIUS = 6
 SWING_HEIGHT = 4
+STAMINA_HEIGHT = 3
 # With several opponents their bars stack on the right, each row this tall, with thinner bars.
 COMPACT_ROW_HEIGHT = 44
 COMPACT_BAR_SCALE = 0.6
@@ -291,6 +292,41 @@ class Hud:
         )
 
         self._draw_swing(screen, fighter, rect, mirrored)
+        self._draw_stamina(screen, fighter, rect, mirrored)
+
+    def _draw_stamina(
+        self,
+        screen: pygame.Surface,
+        fighter: FighterState,
+        bar: pygame.Rect,
+        mirrored: bool,
+    ) -> None:
+        """Draw a thin stamina meter under the swing meter while it is not full."""
+        dodge = self.config.game.dodge
+        if fighter.stamina >= dodge.max_stamina:
+            return
+        theme = self.theme
+        y = bar.bottom + 5 + SWING_HEIGHT + 3
+        pygame.draw.rect(
+            screen,
+            theme.color("health_background"),
+            pygame.Rect(bar.x, y, bar.width, STAMINA_HEIGHT),
+            border_radius=2,
+        )
+        width = round(bar.width * max(0.0, fighter.stamina / dodge.max_stamina))
+        x = bar.right - width if mirrored else bar.x
+        pygame.draw.rect(
+            screen,
+            theme.color("accent"),
+            pygame.Rect(x, y, width, STAMINA_HEIGHT),
+            border_radius=2,
+        )
+        # A tick at one dodge's worth of stamina: the fill must reach it to dodge.
+        offset = round(bar.width * dodge.cost / dodge.max_stamina)
+        tick_x = bar.right - offset if mirrored else bar.x + offset
+        pygame.draw.line(
+            screen, theme.color("text_muted"), (tick_x, y - 1), (tick_x, y + STAMINA_HEIGHT), 1
+        )
 
     def _draw_swing(
         self,

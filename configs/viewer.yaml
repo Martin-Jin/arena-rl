@@ -12,18 +12,21 @@ animation:
     attack: 20
     turn: 21
     parry: 21
+    dodge: 21
   frame_duration: # simulation steps (1/60 s) each sprite of the animation is shown for
     idle: 6
     run: 4
     attack: 3
     turn: 1
     parry: 1 # unused: the parry animation is stretched over the parry frames
+    dodge: 1 # unused: the dodge animation is stretched over the burst and the gap
   loop:
     idle: true
     run: true
     attack: false
     turn: false
     parry: false
+    dodge: false
 
 audio:
   # Default levels. The settings menu overrides them and remembers the choice.
@@ -119,6 +122,12 @@ ui:
   counter_effect_seconds: 0.4
   counter_line_width_px: 4
   counter_line_carry_m: 0.8
+  # A dodge leaves faint copies of the fighter behind it. A copy starts at
+  # dodge_trail_alpha (0 to 255) and fades out over dodge_trail_seconds. One is left every
+  # dodge_trail_spacing_seconds of the burst.
+  dodge_trail_alpha: 90
+  dodge_trail_seconds: 0.25
+  dodge_trail_spacing_seconds: 0.03
   colors:
     background: [244, 245, 247]
     floor: [226, 229, 234]

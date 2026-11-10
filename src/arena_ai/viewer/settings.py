@@ -17,6 +17,7 @@ OPPONENT_OPTIONS = (
     (TRAINED, "Trained agent"),
     ("approach", "Scripted: approach"),
     ("parrier", "Scripted: perfect parry"),
+    ("dodger", "Scripted: dodger"),
     ("idle", "Idle dummy"),
     ("runner", "Scripted: runs away"),
     ("random", "Random"),

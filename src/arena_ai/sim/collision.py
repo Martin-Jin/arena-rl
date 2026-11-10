@@ -3,7 +3,7 @@
 from collections.abc import Mapping
 
 from arena_ai.config import GameConfig
-from arena_ai.sim.rules import LEVEL_TOLERANCE_M, is_lunging
+from arena_ai.sim.rules import LEVEL_TOLERANCE_M, is_lunging, passes_through_bodies
 from arena_ai.sim.state import FighterState
 
 # Bodies closer than this are touching, not overlapping: it absorbs float rounding after a
@@ -30,6 +30,14 @@ def _left_right(
     cut through the opponent. That lunger is returned as the third value, and moves the
     whole push. Otherwise they are ordered by x, or by list position when level.
     """
+    # A dodger still dodging here is on its last burst frame (see ``passes_through_bodies``).
+    # It ends on the far side of the other fighter whatever its x, and moves the whole push.
+    for dodger, other in ((a, b), (b, a)):
+        if dodger.dodge_frames_left:
+            # If dodge dir is pos, moving right, so dodger is on the right
+            left, right = (other, dodger) if dodger.dodge_dir > 0 else (dodger, other)
+            return left, right, dodger
+
     if abs(a.x - b.x) > LEVEL_TOLERANCE_M:
         return (a, b, None) if a.x < b.x else (b, a, None)
     for lunger, other in ((a, b), (b, a)):
@@ -72,8 +80,11 @@ def _resolve_pass(ordered: list[FighterState], config: GameConfig, hits_checked:
     found = False
     for i, a in enumerate(ordered):
         for b in ordered[i + 1 :]:
-            if is_lunging(a, config.combat, hits_checked) or is_lunging(
-                b, config.combat, hits_checked
+            if (
+                is_lunging(a, config.combat, hits_checked)
+                or is_lunging(b, config.combat, hits_checked)
+                or passes_through_bodies(a, hits_checked)
+                or passes_through_bodies(b, hits_checked)
             ):
                 continue
             if a.health <= 0 or b.health <= 0 or not bodies_overlap(a, b, config):

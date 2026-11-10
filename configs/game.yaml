@@ -14,11 +14,10 @@ fighter:
   width_to_height_ratio: 0.3
 
 combat:
-  # TODO Currently the frames are hardcoded for a basic attack. We want to support
-  # TODO multiple attack types, each with its own timing and damage. The config should
-  # TODO then be include frame numbers for a list of attack types, and the agent should
-  # TODO choose which one to use.
-  # TODO The attack frames numbers will need to be updated depending on the attack type.
+  # Each entry of attacks is one attack type with its own timing, damage and range. The keys
+  # must match AttackType in config.py. The agent can only start slash: counter is granted
+  # by a parry (counter_window_frames below). A new type needs an AttackType member and an
+  # entry here. It adds one attack_type_<name> observation feature, so bump spec_version.
   # All "frames" below are simulation steps (1/60 s each). A swing runs attack_windup_frames,
   # then attack_active_frames, then attack_recovery_frames, in that order.
   # Frames from starting a swing until its first damaging frame. Nothing can hit during
@@ -86,11 +85,22 @@ combat:
   # attacker can still move and parry. The viewer plays the swing backwards over these.
   parried_stagger_frames: 28
 
+dodge:
+  # A dodge is a short burst along the move direction (the facing direction when none is
+  # held), fixed when the dodge starts. For the whole burst the fighter takes no damage and
+  # passes through other fighters.
+  speed_mps: 8.0
+  duration_frames: 8 # frames of invulnerability and movement
+  gap_frames: 4 # frames after the dodge ends before the next dodge can start
+  max_stamina: 100 # max stamina points
+  cost: 50 # stamina points spent per dodge
+  regen_per_second: 35.0 # stamina points regenerated per second
+
 observation:
   # spec_version is saved in checkpoints, which refuse to load at another version.
   # TODO: reaction_delay_frames is loaded but not used yet. It will be the frames an
   # observation lags behind the game.
-  spec_version: 5
+  spec_version: 6
   reaction_delay_frames: 0
   max_observed_height_m: 1.3
   # Opponent slots in the observation (the network input is padded and masked to this many).

@@ -11,6 +11,31 @@ from arena_ai.sim.state import FighterState
 from arena_ai.viewer.audio import AudioManager, FighterSnapshot
 
 
+class FootstepLoopTests(unittest.TestCase):
+    def setUp(self) -> None:
+        pygame.init()
+        self.audio = AudioManager(load_config().viewer.audio, 2)
+
+    def tearDown(self) -> None:
+        self.audio.close()
+        pygame.quit()
+
+    def test_footsteps_that_change_direction_every_step_stop_for_good(self) -> None:
+        # Regression: fading a loop out the moment it started left its channel playing
+        # forever, so the walking sound carried on after the match ended. Two fighters
+        # turning every step (a chase, or a dodge) do exactly that.
+        fighter = FighterState(on_ground=True)
+        snapshot = FighterSnapshot.of(fighter)
+        for step in range(12):
+            fighter.vx = 4.0 if step % 2 else -4.0
+            self.audio.update_fighter("agent", fighter, snapshot)
+        self.audio.silence()
+        pygame.mixer.fadeout(self.audio.match_end_fade_ms)
+        pygame.time.wait(self.audio.match_end_fade_ms + 300)
+        channels = self.audio._loops["agent"]._channels
+        self.assertFalse(any(channel.get_busy() for channel in channels))
+
+
 class FighterSoundTests(unittest.TestCase):
     def setUp(self) -> None:
         pygame.init()

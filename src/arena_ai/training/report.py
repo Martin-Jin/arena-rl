@@ -40,11 +40,12 @@ def format_stats(state: TrainingState) -> str:
         f"explained var {metric('explained_variance'):.2f}  "
         f"entropy {metric('entropy'):.2f} (move {metric('entropy_move'):.2f} "
         f"jump {metric('entropy_jump'):.2f} attack {metric('entropy_attack'):.2f} "
-        f"parry {metric('entropy_parry'):.2f})",
+        f"parry {metric('entropy_parry'):.2f} dodge {metric('entropy_dodge'):.2f})",
         f"  loss     total {metric('loss'):.4f}  "
         f"policy {metric('policy_loss'):.4f}  value {metric('value_loss'):.4f}",
         f"  actions  attack {metric('attack_rate'):.0%}  "
-        f"parry {metric('parry_rate'):.0%}  jump {metric('jump_rate'):.0%}  "
+        f"parry {metric('parry_rate'):.0%}  dodge {metric('dodge_rate'):.0%}  "
+        f"jump {metric('jump_rate'):.0%}  "
         f"left {metric('left_rate'):.0%}  "
         f"right {metric('right_rate'):.0%}  idle {metric('idle_rate'):.0%}",
         f"  combat   accuracy {episode('attack_accuracy'):.0%}  "

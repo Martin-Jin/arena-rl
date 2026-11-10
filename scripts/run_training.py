@@ -7,7 +7,12 @@ from pathlib import Path
 import torch
 
 from arena_ai.agents.policy import ActorCritic, PolicyAdapter
-from arena_ai.agents.scripted import EpisodePolicy, training_opponents
+from arena_ai.agents.scripted import (
+    EpisodePolicy,
+    OpponentMixture,
+    random_opponent_pool,
+    training_opponents,
+)
 from arena_ai.config import Config, load_config
 from arena_ai.envs.training_envs.one_v_many_env import OneVManyEnv
 from arena_ai.envs.async_vector_env import AsyncVectorEnv
@@ -256,20 +261,30 @@ def run_training(config: Config | None = None) -> TrainingState:
 
 def make_factories(config: Config):
     """Create a list of environment factories for the training loop."""
-    opponent_names = training_opponents(
-        config.training.opponents,
-        config.training.num_envs,
-        config.game.observation.max_opponents,
+    max_opponents = config.game.observation.max_opponents
+    entries = training_opponents(
+        config.training.opponents, config.training.num_envs, max_opponents
     )
-    return [
-        partial(
-            OneVManyEnv,
-            config,
-            [(name, EpisodePolicy(name, config)) for name in names],
-            max_episode_steps=config.training.max_episode_steps,
+    pool = tuple(random_opponent_pool(config.training.random_opponent_pool))
+    factories = []
+    for entry in entries:
+        if entry is not None and None not in entry:
+            fixed = [(name, EpisodePolicy(name, config)) for name in entry]
+            mixture = None
+        else:  # Some slots (or all of them) are drawn again each episode.
+            fixed = []
+            slots = None if entry is None else tuple(entry)
+            mixture = OpponentMixture(slots, pool, max_opponents)
+        factories.append(
+            partial(
+                OneVManyEnv,
+                config,
+                fixed,
+                max_episode_steps=config.training.max_episode_steps,
+                mixture=mixture,
+            )
         )
-        for names in opponent_names
-    ]
+    return factories
 
 
 if __name__ == "__main__":

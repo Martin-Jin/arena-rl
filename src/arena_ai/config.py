@@ -36,6 +36,16 @@ class FighterConfig:
 
 
 @dataclass(frozen=True)
+class DodgeConfig:
+    speed_mps: float
+    duration_frames: int
+    gap_frames: int
+    max_stamina: int
+    cost: int
+    regen_per_second: float
+
+
+@dataclass(frozen=True)
 class AttackSpec:
     """Attack timing and damage values for a single attack."""
 
@@ -180,6 +190,7 @@ class GameConfig:
     world: WorldConfig
     fighter: FighterConfig
     combat: CombatConfig
+    dodge: DodgeConfig
     observation: ObservationConfig
 
 
@@ -217,8 +228,12 @@ class TrainingConfig:
     checkpoint_interval: int
     seed: int | None
     # One entry per parallel environment, each a list of that environment's opponent names
-    # (a bare name means one opponent).
+    # (a bare name means one opponent). A null name is drawn again each episode, and a null
+    # entry is drawn whole, count included.
     opponents: list = field(default_factory=lambda: [["approach"]])
+    # The opponents a slot left empty (null) in ``opponents`` is drawn from each episode.
+    # Empty means every scripted opponent.
+    random_opponent_pool: list = field(default_factory=list)
     # The most environments training allows; ``opponents`` sets how many run.
     num_envs: int = 1
     randomize_spawns: bool = False
@@ -354,6 +369,9 @@ class ViewerUiConfig:
     counter_effect_seconds: float
     counter_line_width_px: int
     counter_line_carry_m: float
+    dodge_trail_alpha: int
+    dodge_trail_seconds: float
+    dodge_trail_spacing_seconds: float
 
 
 @dataclass(frozen=True)
@@ -395,6 +413,7 @@ def _build_game_config(raw: dict[str, Any]) -> GameConfig:
         fighter=FighterConfig(**raw["fighter"]),
         combat=_build_combat_config(raw["combat"]),
         observation=ObservationConfig(**raw["observation"]),
+        dodge=DodgeConfig(**raw["dodge"]),
     )
 
 

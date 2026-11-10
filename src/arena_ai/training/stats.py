@@ -143,13 +143,14 @@ def rollout_metrics(
     Kept as tensors so the caller can read every statistic back from the device
     with one transfer. ``actions`` holds flat action indices.
     """
-    move, jump, attack, parry = decode_parts(actions)
+    move, jump, attack, parry, dodge = decode_parts(actions)
     left, right = MOVE_DIRS.index(-1), MOVE_DIRS.index(1)
     return {
         "reward_per_step": rewards.mean(),
         "attack_rate": attack.float().mean(),
         "jump_rate": jump.float().mean(),
         "parry_rate": parry.float().mean(),
+        "dodge_rate": dodge.float().mean(),
         "left_rate": (move == left).float().mean(),
         "right_rate": (move == right).float().mean(),
         "idle_rate": (actions == 0).float().mean(),

@@ -21,6 +21,7 @@ class FighterAction:
     jump: bool = False
     attack: bool = False
     parry: bool = False
+    dodge: bool = False
 
 
 def _validate_actions(
@@ -37,21 +38,18 @@ def _validate_actions(
     if missing_ids:
         raise ValueError(f"Missing actions for fighters: {sorted(missing_ids)}")
     if unknown_ids:
-        raise ValueError(
-            f"Actions provided for unknown fighters: {sorted(unknown_ids)}"
-        )
+        raise ValueError(f"Actions provided for unknown fighters: {sorted(unknown_ids)}")
 
     for fighter_id, action in actions.items():
         if not isinstance(action, FighterAction):
             raise TypeError(f"Action for {fighter_id!r} must be a FighterAction")
         if action.move_dir not in (-1, 0, 1):
             raise ValueError(
-                f"move_dir for {fighter_id!r} must be -1, 0, or 1; "
-                f"got {action.move_dir}"
+                f"move_dir for {fighter_id!r} must be -1, 0, or 1; got {action.move_dir}"
             )
-        flags = (action.jump, action.attack, action.parry)
+        flags = (action.jump, action.attack, action.parry, action.dodge)
         if not all(isinstance(flag, bool) for flag in flags):
-            raise TypeError(f"jump, attack and parry for {fighter_id!r} must be bools")
+            raise TypeError(f"jump, attack, parry and dodge for {fighter_id!r} must be bools")
 
 
 def step_game(
@@ -82,6 +80,7 @@ def step_game(
             config.game,
             attack=action.attack,
             parry=action.parry,
+            dodge=action.dodge,
             target_x=_lunge_target_x(fighter_id, fighters, config.game),
         )
 
@@ -99,6 +98,7 @@ def step_game(
             if (
                 target_id not in alive
                 or target_id in attacker.hit_targets
+                or target.dodge_frames_left
                 or not attack_hits(attacker, target, config.game)
             ):
                 continue
@@ -155,9 +155,7 @@ def _lunge_target_x(
     return me.x + direction * max([base_distance, *ahead])
 
 
-def _nearest_opponent_x(
-    fighter_id: str, fighters: Mapping[str, FighterState]
-) -> float | None:
+def _nearest_opponent_x(fighter_id: str, fighters: Mapping[str, FighterState]) -> float | None:
     """Return the x position of the nearest living enemy, or None when there is none."""
     me = fighters[fighter_id]
     others = [f for f in enemies_of(fighter_id, fighters).values() if f.health > 0]
@@ -238,7 +236,6 @@ def attack_hits(
     horizontal_overlap = hitbox_left <= target_right and target_left <= hitbox_right
     fighter_height = config.fighter.height_m
     vertical_overlap = (
-        target.y < attacker.y + fighter_height
-        and attacker.y < target.y + fighter_height
+        target.y < attacker.y + fighter_height and attacker.y < target.y + fighter_height
     )
     return horizontal_overlap and vertical_overlap

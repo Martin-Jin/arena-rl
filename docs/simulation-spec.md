@@ -19,32 +19,34 @@ here as the current defaults.
 
 ## Actions
 
-Each step a fighter takes one of 24 discrete actions, defined in
+Each step a fighter takes one of 48 discrete actions, defined in
 [`agents/action.py`](../src/arena_ai/agents/action.py). The index is a
-mixed-radix combination of four independent choices:
+mixed-radix combination of five independent choices:
 
 ```
-index = move + 3 * jump + 6 * attack + 12 * parry
-move: 0 = none, 1 = left, 2 = right    jump, attack, parry: 0 or 1
+index = move + 3 * jump + 6 * attack + 12 * parry + 24 * dodge
+move: 0 = none, 1 = left, 2 = right    jump, attack, parry, dodge: 0 or 1
 ```
 
-The policy has four output heads (3 + 2 + 2 + 2 = 9 logits) and samples each head
+The policy has five output heads (3 + 2 + 2 + 2 + 2 = 11 logits) and samples each head
 independently. Append new actions only; reordering invalidates checkpoints.
-Indices 0-11 are the pre-parry actions, so adding parry did not renumber them.
+Indices 0-11 are the pre-parry actions and 0-23 the pre-dodge ones, so adding parry and
+dodge did not renumber them. A dodge press wins over an attack or a parry press: the
+simulation starts the dodge, which blocks both.
 Attack and parry cannot overlap (see Combat), so a parry press wins over an
-attack press made at the same time. The viewer maps `Q` to parry.
+attack press made at the same time. The viewer maps `Q` to parry, and `Shift` or the right mouse button to dodge.
 
 ## Observation
 
 `encode_observation` returns one flat vector from the acting fighter's point of view
-(`spec_version` 5):
+(`spec_version` 6):
 
 ```
 [acting fighter: F values] [opponent slot 0: F] ... [opponent slot K-1: F] [mask: K values]
 ```
 
-`F` is `FEATURES_PER_FIGHTER` (14) and `K` is `observation.max_opponents` in
-[`configs/game.yaml`](../configs/game.yaml) (3), so the vector has `F * (1 + K) + K` = 59
+`F` is `FEATURES_PER_FIGHTER` (27) and `K` is `observation.max_opponents` in
+[`configs/game.yaml`](../configs/game.yaml) (3), so the vector has `F * (1 + K) + K` = 111
 values. `K` is the only place the number of opponents appears: raising it needs only that
 config value (and a retrain).
 
@@ -55,7 +57,7 @@ config value (and a retrain).
 - Fewer opponents than slots is allowed, so one network plays against any number up to
   `K`. More than `K` raises an error.
 
-Every fighter contributes these 22 values, each clamped to `[-1, 1]`. Their order is
+Every fighter contributes these 27 values, each clamped to `[-1, 1]`. Their order is
 `FEATURE_NAMES` in [`sim/observation_vector.py`](../src/arena_ai/sim/observation_vector.py),
 the single source for this table:
 
@@ -77,11 +79,16 @@ the single source for this table:
 | 13     | `counter_frames` | frames left to counter, divided by `counter_window_frames` |
 | 14     | `stagger_frames` | frames left in which a parried fighter cannot attack, divided by `parried_stagger_frames` |
 | 15     | `parry_held` | 1.0 if the fighter's parry input was held on the previous step. Only a new press starts a parry, so a policy that keeps parry on never starts another one, and needs this to know it must release first |
-| 16     | `busy_frames_left` | frames until the fighter can start an attack or a parry again (the larger of the attack and parry countdowns), divided by the longer of `longest_attack_frames` and `parry_total_frames` |
-| 17     | `attack_type_<name>` | one-hot of the attack in progress, one value per `AttackType` (`slash` and `counter`), all 0 when not attacking |
-| 18     | `rel_x_ahead` | horizontal distance from the acting fighter, positive in front of it (along its facing), divided by 3 attack reaches (`width_m + attack_range_m`) |
-| 19     | `rel_y` | height above the acting fighter, divided by 2 fighter heights |
-| 20     | `rel_x_aimed` | horizontal distance, positive when this fighter faces the acting fighter (its swing points at it), divided by 3 attack reaches |
+| 16     | `busy_frames_left` | frames until the fighter can start an attack or a parry again (the larger of the attack and parry countdowns), divided by the longer of `longest_attack_frames` and `parry_total_frames`. A dodge burst counts too, since it blocks both |
+| 17, 18 | `attack_type_<name>` | one-hot of the attack in progress, one value per `AttackType` (`slash` and `counter`), all 0 when not attacking |
+| 19     | `rel_x_ahead` | horizontal distance from the acting fighter, positive in front of it (along its facing), divided by 3 attack reaches (`width_m + attack_range_m`) |
+| 20     | `rel_y` | height above the acting fighter, divided by 2 fighter heights |
+| 21     | `rel_x_aimed` | horizontal distance, positive when this fighter faces the acting fighter (its swing points at it), divided by 3 attack reaches |
+| 22     | `dodge_frames_left` | frames of the running dodge burst still to run, divided by `duration_frames`. The fighter is invincible while it is above 0 and cannot attack or parry |
+| 23     | `dodge_gap_left` | frames left after the burst in which the fighter cannot dodge again (it can be hit), divided by `gap_frames` |
+| 24     | `dodge_held` | 1.0 if the dodge input was held on the previous step. Only a new press starts a dodge, so a policy that keeps dodge on never dodges again, and needs this to know it must release first |
+| 25     | `stamina` | divided by `max_stamina`. A dodge needs at least `cost` |
+| 26     | `dodge_cost` | `cost` divided by `max_stamina`: the same for every fighter and step. It is an input so the network knows how many dodges the stamina buys |
 
 The three `rel_*` features are measured from the acting fighter, so they are 0 in its own
 row. They exist because each opponent row is encoded on its own: without them the network
@@ -227,6 +234,34 @@ kept, not reduced), and scales gravity by `parry_hover_gravity_scale` for
 `parry_hover_frames`. A parry that does not stop an attack never hovers, so spamming
 the button does not keep a fighter in the air.
 
+## Dodge
+
+**What it does.** A dodge is a short burst along the ground in the direction the fighter
+faces (a direction held on the same step turns it first, so there is no backward dodge).
+For `dodge.duration_frames` (8) the fighter moves at `speed_mps` (8 m/s, about 1.07 m),
+takes no damage and passes through other fighters. A swing that is still active when the
+burst ends can hit it. The facing is locked for the burst.
+
+**Gap and stamina.** After the burst a gap of `gap_frames` (4) follows in which the fighter
+can be hit and cannot dodge again. A dodge costs `cost` (50) stamina out of `max_stamina`
+(100), so a full bar gives two. Stamina refills at `regen_per_second` (35) only when no
+burst or gap is running.
+
+**When it can start.** On a new press of the dodge button (holding it dodges once, like the
+parry), on the ground, with enough stamina, and not while parrying, staggered, dodging or
+in the gap. A swing still in its wind-up is cancelled by the dodge. Once the swing is
+active or recovering the fighter is committed. During the burst the fighter cannot attack,
+parry or jump.
+
+**Passing through.** Fighters ignore each other's bodies during the burst. After the hits
+of the burst's last frame are checked, a dodger left inside a body is pushed out on the far
+side, as a counter's lunge is.
+
+**Viewer effects.** The roll sprites (`assets/sprites/fighter/dodge`) are stretched over
+the burst and the gap, so the roll finishes standing as the gap ends. A faint afterimage
+trail follows the burst (`dodge_trail_*` in [`configs/viewer.yaml`](../configs/viewer.yaml)),
+and a thin stamina meter under the health bar shows while stamina is below full.
+
 ## Teams and termination
 
 - **Ids.** [`sim/state.py`](../src/arena_ai/sim/state.py) is the single source: the agent
@@ -284,10 +319,24 @@ The counter reward pays for finishing a parry with its counter attack, so the ag
 learns the parry is worth more than a block. It pays only when the counter hits, so
 spamming counters earns nothing.
 
-The parry reward is needed because a random policy rarely finds a parry timed
-inside an 8-frame window. The two miss penalties push the agent toward accurate
-attacks and parries instead of spamming. The simulation reports each as a one-step
-event on `FighterState` (`parried`, `counter_hit`, `missed_parry`, `missed_attack`).
+**Why the parry reward exists.** A random policy rarely finds a parry timed inside the
+`parry_window_frames` (9) window, and the damage it avoids pays only after the press. The
+parry and counter rewards are a small nudge (a fraction of the damage a parry avoids, which
+is worth about 1.0 per 10 HP), so they help the agent find the behavior without making it
+better than winning. Watch for a high parry rate with a flat win rate: that means the bonus
+is being farmed, so lower it.
+
+**Why the miss penalties are small.** The two miss penalties push the agent toward accurate
+attacks and parries instead of spamming. A parry only pays on average when its accuracy is
+above `missed_parry_penalty / (parry_reward + missed_parry_penalty)`: 20% at 0.05, about 5%
+at 0.01. A random policy parries far less accurately than 20%, so a larger penalty made the
+reward discourage the agent from trying a parry at all. Therefore keep `missed_parry_penalty`
+well below `parry_reward`. The simulation reports each as a one-step event on
+`FighterState` (`parried`, `counter_hit`, `missed_parry`, `missed_attack`).
+
+**No dodge reward.** A dodge is paid only through what it does: the damage it avoids. It also
+costs stamina, so spamming it limits itself, and a reward of its own would only encourage
+spamming.
 
 The edge penalty applies when the learner is closer than `edge_margin` meters to
 a wall and grows linearly from 0 at the margin to `edge_penalty_scale` at the

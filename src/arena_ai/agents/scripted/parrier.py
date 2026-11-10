@@ -5,8 +5,8 @@ import random
 from arena_ai.agents.action import Action
 from arena_ai.agents.scripted.approach import approach_and_attack
 from arena_ai.agents.scripted.teamwork import jumps_over_allies
-from arena_ai.agents.scripted.view import is_attacking, learner_and_me
-from arena_ai.config import AttackType, Config, load_config
+from arena_ai.agents.scripted.view import is_attacking, learner_and_me, swing_threatens
+from arena_ai.config import Config, load_config
 
 # Chance per step that the perfect-parry opponent attacks a learner that stands still. It cannot
 # tell a learner that is passive from one that is spamming attack: a spamming learner
@@ -61,52 +61,28 @@ def parrying_hunter(
     """
     learner, me = learner_and_me(observation)
     config = config or load_config()
-    game = config.game
-    combat = game.combat
-    arena_width = game.world.arena_width_m
-    max_height = game.observation.max_observed_height_m
+    combat = config.game.combat
+    arena_width = config.game.world.arena_width_m
 
     learner_x = learner["x"] * arena_width
-    learner_y = learner["y"] * max_height
-    learner_facing = int(learner["facing_dir"])
-    learner_is_counter = learner[f"attack_type_{AttackType.COUNTER.value}"] > 0.5
     learner_swinging = is_attacking(learner)
     # Wind-up frames left: 1 is the last one, so a parry pressed now is up on the first hit.
     windup_left = round(learner["attack_windup_left"] * combat.longest_windup_frames)
     self_x = me["x"] * arena_width
-    self_y = me["y"] * max_height
     self_facing = int(me["facing_dir"])
     self_busy = me["busy_frames_left"] > 0
     counter_ready = me["counter_frames"] > 0
 
-    if learner_swinging and not self_busy:
-        # Where the learner's swing reaches, widened by one step of the learner's
-        # walking, since its input on the step the swing lands is not known. The swing
-        # starts at the learner's front edge and hits any body it touches, so it reaches a
-        # fighter whose center is a body width plus the range away: the same distance at
-        # which this fighter stops to attack. A swing that points away from this fighter
-        # cannot hit it, so it is not a threat: the fighter carries on and may attack
-        # instead of parrying.
-        reach = game.fighter.width_m + combat.attack_range_m
-        slack = game.fighter.move_speed_mps * game.world.dt_seconds
-        to_self = (self_x - learner_x) * learner_facing  # Positive: in front of the swing.
-        # A counter also reaches behind its attacker, as far back as its hitbox touches the
-        # body of this fighter.
-        behind = (
-            combat.spec(AttackType.COUNTER).hitbox_back_m + game.fighter.width_m / 2
-            if learner_is_counter
-            else 0.0
-        )
-        in_reach = -behind - slack <= to_self <= reach + slack
-        level = abs(self_y - learner_y) < game.fighter.height_m
-        if in_reach and level:
-            learner_in_front = (learner_x - self_x) * self_facing >= 0
-            if not learner_in_front and windup_left > 1:
-                # Moving toward the learner turns this fighter at once, in time to parry.
-                return int(Action.MOVE_RIGHT if learner_x > self_x else Action.MOVE_LEFT)
-            if learner_in_front and windup_left == 1:
-                return int(Action.PARRY)
-            return int(Action.IDLE)  # Waiting to parry, or too late to turn around.
+    # A swing that points away from this fighter cannot hit it, so it is not a threat: the
+    # fighter carries on and may attack instead of parrying.
+    if learner_swinging and not self_busy and swing_threatens(learner, me, config):
+        learner_in_front = (learner_x - self_x) * self_facing >= 0
+        if not learner_in_front and windup_left > 1:
+            # Moving toward the learner turns this fighter at once, in time to parry.
+            return int(Action.MOVE_RIGHT if learner_x > self_x else Action.MOVE_LEFT)
+        if learner_in_front and windup_left == 1:
+            return int(Action.PARRY)
+        return int(Action.IDLE)  # Waiting to parry, or too late to turn around.
     if counter_ready and not self_busy:
         return int(Action.ATTACK)  # The counter after a parry.
     # Otherwise chase and face the learner, and attack only a learner that stands still.

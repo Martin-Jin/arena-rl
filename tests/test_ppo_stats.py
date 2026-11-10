@@ -72,6 +72,12 @@ class PpoStatsTests(unittest.TestCase):
         self.assertAlmostEqual(metrics["attack_rate"].item(), 0.2)
         self.assertAlmostEqual(metrics["jump_rate"].item(), 0.2)
         self.assertAlmostEqual(metrics["reward_per_step"].item(), 0.6)
+        self.assertEqual(metrics["dodge_rate"].item(), 0.0)
+
+    def test_rollout_metrics_count_the_dodge_head(self) -> None:
+        # Flat index 24 is dodge alone, 25 is dodge with a move left.
+        metrics = rollout_metrics(torch.tensor([0, 24, 25, 3]), torch.zeros(4))
+        self.assertAlmostEqual(metrics["dodge_rate"].item(), 0.5)
 
 
 if __name__ == "__main__":

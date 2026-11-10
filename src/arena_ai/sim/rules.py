@@ -78,6 +78,16 @@ def is_lunging(f: FighterState, combat: CombatConfig, hits_checked: bool = False
     return bool(f.attack_frame) and spec.lunge_speed_mps > 0 and f.attack_frame <= last
 
 
+def passes_through_bodies(f: FighterState, hits_checked: bool = False) -> bool:
+    """Return whether a dodging fighter passes through other fighters' bodies.
+
+    The whole burst passes through, except that after the hits are checked the last burst
+    frame does not: a dodger left inside a body is pushed out the far side (see
+    ``collision._left_right``).
+    """
+    return f.dodge_frames_left > (1 if hits_checked else 0)
+
+
 def end_attack(f: FighterState) -> None:
     """Return a fighter to not attacking."""
     f.attack_frame = 0
@@ -96,6 +106,7 @@ def step_fighter(
     attack: bool = False,
     parry: bool = False,
     target_x: float | None = None,
+    dodge: bool = False,
 ) -> None:
     """Advance one fighter by one step.
 
@@ -110,9 +121,20 @@ def step_fighter(
     w, fc = config.world, config.fighter
     dt = w.dt_seconds
     combat = config.combat
+    dodge_config = config.dodge
 
     f.parried = f.missed_attack = f.missed_parry = f.counter_started = False
     f.counter_hit = False
+    # Dodge countdowns: the burst, then the gap. Stamina refills only when neither runs.
+    if f.dodge_frames_left:
+        f.dodge_frames_left -= 1
+        if not f.dodge_frames_left:
+            f.dodge_gap_left = dodge_config.gap_frames
+    elif f.dodge_gap_left:
+        f.dodge_gap_left -= 1
+    else:
+        f.stamina = min(dodge_config.max_stamina, f.stamina + dodge_config.regen_per_second * dt)
+
     staggered = f.stagger_frames > 0
 
     # A fighter that was busy at the start of the step cannot start anything new, so
@@ -121,12 +143,16 @@ def step_fighter(
     # Holding the parry button parries once: only a new press starts a parry.
     parry_pressed = parry and not f.parry_held
     f.parry_held = parry
+    # Holding the dodge button dodges once: only a new press starts a dodge.
+    dodge_pressed = dodge and not f.dodge_held
+    f.dodge_held = dodge
     # A fighter can turn mid-attack, and the swing's hitbox follows. Facing is locked while
     # parrying, and by the press that starts a parry. Otherwise pressing a direction with
     # parry would turn the fighter toward an attacker behind it in the same step, and the
     # parry would stop a hit from behind.
     starting_parry = parry_pressed and not was_busy
-    if move_dir and not f.parry_frame and not starting_parry:
+    # Facing is also locked during a dodge, so the burst keeps the direction it started in.
+    if move_dir and not f.parry_frame and not starting_parry and not f.dodge_frames_left:
         f.facing_dir = move_dir
 
     if f.attack_frame:
@@ -153,13 +179,32 @@ def step_fighter(
         f.counter_target = None  # The window passed without a counter.
     f.hover_frames = max(0, f.hover_frames - 1)
 
-    if not was_busy:
+    # A dodge can start unless the fighter is in the air, parrying, staggered, dodging or in the
+    # gap after one, or short of stamina. A swing still winding up can be dodged out of (it is cancelled).
+    # Once the swing is active or recovering the fighter is committed.
+    winding_up = f.attack_frame <= combat.windup_frames(f.attack_type)
+    if (
+        dodge_pressed
+        and f.on_ground
+        and not staggered
+        and not f.parry_frame
+        and not f.dodge_frames_left
+        and not f.dodge_gap_left
+        and f.stamina >= dodge_config.cost
+        and winding_up
+    ):
+        f.stamina -= dodge_config.cost
+        f.dodge_frames_left = dodge_config.duration_frames
+        f.dodge_dir = f.facing_dir
+        if f.attack_frame:
+            end_attack(f)
+
+    # Attacking and parrying are not possible during the burst.
+    if not was_busy and not f.dodge_frames_left:
         if parry_pressed:
             f.parry_window = next_parry_window(f, combat)
             f.parry_count = (
-                1
-                if f.parry_idle_frames >= combat.parry_spam_reset_frames
-                else f.parry_count + 1
+                1 if f.parry_idle_frames >= combat.parry_spam_reset_frames else f.parry_count + 1
             )
             f.parry_frame = 1
             f.parry_pose_frame = 0
@@ -179,6 +224,8 @@ def step_fighter(
     # A parrying fighter cannot walk or jump.
     if f.parry_frame:
         f.vx = 0.0
+    elif f.dodge_frames_left:
+        f.vx = f.dodge_dir * dodge_config.speed_mps
     elif is_lunging(f, combat):
         lunge_speed = combat.spec(f.attack_type).lunge_speed_mps
         f.vx = f.lunge_dir * lunge_speed
@@ -188,7 +235,8 @@ def step_fighter(
     else:
         f.vx = move_dir * fc.move_speed_mps  # -1, 0, or 1
     # Apply gravity and jump mechanics.
-    if jump and f.on_ground and not f.parry_frame:
+    # No jumping while parrying or dodging: a dodge stays on the ground.
+    if jump and f.on_ground and not f.parry_frame and not f.dodge_frames_left:
         f.vy = fc.jump_velocity_mps
         f.on_ground = False
 

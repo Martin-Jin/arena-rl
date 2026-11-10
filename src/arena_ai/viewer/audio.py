@@ -19,6 +19,11 @@ MUSIC_ROOT = ASSET_ROOT / "music"
 # mixer's channels play the one-shot effects.
 FOOTSTEP_CHANNELS_PER_FIGHTER = 2
 EFFECT_CHANNELS = 12
+# A footstep loop that has run for less than this many milliseconds is cut, not faded out.
+# SDL_mixer leaves a looping channel playing forever when it is told to fade out within a few
+# milliseconds of starting (measured: stuck after 5 ms, fine from 20 ms), which two fighters
+# changing direction every step make happen constantly.
+MIN_FADE_OUT_AFTER_START_MS = 100
 MAX_MIXER_CHANNELS = 64
 
 
@@ -107,6 +112,7 @@ class _RunningLoop:
         self._channels = channels
         self._fade_ms = fade_ms
         self._index = 0
+        self._started_ms = 0
         self.running = False
         self.direction = 0
 
@@ -124,13 +130,18 @@ class _RunningLoop:
         channel = self._channels[inactive_index]
         channel.stop()
         channel.play(self._sound, loops=-1, fade_ms=self._fade_ms)
+        self._started_ms = pygame.time.get_ticks()
         self._index = inactive_index
         self.running = True
         self.direction = move_dir
 
     def stop(self) -> None:
-        """Fade the loop out."""
-        self._channels[self._index].fadeout(self._fade_ms)
+        """Fade the loop out, or cut it if it only just started (see the constant above)."""
+        channel = self._channels[self._index]
+        if pygame.time.get_ticks() - self._started_ms < MIN_FADE_OUT_AFTER_START_MS:
+            channel.stop()
+        else:
+            channel.fadeout(self._fade_ms)
         self.running = False
         self.direction = 0
 

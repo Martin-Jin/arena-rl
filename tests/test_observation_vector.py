@@ -95,6 +95,26 @@ class ObservationVectorTests(unittest.TestCase):
              combat.basic.attack_recovery_frames),
         )
 
+    def test_the_vector_shows_the_dodge_state_and_cost(self) -> None:
+        dodge = CONFIG.game.dodge
+        fighter = FighterState(
+            dodge_frames_left=dodge.duration_frames,
+            dodge_gap_left=dodge.gap_frames,
+            dodge_held=True,
+            stamina=dodge.cost,
+        )
+        vector = encode_observation(get_observation(fighter, {"opponent": FighterState()}), CONFIG)
+        row = fighter_features(vector, 0)
+        self.assertEqual(row["dodge_frames_left"], 1.0)
+        self.assertEqual(row["dodge_gap_left"], 1.0)
+        self.assertEqual(row["dodge_held"], 1.0)
+        self.assertEqual(row["stamina"], dodge.cost / dodge.max_stamina)
+        self.assertEqual(row["dodge_cost"], dodge.cost / dodge.max_stamina)
+        # A dodge burst blocks attacking and parrying, so it counts as busy time.
+        self.assertGreater(row["busy_frames_left"], 0.0)
+        # Opponent rows carry the same features, for the attention layer.
+        self.assertEqual(fighter_features(vector, 1)["stamina"], 1.0)
+
     def test_a_counter_is_its_own_attack_type_in_the_vector(self) -> None:
         # The counter used to be a separate attack_counter flag beside the attack type.
         row = fighter_features(

@@ -210,6 +210,21 @@ def parry_frame_index(parry_frame: int, window: int, frame_count: int) -> int | 
     return round(raised * (frame_count - 1))
 
 
+def dodge_frame_index(fighter, frame_count: int) -> int:
+    """Return the dodge frame to show: the animation is stretched over the burst and the gap.
+
+    The roll plays through the burst and finishes standing up as the gap ends, however many
+    frames those are, so changing ``dodge`` in game.yaml needs no change to the sprites.
+    """
+    dodge = config.game.dodge
+    if fighter.dodge_frames_left:
+        elapsed = dodge.duration_frames - fighter.dodge_frames_left
+    else:
+        elapsed = dodge.duration_frames + dodge.gap_frames - fighter.dodge_gap_left
+    total = dodge.duration_frames + dodge.gap_frames
+    return min(elapsed * frame_count // total, frame_count - 1)
+
+
 def deflect_frame_index(fighter, animation: Animation) -> int:
     """Return the attack frame for a parried fighter: the swing played backwards.
 
@@ -231,6 +246,7 @@ def draw_fighter(
     shade: tuple[int, int, int] | None = None,
     hurt: float = 0.0,
     effect_color: tuple[int, int, int] | None = None,
+    alpha: int = 255,
 ):
     """Draw a fighter animation and return whether sprite frames were available.
 
@@ -238,7 +254,8 @@ def draw_fighter(
     when None).
 
     ``hurt`` (0 to 1) flashes the fighter: it is tinted toward the damage color and made
-    partly transparent, by that fraction.
+    partly transparent, by that fraction. ``alpha`` (0 to 255) makes the whole sprite
+    translucent, for the dodge's afterimages.
     """
     effect_color = effect_color or config.viewer.ui.colors["accent"]
     # After a successful parry the shield effects play on to the end of the window, even
@@ -260,6 +277,9 @@ def draw_fighter(
         animation_name = "attack"
         animation_tick = 0
         deflected = True
+    elif fighter.dodge_frames_left or fighter.dodge_gap_left:
+        animation_name = "dodge"
+        animation_tick = 0
     elif turning:
         animation_name = "turn"
         animation_tick = 0
@@ -291,6 +311,8 @@ def draw_fighter(
         img = animation.frames[index]
     elif deflected:
         img = animation.frames[deflect_frame_index(fighter, animation)]
+    elif animation_name == "dodge":
+        img = animation.frames[dodge_frame_index(fighter, len(animation.frames))]
     elif animation_name == "run" and fighter.vx < 0:
         frame_index = (animation_tick // animation.frame_duration) % len(
             animation.frames
@@ -311,6 +333,9 @@ def draw_fighter(
         tint = tuple(round(255 + (c - 255) * hurt) for c in ui.colors["damage_taken"])
         img.fill((*tint, 255), special_flags=pygame.BLEND_RGBA_MULT)
         img.set_alpha(round(255 - (255 - ui.hurt_flash_min_alpha) * hurt))
+    if alpha < 255:
+        img = img.copy()
+        img.set_alpha(alpha)
     x_px, y_px = to_screen(fighter.x, fighter.y)
     rect = img.get_rect(midbottom=(x_px, y_px))
     screen.blit(img, rect)

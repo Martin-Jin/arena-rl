@@ -21,11 +21,11 @@ to judge how good an action was. Each has its own attention block.
 
 ```mermaid
 flowchart LR
-    OBS["Observation vector<br/>59 values"] --> PN["Policy network<br/>attention block, hidden layers, output"]
+    OBS["Observation vector<br/>111 values"] --> PN["Policy network<br/>attention block, hidden layers, output"]
     OBS --> VN["Value network<br/>attention block, hidden layers, output"]
     PN --> LOGITS["9 logits"]
-    LOGITS --> DIST["4 independent action heads<br/>move, jump, attack, parry"]
-    DIST --> ACT["One of 24 actions"]
+    LOGITS --> DIST["5 independent action heads<br/>move, jump, attack, parry, dodge"]
+    DIST --> ACT["One of 48 actions"]
     VN --> VAL["V(s): one number"]
     VAL -. "critic target" .-> LOSS["PPO loss<br/>see Training"]
     DIST -. "log probability" .-> LOSS
@@ -34,17 +34,17 @@ flowchart LR
 ## What the agent sees
 
 The input is one flat vector from the acting fighter's point of view (details and scaling in
-the [simulation spec](simulation-spec.md#observation)). `F` is 22 features per fighter and
+the [simulation spec](simulation-spec.md#observation)). `F` is 27 features per fighter and
 `K` is the number of opponent slots (3).
 
 ```mermaid
 flowchart TB
-    subgraph IN["Observation: 14 x (1 + 3) + 3 = 59 values"]
+    subgraph IN["Observation: 27 x (1 + 3) + 3 = 111 values"]
         direction LR
-        S["Own row (F = 22)<br/>x, y, vx, vy, on_ground, facing,<br/>health, attack_*_left (3),<br/>parry_*_left (2), parry_window, counter_frames,<br/>stagger_frames, parry_held, busy_frames_left,<br/>attack_type (one-hot: slash, counter),<br/>rel_x_ahead, rel_y, rel_x_aimed"]
-        O1["Opponent slot 0 (F = 22)"]
-        O2["Opponent slot 1 (F = 22)"]
-        O3["Opponent slot 2 (F = 22)"]
+        S["Own row (F = 27)<br/>x, y, vx, vy, on_ground, facing,<br/>health, attack_*_left (3),<br/>parry_*_left (2), parry_window, counter_frames,<br/>stagger_frames, parry_held, busy_frames_left,<br/>attack_type (one-hot: slash, counter),<br/>rel_x_ahead, rel_y, rel_x_aimed,<br/>dodge_frames_left, dodge_gap_left, dodge_held,<br/>stamina, dodge_cost"]
+        O1["Opponent slot 0 (F = 27)"]
+        O2["Opponent slot 1 (F = 27)"]
+        O3["Opponent slot 2 (F = 27)"]
         M["Mask (K = 3)<br/>1 = living opponent<br/>0 = absent or dead"]
     end
     NOTE["A missing or dead opponent is all zeros with mask 0.<br/>Opponents are sorted by id, so slot order carries no meaning."]
@@ -59,7 +59,7 @@ plus a bias; every parameter in the diagram is trained.
 
 ```mermaid
 flowchart TB
-    OBS["Observation, 59 values"] --> SPLIT["Split"]
+    OBS["Observation, 111 values"] --> SPLIT["Split"]
     SPLIT -->|"own row [B, 14]"| PHIS
     SPLIT -->|"opponent rows [B, 3, 14]"| PHIO
     SPLIT -->|"mask [B, 3]"| MASK
@@ -96,7 +96,7 @@ flowchart TB
 
 How to read it:
 
-- **Embeddings.** `phi_self` turns the acting fighter's 22 numbers into a 64-number summary,
+- **Embeddings.** `phi_self` turns the acting fighter's 27 numbers into a 64-number summary,
   `e_self`. `phi_opp` does the same for each opponent with the **same weights**, so what is
   learned about one opponent applies to all of them.
 - **Query, keys, values.** Only the acting fighter has a query. Every entity (itself and each
@@ -121,25 +121,28 @@ How to read it:
 
 ## The decision
 
-The 9 policy logits are split into four independent categorical distributions
+The 11 policy logits are split into five independent categorical distributions
 ([`FactoredCategorical`](../src/arena_ai/agents/distribution.py)). The action index is built
-from one choice per head, and its log probability is the sum of the four heads' log
+from one choice per head, and its log probability is the sum of the five heads' log
 probabilities.
 
 ```mermaid
 flowchart LR
-    L["9 logits"] --> HM["move head<br/>3 logits: none, left, right"]
+    L["11 logits"] --> HM["move head<br/>3 logits: none, left, right"]
     L --> HJ["jump head<br/>2 logits"]
     L --> HA["attack head<br/>2 logits"]
     L --> HP["parry head<br/>2 logits"]
+    L --> HD["dodge head<br/>2 logits"]
     HM --> SM1["softmax, sample"]
     HJ --> SM2["softmax, sample"]
     HA --> SM3["softmax, sample"]
     HP --> SM4["softmax, sample"]
-    SM1 --> IDX["action index =<br/>move + 3 jump + 6 attack + 12 parry<br/>(24 actions)"]
+    HD --> SM5["softmax, sample"]
+    SM1 --> IDX["action index =<br/>move + 3 jump + 6 attack + 12 parry + 24 dodge<br/>(48 actions)"]
     SM2 --> IDX
     SM3 --> IDX
     SM4 --> IDX
+    SM5 --> IDX
 ```
 
 During training the action is sampled. In the viewer the trained agent plays the most likely
@@ -157,8 +160,8 @@ flowchart TB
     B["Minibatch: observations, actions, old log probs, advantages, returns"] --> FWD["Forward pass through both networks"]
     FWD --> LG["Policy logits"]
     FWD --> VP["Value predictions V(s)"]
-    LG --> NLP["New log prob of the stored action<br/>sum over the 4 heads"]
-    LG --> ENT["Entropy of the 4 heads"]
+    LG --> NLP["New log prob of the stored action<br/>sum over the 5 heads"]
+    LG --> ENT["Entropy of the 5 heads"]
     NLP --> RATIO["Ratio = exp(new log prob - old log prob)"]
     RATIO --> CLIP["Clipped surrogate<br/>min(ratio x A, clip(ratio, 0.8, 1.2) x A)"]
     CLIP --> PL["Policy loss = - mean of the surrogate"]

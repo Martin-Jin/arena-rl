@@ -49,7 +49,7 @@ mouse, or the arrow keys with `Enter`. The settings menu has:
 - **Opponents** — how many opponents you face (none for solo practice, up to three;
   solo is not available while watching), then **Opponent 1** to **3**, one dropdown
   each: the trained agent, the scripted approach-and-attack fighter, a perfect-parry fighter (it parries every attack it can
-  see coming, so hit it while it is busy swinging or recovering), an idle dummy, a fighter that runs away, or a random fighter. Opponents are allies and never hurt
+  see coming, so hit it while it is busy swinging or recovering), a dodger (the approach fighter, but it rolls through your swings until its stamina runs out), an idle dummy, a fighter that runs away, or a random fighter. Opponents are allies and never hurt
   each other, and you win when all of them are dead. The trained agent needs a checkpoint, so run
   training first. It can play its best move or sample varied moves.
 - **Checkpoint** — which file in `checkpoints/` the trained agent loads. Automatic
@@ -80,6 +80,7 @@ Controls:
 | `W`, `Up` or `Space`               | Jump       |
 | Left mouse button                  | Attack     |
 | `Q`                                | Parry      |
+| `Shift` or right mouse button      | Dodge      |
 | `Esc` or `P`                       | Pause      |
 | `F11`                              | Fullscreen (any screen) |
 

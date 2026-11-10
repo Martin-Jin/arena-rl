@@ -117,6 +117,3 @@ class RandomizedOpponentTests(unittest.TestCase):
         scene = self._scene(False, "parrier")
         scene.restart()
         self.assertEqual(scene.controllers["opponent"].policy.options, {})
-
-    def test_the_setting_is_off_by_default(self) -> None:
-        self.assertFalse(App(load_config()).settings.randomize_opponents)

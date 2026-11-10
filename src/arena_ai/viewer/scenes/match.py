@@ -21,6 +21,7 @@ from arena_ai.sim.state import (
 from arena_ai.viewer.audio import FighterSnapshot
 from arena_ai.viewer.controllers import Controller, make_controller
 from arena_ai.viewer.render.scene import draw_scene
+from arena_ai.viewer.render.trail import DodgeTrail
 from arena_ai.viewer.scenes.settings_menu import SettingsScene
 from arena_ai.viewer.matchup import fighter_labels
 from arena_ai.viewer.settings import DEFAULT_OPPONENT
@@ -37,7 +38,10 @@ BUTTON_HEIGHT = 56
 TURN_FRAMES = 6  # Render frames the turn animation is shown after a direction change.
 NOTICE_SECONDS = 5.0
 URGENT_SECONDS = 10  # The timer turns red for the last seconds of a timed match.
-HUMAN_HINT = "A / D  move     W / Space  jump     Click  attack     Q  parry     Esc  pause"
+HUMAN_HINT = (
+    "A / D  move     W / Space  jump     Click  attack     Q  parry"
+    "     Shift / Right click  dodge     Esc  pause"
+)
 WATCH_HINT = "Esc  pause"
 
 
@@ -57,6 +61,7 @@ class MatchScene:
         self.time_limit = self.config.viewer.match.time_limit_seconds or None
         self.rng = random.Random()
         self.hud = Hud(self.config, app.theme, app.to_screen)
+        self.trail = DodgeTrail(self.config)
         self.notice = ""
         self.age = 0.0  # Real seconds since the first round, for the controls hint.
         self.controllers: dict[str, Controller] = {}
@@ -119,6 +124,7 @@ class MatchScene:
                 if hasattr(controller, "resample"):  # Scripted: new behavior each round.
                     controller.resample(self.rng)
         self.hud.reset(self.fighters)
+        self.trail.reset()
         self.phase = INTRO
         self.menu: Menu | None = None
         self.intro_elapsed = 0.0
@@ -240,7 +246,10 @@ class MatchScene:
         jump = bool(keys[pygame.K_w] or keys[pygame.K_UP] or keys[pygame.K_SPACE])
         attack = bool(pygame.mouse.get_pressed()[0])
         parry = bool(keys[pygame.K_q])
-        return to_fighter_action(from_parts(move_dir, jump, attack, parry))
+        dodge = bool(
+            keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT] or pygame.mouse.get_pressed()[2]
+        )
+        return to_fighter_action(from_parts(move_dir, jump, attack, parry, dodge))
 
     def _simulate(self, dt: float) -> None:
         """Step the simulation in fixed timesteps, however long the frame took."""
@@ -299,6 +308,7 @@ class MatchScene:
         if self.phase != PAUSED:
             self.render_tick += 1
             self.turn_timer = max(0, self.turn_timer - 1)
+            self.trail.update(dt, self.fighters)
         self.hud.update(dt, self.fighters)
 
     # -- drawing -----------------------------------------------------------
@@ -322,6 +332,7 @@ class MatchScene:
             self.render_tick,
             turning=self.turn_timer > 0,
             hurt={fid: self.hud.hurt_strength(fid) for fid in self.fighters},
+            ghosts=self.trail.ghosts(),
         )
         timer_seconds, urgent = self._timer()
         self.hud.draw(screen, self.fighters, self.labels, timer_seconds, urgent)

@@ -33,6 +33,13 @@ FEATURE_NAMES = (
     "rel_x_ahead",
     "rel_y",
     "rel_x_aimed",
+    # Dodge state. The cost is the same for every fighter and every step, but it is an input
+    # so the network knows how many dodges the stamina buys.
+    "dodge_frames_left",
+    "dodge_gap_left",
+    "dodge_held",
+    "stamina",
+    "dodge_cost",
 )
 # Horizontal distances are scaled by this many attack reaches (body width + attack range),
 # so a swing that can reach the acting fighter sits near the middle of [-1, 1], not in a
@@ -89,6 +96,7 @@ def _scales(config: Config) -> list[float]:
     if _scales_cache is not None and _scales_cache[0] is config:
         return _scales_cache[1]
     world = config.game.world
+    dodge = config.game.dodge
     fighter = config.game.fighter
     combat = config.game.combat
     reach = RELATIVE_X_REACHES * (fighter.width_m + combat.attack_range_m)
@@ -110,6 +118,10 @@ def _scales(config: Config) -> list[float]:
         "rel_x_ahead": reach,
         "rel_y": RELATIVE_Y_HEIGHTS * fighter.height_m,
         "rel_x_aimed": reach,
+        "dodge_frames_left": dodge.duration_frames,
+        "dodge_gap_left": dodge.gap_frames,
+        "stamina": dodge.max_stamina,
+        "dodge_cost": dodge.max_stamina,
     }
     scales = [float(by_name.get(name, 1.0)) for name in FEATURE_NAMES]
     for name, scale in zip(FEATURE_NAMES, scales):
@@ -160,6 +172,11 @@ def _fighter_row(
         dy,
         # Positive when this fighter faces the acting fighter (its swing points at it).
         -dx * float(fighter["facing_dir"]),
+        float(fighter["dodge_frames_left"]),
+        float(fighter["dodge_gap_left"]),
+        float(bool(fighter["dodge_held"])),
+        float(fighter["stamina"]),
+        config.game.dodge.cost,
     ]
     return [max(-1.0, min(1.0, value / scale)) for value, scale in zip(raw, _scales(config))]
 

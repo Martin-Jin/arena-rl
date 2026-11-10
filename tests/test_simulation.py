@@ -17,7 +17,9 @@ class SimulationTests(unittest.TestCase):
         for index in range(ACTION_COUNT):
             action = to_fighter_action(index)
             self.assertEqual(
-                from_parts(action.move_dir, action.jump, action.attack, action.parry),
+                from_parts(
+                    action.move_dir, action.jump, action.attack, action.parry, action.dodge
+                ),
                 index,
             )
         self.assertEqual(ACTION_COUNT, len(Action))

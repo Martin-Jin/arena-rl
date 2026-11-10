@@ -8,7 +8,7 @@ by number.
 
 from collections.abc import Mapping
 
-from arena_ai.config import Config
+from arena_ai.config import AttackSpec, AttackType, CombatConfig, Config
 from arena_ai.sim.observation_vector import (
     FEATURES_PER_FIGHTER,
     assemble_vector,
@@ -34,6 +34,43 @@ def is_attacking(fighter: dict[str, float]) -> bool:
         + fighter["attack_active_left"]
         + fighter["attack_recovery_left"]
     ) > 0
+
+
+def attack_spec(fighter: dict[str, float], combat: CombatConfig) -> AttackSpec:
+    """Return the spec of the attack the fighter is in (the basic attack when it is not).
+
+    It reads the attack-type one-hot, so a new attack type needs no change in the policies
+    that use its range, reach and timing.
+    """
+    for attack_type in AttackType:
+        if fighter[f"attack_type_{attack_type.value}"] > 0.5:
+            return combat.spec(attack_type)
+    return combat.basic
+
+
+def swing_threatens(learner: dict[str, float], me: dict[str, float], config: Config) -> bool:
+    """Return whether the learner's swing, once active, would reach this opponent.
+
+    It is where the swing reaches, widened by one step of the learner's walking, since its
+    input on the step the swing lands is not known. The swing starts at the learner's front
+    edge and hits any body it touches, so it reaches a fighter whose center is a body width
+    plus the range away. A swing that points away cannot hit, and neither can one more than
+    a fighter height above or below. An attack with a ``hitbox_back_m`` (the counter) also
+    reaches behind its attacker. The range comes from the attack's own spec.
+    """
+    game = config.game
+    combat = game.combat
+    learner_x = learner["x"] * game.world.arena_width_m
+    learner_y = learner["y"] * game.observation.max_observed_height_m
+    self_x = me["x"] * game.world.arena_width_m
+    self_y = me["y"] * game.observation.max_observed_height_m
+    spec = attack_spec(learner, combat)
+    reach = game.fighter.width_m + spec.range_m
+    slack = game.fighter.move_speed_mps * game.world.dt_seconds
+    to_self = (self_x - learner_x) * int(learner["facing_dir"])  # Positive: in front of it.
+    behind = 0.0 if spec.hitbox_back_m is None else spec.hitbox_back_m + game.fighter.width_m / 2
+    in_reach = -behind - slack <= to_self <= reach + slack
+    return in_reach and abs(self_y - learner_y) < game.fighter.height_m
 
 
 def living_allies(observation: list[float]) -> list[dict[str, float]]:

@@ -21,7 +21,15 @@ defines:
   `[[approach], [approach, idle], [runner, parrier, idle]]` runs a one-on-one, a 1v2 and a
   1v3, and a single entry uses the scalar environment path. The opponents of an entry are
   allies: they never hurt each other, and the fight ends when the agent or all of them are
-  dead.
+  dead. A `null` slot is left empty and drawn again at the start of every episode from
+  `random_opponent_pool`, so `[parrier, null]` is a parrier plus one drawn opponent and
+  `[null, null]` is two drawn ones. A `null` entry is a whole mixture, with the number of
+  opponents (1 to `max_opponents`) drawn too. The draw comes from the environment's seeded
+  generator, so training stays reproducible. Stats are kept per entry, not per draw, so a
+  mixture is one line in the report: drawn slots show as `*` (`parrier+*`) and a `null`
+  entry as `random`.
+- `random_opponent_pool` — the opponents a `null` slot can be drawn as. Empty means every
+  opponent in the registry.
 - `num_envs` — the most environments allowed. Training refuses to start, with an
   error, if `opponents` lists more entries, or an entry has no names or more than
   `observation.max_opponents`.
@@ -35,11 +43,11 @@ defines:
 - `randomize_spawns` — start each episode with random fighter positions.
 - `randomize_opponents` — redraw the scripted opponents' options at every episode reset,
   from the environment's seeded generator, so a learner cannot memorize one fixed distance
-  or timing. Only `approach` and `parrier` have options. The next two keys are the ranges.
+  or timing. Only `approach`, `parrier` and `dodger` have options. The next two keys are the ranges.
   Off, they use fixed defaults (offset 0, attack chance 0.2). The `parrier` and `random`
   opponents draw their dice from that generator either way, so training is reproducible.
 - `swing_start_offset_m` — `[low, high]` meters added to the distance at which `approach` and
-  `parrier` start a swing. Negative walks closer first. Positive swings early, while still
+  `parrier` (and `dodger`) start a swing. Negative walks closer first. Positive swings early, while still
   out of reach: they keep walking during the 16-frame wind-up, so the gap closes.
 - `hunter_attack_chance` — `[low, high]` range of the `parrier`'s per-step chance to attack a
   learner that is not walking away from it.
@@ -54,8 +62,9 @@ defines:
   last iteration of a run always print.
 
 Environment `i` plays `opponents[i]`. The names come from `OPPONENTS` in
-[`agents/scripted/registry.py`](../src/arena_ai/agents/scripted/registry.py) (`approach`, `parrier`, `idle`,
-`runner`, `random`). `parrier` parries every attack it can see from the front, so the learner
+[`agents/scripted/registry.py`](../src/arena_ai/agents/scripted/registry.py) (`approach`, `parrier`, `dodger`, `idle`,
+`runner`, `random`). `dodger` is `approach` that rolls through every swing it can see, so
+the learner has to bait out its stamina (a full bar is two dodges) before a swing lands. `parrier` parries every attack it can see from the front, so the learner
 cannot win against it by attacking head on. It earns only parry rewards until it finds
 another way past, so give it a share of the environments, not all of them, and keep
 some easy opponents (`idle`, `random`) for a winning signal. `runner` flees from the
@@ -281,9 +290,9 @@ iterations when `print_stats` is true:
 ```text
 [iter 100] steps=204,800 episodes=312
   results  win 41%  return +0.35  reward/step +0.0021  (last 100 episodes)
-  policy   kl 0.0120  clip 14%  explained var 0.72  entropy 2.31 (move 0.99 jump 0.60 attack 0.60)
+  policy   kl 0.0120  clip 14%  explained var 0.72  entropy 2.31 (move 0.99 jump 0.60 attack 0.60 parry 0.60 dodge 0.60)
   loss     total 0.2295  policy -0.0020  value 0.5175
-  actions  attack 31%  jump 12%  left 20%  right 25%  idle 22%
+  actions  attack 31%  parry 10%  dodge 8%  jump 12%  left 20%  right 25%  idle 22%
   combat   accuracy 38%  dealt 71  taken 45  near wall 8%  win length 612  loss length 480
   time     0.81s/iter  rollout 0.52s (env 0.10s  act 0.28s  value 0.09s  other 0.05s)  update 0.28s  2,530 steps/s
   vs approach  win 33%  timeout 0%  length 571  (6 episodes)
@@ -299,9 +308,9 @@ healthy, and the actions and combat lines say what the agent is actually doing.
 | policy | `kl` | Approximate KL divergence (how far the update moved the policy), averaged over minibatches. Very large means unstable. Near 0 means a learning rate that is too low or a converged policy. |
 | policy | `clip` | Share of samples whose probability ratio hit the clip range. About 10% to 20% is typical. 0% means updates barely move the policy, and persistently high means they are too aggressive. |
 | policy | `explained var` | `1 - Var(returns - values) / Var(returns)`. Near 1 is a good critic, near 0 predicts nothing, below 0 is worse than a constant. Its scale does not depend on the reward, unlike the value loss. |
-| policy | `entropy` | The sum of the three heads, then each head alone, so one head collapsing early (for example never jumping) is visible. |
+| policy | `entropy` | The sum of the five heads, then each head alone, so one head collapsing early (for example never jumping) is visible. |
 | loss | `total`, `policy`, `value` | Averaged over every minibatch of the update, not only the last one. |
-| actions | `attack`, `jump`, `left`, `right`, `idle` | Share of rollout steps. `idle` is the no-op action. |
+| actions | `attack`, `parry`, `dodge`, `jump`, `left`, `right`, `idle` | Share of rollout steps. `idle` is the no-op action. |
 | combat | `accuracy` | Hits per swing started. Many swings with a low accuracy means the agent is spamming. |
 | combat | `dealt`, `taken` | Mean damage per episode, which is clearer than the reward because the reward also includes the wall penalty. |
 | combat | `near wall` | Share of steps within `edge_margin` of a wall, which shows whether it still hugs walls. |

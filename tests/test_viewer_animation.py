@@ -255,5 +255,18 @@ class ParryAnimationTests(unittest.TestCase):
         self.assertNotEqual(draw(FighterState(parry_frame=4, parry_window=8)), draw(FighterState()))
 
 
+class DodgeAnimationTests(unittest.TestCase):
+    def test_the_roll_is_stretched_over_the_burst_and_the_gap(self) -> None:
+        dodge = load_config().game.dodge
+        frames = []
+        for left in range(dodge.duration_frames, 0, -1):
+            frames.append(animation.dodge_frame_index(FighterState(dodge_frames_left=left), 11))
+        for gap_left in range(dodge.gap_frames, 0, -1):
+            frames.append(animation.dodge_frame_index(FighterState(dodge_gap_left=gap_left), 11))
+        self.assertEqual(frames, sorted(frames))  # It only moves forward.
+        self.assertEqual(frames[0], 0)
+        self.assertEqual(frames[-1], 10)  # It finishes standing as the gap ends.
+
+
 if __name__ == "__main__":
     unittest.main()

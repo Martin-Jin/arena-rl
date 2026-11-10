@@ -93,7 +93,8 @@ The simulation layer is deterministic and independent of rendering. It must not 
 - `src/arena_ai/agents/scripted/` — The non-learning opponents, one module each:
   `approach.py` (deterministic approach-and-attack), `parrier.py` (the perfect-parry
   hunter: it parries every attack it can see from the front, so mix it with easier
-  opponents in training), `runner.py` (flees the learner), `simple.py` (idle and uniformly
+  opponents in training), `dodger.py` (approach-and-attack that rolls through every swing
+  it can see, until its stamina runs out), `runner.py` (flees the learner), `simple.py` (idle and uniformly
   random), `registry.py` (the `OPPONENTS` registry and `training_opponents`, which checks a
   `training.opponents` list), `episode.py` (`EpisodePolicy`, which redraws an opponent's
   options each training episode), `view.py` (how a policy reads its observation by name, and
@@ -176,10 +177,10 @@ The viewer layer is the only layer intended to depend on `pygame`.
 - `src/arena_ai/viewer/ui/` — Reusable UI pieces: `theme.py` (colors, fonts,
   text and panel drawing, and `fit_text`, which scrolls text that is too wide for
   its box), `widgets.py` (buttons, sliders, toggles, selectors, dropdowns and the
-  focus-handling `Menu`) and `hud.py` (health bars, swing meters and damage
+  focus-handling `Menu`) and `hud.py` (health bars, swing and stamina meters and damage
   numbers).
 - `src/arena_ai/viewer/render/` — Drawing helpers: `layout.py` (meters to pixels),
-  `animation.py` (sprite animations) and `scene.py` (arena, shadows and
+  `animation.py` (sprite animations), `trail.py` (the dodge's afterimages) and `scene.py` (arena, shadows and
   fighters, shared by the menus, matches and the training view).
 
 ### Utilities

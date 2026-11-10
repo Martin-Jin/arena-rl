@@ -4,6 +4,8 @@ from collections.abc import Callable, Mapping, Sequence
 import random
 
 from arena_ai.agents.action import to_fighter_action
+from arena_ai.agents.scripted.episode import EpisodePolicy
+from arena_ai.agents.scripted.registry import OpponentMixture
 from arena_ai.agents.scripted.view import team_observation
 from arena_ai.config import Config
 from arena_ai.envs.arena_env import ArenaEnv
@@ -30,7 +32,8 @@ class OneVManyEnv(ArenaEnv):
     ``opponents`` is a list of ``(name, policy)``. The opponents are allies: they never
     hurt each other. Each policy sees the learner-perspective observation of the agent, itself
     and its living allies (``team_observation``). The episode ends when the agent or every
-    opponent is dead.
+    opponent is dead. With a ``mixture`` the opponents are drawn again at every reset (and
+    ``opponents`` is ignored), so one environment cycles through different matchups.
     """
 
     def __init__(
@@ -38,24 +41,38 @@ class OneVManyEnv(ArenaEnv):
         config: Config,
         opponents: Sequence[tuple[str, OpponentPolicy]],
         max_episode_steps: int | None = None,
+        mixture: OpponentMixture | None = None,
     ) -> None:
-        if not 1 <= len(opponents) <= config.game.observation.max_opponents:
+        if mixture is None and not 1 <= len(opponents) <= config.game.observation.max_opponents:
             raise ValueError(
                 f"an environment needs 1 to {config.game.observation.max_opponents} "
                 f"opponents, got {len(opponents)}"
             )
         super().__init__(config, max_episode_steps)
         self.rng = random.Random()
+        self.mixture = mixture
+        if mixture is not None:
+            opponents = self._draw_mixture()
+        self._set_opponents(opponents)
+
+    def _draw_mixture(self) -> list[tuple[str, OpponentPolicy]]:
+        """Draw this episode's opponents from the mixture."""
+        return [(name, EpisodePolicy(name, self.config)) for name in self.mixture.draw(self.rng)]
+
+    def _set_opponents(self, opponents: Sequence[tuple[str, OpponentPolicy]]) -> None:
         self.opponent_names = [name for name, _ in opponents]
         self.opponent_policies = dict(zip(opponent_ids(len(opponents)), [p for _, p in opponents]))
-        # Reported in info["opponent"] so training can track stats per matchup.
-        self.label = matchup_label(self.opponent_names)
+        # Reported in info["opponent"] so training can track stats per matchup. A mixture
+        # reports its own label, so its drawn matchups share one line of stats.
+        self.label = self.mixture.label if self.mixture else matchup_label(self.opponent_names)
 
     def reset(self, seed: int | None = None):
         """Reseed the RNG only when a seed is given, so later auto-resets keep drawing new
-        positions and new opponent options. Each ``EpisodePolicy`` redraws its options."""
+        positions, opponents and options. Each ``EpisodePolicy`` redraws its options."""
         if seed is not None:
             self.rng = random.Random(seed)
+        if self.mixture is not None:
+            self._set_opponents(self._draw_mixture())
         for policy in self.opponent_policies.values():
             if hasattr(policy, "resample"):
                 policy.resample(self.rng)

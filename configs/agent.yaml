@@ -31,32 +31,43 @@ training:
   seed: null
   # One environment per entry, in order. Each entry lists the opponents the agent faces at
   # once in that environment (1 to game.yaml observation.max_opponents names from approach,
-  # parrier, idle, runner, random). A bare name means one opponent. Opponents are allies:
-  # they never hurt each other, and a fight ends when the agent or all of them are dead.
-  # Repeat an entry to run several environments with it. Here seven of sixteen are
-  # one-on-one (two against the perfect-parry hunter, which parries every attack it can
-  # see from the front), five have two opponents and four have three. Most multi-opponent
-  # entries have opponents that all attack (parrier and approach). Easy opponents
-  # (idle, random) keep a winning signal.
+  # parrier, dodger, idle, runner, random). A bare name means one opponent. Opponents are
+  # allies: they never hurt each other, and a fight ends when the agent or all of them are
+  # dead. Repeat an entry to run several environments with it.
+  #
+  # Fixed or drawn: a null slot is left empty and drawn again at the start of every episode
+  # from random_opponent_pool, so the environment cycles through different matchups.
+  #   [parrier, parrier, parrier]  three parriers, always
+  #   [parrier, null]              a parrier plus one drawn opponent
+  #   [null, null]                 two drawn opponents
+  #   null                         a whole mixture: 1 to 3 drawn opponents, count included
+  # The report keeps one line of stats per entry, so drawn slots show as "*"
+  # ("parrier+*"), and a null entry shows as "random".
+  #
+  # Here six of sixteen are one-on-one against a single opponent, four have two fixed
+  # opponents, two keep one fixed and draw the other, and four are drawn or three-wide.
+  # Easy opponents (idle, random, runner) stay in the pool, so there is still a winning signal.
   opponents:
     [
       [parrier],
       [runner],
       [approach],
-      [random],
+      [dodger],
       [idle],
       [random],
       [approach, approach],
       [parrier, approach],
-      [parrier, random],
-      [approach, runner],
-      [approach, idle],
-      [parrier, approach, approach],
+      [dodger, approach],
+      [parrier, dodger],
+      [approach, null],
+      [parrier, null],
       [parrier, parrier, parrier],
-      [approach, approach, idle],
-      [parrier, random, approach],
-      [random, runner, idle],
+      [approach, approach, null],
+      [null, null, null],
+      null,
     ]
+  # What a null slot can be drawn as (an empty list means every opponent in the registry).
+  random_opponent_pool: [approach, parrier, dodger, idle, runner, random]
   # Worker processes that step the environments in parallel (1 = in this process). Environments
   # are dealt out round-robin, so use a divisor of the environment count: with 16, 8 workers
   # of 2 are as fast as 10 (some would hold 2, others 1), and 16 oversubscribes the cores.

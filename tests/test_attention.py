@@ -5,6 +5,7 @@ from pathlib import Path
 
 import torch
 
+from arena_ai.agents.action import LOGIT_COUNT
 from arena_ai.agents.attention import EntityAttention
 from arena_ai.agents.policy import ActorCritic
 from arena_ai.config import load_config
@@ -49,7 +50,7 @@ class AttentionTests(unittest.TestCase):
         x = batch(2, size=7)
         logits = self.model.policy_network(x)
         value = self.model.value_network(x)
-        self.assertEqual(tuple(logits.shape), (7, 9))
+        self.assertEqual(tuple(logits.shape), (7, LOGIT_COUNT))
         self.assertEqual(tuple(value.shape), (7, 1))
         combined = self.model.policy_network.encoder(x)
         self.assertEqual(tuple(combined.shape), (7, 2 * EMBED))
@@ -124,7 +125,7 @@ class AttentionTests(unittest.TestCase):
 
     def test_several_heads_work_and_need_an_output_projection(self) -> None:
         model = ActorCritic(config_with(num_heads=4)).eval()
-        self.assertEqual(tuple(model.policy_network(batch(2)).shape), (5, 9))
+        self.assertEqual(tuple(model.policy_network(batch(2)).shape), (5, LOGIT_COUNT))
         self.assertNotIsInstance(model.policy_network.encoder.out_proj, torch.nn.Identity)
         with self.assertRaises(ValueError):
             EntityAttention(3, 64, 5, "relu")
