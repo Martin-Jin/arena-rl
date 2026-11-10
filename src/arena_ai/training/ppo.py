@@ -251,3 +251,132 @@ def train_step(
         for name, head_entropy in zip(HEAD_NAMES, head_entropies):
             stats[f"entropy_{name}"] = head_entropy
         return {name: value.detach() for name, value in stats.items()}
+
+
+class GraphedTrainStep:
+    """Run ``train_step`` for a fixed minibatch size as one replayed CUDA graph.
+
+    **Why:** a PPO step on this small network is a thousand tiny GPU launches, and the
+    time is the CPU queuing them one by one (about 27 ms), not the GPU running them (a few
+    ms). **What:** the first call records one whole step (forward, loss, backward, gradient
+    clipping, Adam step) against fixed input buffers. After that each step copies a
+    minibatch into those buffers and replays the recording with one call. **How:** the
+    recording remembers memory addresses, so the buffers, the weights and the optimizer
+    state are only ever updated in place. The statistics are summed inside the graph into
+    fixed tensors, and ``means`` returns them. **Limits:** CUDA only. A minibatch of another
+    size (the short last one) runs as an ordinary ``train_step``, which gives the same
+    result. The learning rate is recorded as a constant, so it cannot change between steps.
+    Building it runs three warm-up steps, then puts the weights and optimizer state back as
+    they were, so it can be built after a checkpoint was loaded.
+    """
+
+    def __init__(
+        self,
+        policy: Callable[[torch.Tensor], tuple[torch.Tensor, torch.Tensor]],
+        optimizer: torch.optim.Optimizer,
+        example: tuple[torch.Tensor, ...],
+        clip_range: float,
+        value_loss_coef: float,
+        entropy_coef: float,
+        max_grad_norm: float | None = 0.5,
+    ) -> None:
+        """``example`` is one full minibatch: its tensors give the shapes the graph is for."""
+        self.policy = policy
+        self.optimizer = optimizer
+        self.settings = (clip_range, value_loss_coef, entropy_coef, max_grad_norm)
+        self.batch_size = example[0].shape[0]
+        self.inputs = [tensor.clone() for tensor in example]
+        parameters = [
+            parameter for group in optimizer.param_groups for parameter in group["params"]
+        ]
+        device = parameters[0].device
+        # A graph needs the optimizer's step counters on the GPU.
+        for group in optimizer.param_groups:
+            group["capturable"] = True
+        for state in optimizer.state.values():
+            if "step" in state:
+                state["step"] = state["step"].to(device=device, dtype=torch.float32)
+        saved_parameters = [parameter.detach().clone() for parameter in parameters]
+        saved_state = {
+            parameter: {
+                name: value.clone() if torch.is_tensor(value) else value
+                for name, value in optimizer.state[parameter].items()
+            }
+            for parameter in parameters
+            if parameter in optimizer.state
+        }
+
+        side_stream = torch.cuda.Stream()
+        side_stream.wait_stream(torch.cuda.current_stream())
+        with torch.cuda.stream(side_stream):
+            for _ in range(3):
+                stats = self._step()
+        torch.cuda.current_stream().wait_stream(side_stream)
+        self.sums = {name: torch.zeros_like(value) for name, value in stats.items()}
+        self.count = 0
+        self.graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(self.graph):
+            captured = self._step()
+            for name, value in captured.items():
+                self.sums[name].add_(value)
+
+        # Undo the warm-up, in place: the graph remembers these tensors' addresses.
+        with torch.no_grad():
+            for parameter, saved in zip(parameters, saved_parameters):
+                parameter.copy_(saved)
+            for parameter in parameters:
+                state = optimizer.state[parameter]
+                for name, value in state.items():
+                    if not torch.is_tensor(value):
+                        continue
+                    if parameter in saved_state:
+                        value.copy_(saved_state[parameter][name])
+                    else:
+                        value.zero_()  # The optimizer had no state before the warm-up.
+        for value in self.sums.values():
+            value.zero_()
+
+    def _step(self) -> dict[str, torch.Tensor]:
+        clip_range, value_loss_coef, entropy_coef, max_grad_norm = self.settings
+        return train_step(
+            self.policy,
+            self.optimizer,
+            *self.inputs,
+            clip_range,
+            value_loss_coef,
+            entropy_coef,
+            max_grad_norm,
+        )
+
+    def step(self, tensors: tuple[torch.Tensor, ...], indices: torch.Tensor) -> None:
+        """Train on ``tensor[indices]`` for each of the five minibatch tensors.
+
+        The five are observations, actions, old log-probabilities, advantages and returns,
+        in the order ``train_step`` takes them.
+        """
+        self.count += 1
+        if len(indices) == self.batch_size:
+            for tensor, buffer in zip(tensors, self.inputs):
+                torch.index_select(tensor, 0, indices, out=buffer)
+            self.graph.replay()
+            return
+        clip_range, value_loss_coef, entropy_coef, max_grad_norm = self.settings
+        stats = train_step(
+            self.policy,
+            self.optimizer,
+            *(tensor[indices] for tensor in tensors),
+            clip_range,
+            value_loss_coef,
+            entropy_coef,
+            max_grad_norm,
+        )
+        for name, value in stats.items():
+            self.sums[name].add_(value)
+
+    def means(self) -> dict[str, torch.Tensor]:
+        """Return each statistic averaged over the steps since the last call, and reset."""
+        means = {name: value / self.count for name, value in self.sums.items()}
+        for value in self.sums.values():
+            value.zero_()
+        self.count = 0
+        return means

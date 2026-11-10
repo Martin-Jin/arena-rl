@@ -16,6 +16,7 @@ from arena_ai.training.checkpoints import load_checkpoint, save_checkpoint
 from arena_ai.training.ppo import (
     advantage_estimation,
     discounted_returns,
+    GraphedTrainStep,
     explained_variance,
     normalize_advantages,
     train_step,
@@ -27,6 +28,9 @@ from arena_ai.training.train import TrainingLoop, TrainingState
 # Switch this to True to render every simulation step during training.
 VISUALIZE_TRAINING = False
 TRAINING_DEVICE = "auto"
+# Run each PPO minibatch step as one replayed CUDA graph (CUDA only; see GraphedTrainStep).
+# Set to False to use ordinary steps, for example to compare results or to debug.
+USE_CUDA_GRAPH = True
 # Set to a checkpoint path, for example "checkpoints/latest.pt", to continue that
 # run. The model, optimizer and progress counters are restored and
 # training.iterations more iterations are run on top of the saved ones. Leave as
@@ -55,6 +59,7 @@ def build_update_callback(
 ):
     """Build the PPO callback consumed by the outer training loop."""
     policy_config = config.agent.policy
+    graphed: GraphedTrainStep | None = None
 
     def update_policy(
         batch,
@@ -64,8 +69,10 @@ def build_update_callback(
         episode_ends: torch.Tensor,
         next_values: torch.Tensor,
     ) -> dict[str, float]:
+        nonlocal graphed
         values = batch.values
         device = values.device
+        use_graph = USE_CUDA_GRAPH and device.type == "cuda"
         # 1. Compute advantages and returns for the batch, using GAE and discounting.
         # These loops run one tiny operation per step, which is much faster on the
         # CPU than on a GPU, so compute them there and move the results back.
@@ -98,10 +105,29 @@ def build_update_callback(
         batch_size = min(policy_config.batch_size, len(flat.actions))
         totals: dict[str, torch.Tensor] = {}
         minibatches = 0
+        minibatch_tensors = (
+            flat.observations,
+            flat.actions,
+            flat.log_probs,
+            flat_advantages,
+            flat_returns,
+        )
         for _ in range(policy_config.num_epochs):
             # Randomly permute the batch indices to create mini-batches for training.
             permutation = torch.randperm(len(flat.actions), device=flat.actions.device)
             for indices in permutation.split(batch_size):
+                if use_graph:
+                    if graphed is None and len(indices) == batch_size:
+                        graphed = GraphedTrainStep(
+                            policy.forward,
+                            optimizer,
+                            tuple(tensor[indices] for tensor in minibatch_tensors),
+                            policy_config.clip_range,
+                            policy_config.value_loss_coef,
+                            policy_config.entropy_coef,
+                        )
+                    graphed.step(minibatch_tensors, indices)
+                    continue
                 stats = train_step(
                     policy.forward,
                     optimizer,
@@ -121,7 +147,10 @@ def build_update_callback(
         # Average over every minibatch (the last one alone is noisy), add the
         # batch-level statistics, and read everything back with one device
         # transfer. Reading each value separately would sync the GPU every time.
-        tensors = {name: value / minibatches for name, value in totals.items()}
+        if use_graph:
+            tensors = graphed.means()
+        else:
+            tensors = {name: value / minibatches for name, value in totals.items()}
         tensors["explained_variance"] = explained_variance(
             cpu_values.reshape(-1), cpu_returns.reshape(-1)
         ).to(device)
@@ -150,6 +179,10 @@ def run_training(config: Config | None = None) -> TrainingState:
         saved = load_checkpoint(RESUME_FROM, model, optimizer, map_location=device)
         resumed_state = saved["training_state"]
         policy.sync()  # the CPU acting copy must start from the restored weights
+        # A graph run saves its optimizer as "capturable", which only works on CUDA, so set
+        # the flag for this run (GraphedTrainStep sets it again when it builds the graph).
+        for group in optimizer.param_groups:
+            group["capturable"] = USE_CUDA_GRAPH and device.type == "cuda"
         if config.training.seed is not None:
             # Offset so the continued run does not replay the first run's stream.
             torch.manual_seed(config.training.seed + resumed_state.iteration)

@@ -15,8 +15,11 @@ class FactoredCategorical:
     """Drop-in for Categorical: flat action index in, flat index out."""
 
     def __init__(self, logits: torch.Tensor) -> None:
+        # No argument validation: its checks read tensors back to Python, which waits for
+        # the GPU on every call and is not allowed while a CUDA graph is being captured.
         self.heads = [
-            Categorical(logits=part) for part in torch.split(logits, HEAD_SIZES, dim=-1)
+            Categorical(logits=part, validate_args=False)
+            for part in torch.split(logits, HEAD_SIZES, dim=-1)
         ]
 
     def sample(self) -> torch.Tensor:

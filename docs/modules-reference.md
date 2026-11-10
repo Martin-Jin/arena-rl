@@ -121,7 +121,7 @@ The simulation layer is deterministic and independent of rendering. It must not 
   termination flags, and policy values/log probabilities collected from rollouts.
 - `src/arena_ai/training/ppo.py` — Calculates GAE and bootstrapped critic
   targets, then calculates PPO policy, value, and entropy losses and applies
-  optimizer updates.
+  optimizer updates. `GraphedTrainStep` replays one PPO minibatch step as a CUDA graph.
 - `src/arena_ai/training/stats.py` — Cheap training statistics: rolling episode
   statistics overall and per opponent (running sums, so O(1) to update) and
   behaviour statistics for a rollout batch (action shares, reward per step).

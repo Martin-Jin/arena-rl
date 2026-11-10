@@ -37,7 +37,7 @@ simulation for cores.
 | Rollout storage                               | CPU, then GPU  | Transitions are stored as Python lists. `Rollout.as_batch` converts them to tensors on the training device once per iteration. |
 | GAE advantages and discounted returns         | CPU            | Sequential: 512 dependent steps, each doing tiny operations. See below.                                       |
 | Advantage normalization, minibatch indexing   | Training device | One operation over the whole batch.                                                                          |
-| PPO forward pass, loss, backward, Adam step   | Training device | Minibatches of 512 samples. This is the part that benefits from a GPU.                                        |
+| PPO forward pass, loss, backward, Adam step   | Training device | Minibatches of 512 samples. On CUDA each step is one replayed CUDA graph (see below).                         |
 | Checkpoint saving                             | Training device state | Tensors are saved as they are on the device. Loading uses `map_location="cpu"` by default.             |
 | Viewer inference (playing against the agent)  | CPU            | One observation per frame, and the viewer must run without a GPU.                                            |
 
@@ -81,6 +81,29 @@ values and the episode flags to the CPU, computes advantages and returns, and
 moves the results back to the training device before the PPO epochs. The numbers
 are identical either way. `discounted_returns` also checks for truncations once
 before its loop, not on every step.
+
+## The CUDA graph for the PPO update
+
+**Why it exists.** One PPO minibatch step on this network is about a thousand tiny GPU
+operations. The GPU runs each in microseconds, but the CPU needs about 27 ms to queue them
+one by one from Python, so the GPU mostly waits. **What it does.**
+[`GraphedTrainStep`](../src/arena_ai/training/ppo.py) records one whole step (forward, loss,
+backward, gradient clipping, Adam step) as a CUDA graph (a recording of the GPU work that is
+replayed with one call). Each minibatch is copied into fixed buffers and the recording is
+replayed, which takes about 3.7 ms. **How it works in code.** The recording stores memory
+addresses, so the buffers, weights and optimizer state are only updated in place. Building it
+runs three warm-up steps and then restores the weights and optimizer state, so it can be built
+after a checkpoint was loaded. Statistics are summed inside the graph and read once per
+update. **Limits.** CUDA only (`USE_CUDA_GRAPH` in `run_training.py` turns it off). A minibatch
+of another size, such as a short last one, runs as an ordinary step with the same result. The
+learning rate is recorded as a constant. The Adam optimizer is switched to its `capturable`
+mode, so `run_training.py` sets that flag again after loading a checkpoint. The first update
+after the graph is built matches the ordinary step to about four digits, and 20 iterations
+took 48.7 s instead of 78.2 s.
+
+`FactoredCategorical` skips argument validation (`validate_args=False`) because the checks
+read tensors back to Python, which waits for the GPU and is not allowed while a graph is
+being recorded.
 
 ## Measured effect
 
