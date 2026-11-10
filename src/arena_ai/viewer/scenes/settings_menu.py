@@ -31,12 +31,12 @@ if TYPE_CHECKING:
 
 COLUMN_WIDTH = 560
 COLUMN_GAP = 40
-PANEL_PADDING = 24
-ROW_HEIGHT = 40
+PANEL_PADDING = 18
+ROW_HEIGHT = 39
 ROW_GAP = 6
 SECTION_HEIGHT = 30
 SECTION_GAP = 8
-MAX_CHECKPOINTS_SHOWN = 8  # Keeps the dropdown list on the screen.
+MAX_CHECKPOINTS_SHOWN = 3  # Keeps the dropdown list on the screen.
 
 
 class SettingsScene:
@@ -204,8 +204,8 @@ class SettingsScene:
                     y += ROW_HEIGHT + ROW_GAP
                 y += SECTION_GAP
             bottom = max(bottom, y)
-        self.back.rect = pygame.Rect(0, 0, 200, 50)
-        self.back.rect.midtop = (center_x, bottom + 4)
+        self.back.rect = pygame.Rect(0, 0, 100, 40)
+        self.back.rect.midtop = (center_x, bottom + 8)
         self.panel = pygame.Rect(
             center_x - panel_width // 2, 84, panel_width, self.back.rect.bottom + 24 - 84
         )
