@@ -10,6 +10,7 @@ from arena_ai.agents.policy import ActorCritic, PolicyAdapter
 from arena_ai.agents.scripted import EpisodePolicy, training_opponents
 from arena_ai.config import Config, load_config
 from arena_ai.envs.training_envs.one_v_many_env import OneVManyEnv
+from arena_ai.envs.async_vector_env import AsyncVectorEnv
 from arena_ai.envs.vector_env import VectorEnv
 from arena_ai.training.checkpoints import load_checkpoint, save_checkpoint
 from arena_ai.training.ppo import (
@@ -177,7 +178,13 @@ def run_training(config: Config | None = None) -> TrainingState:
 
     # Build the environment(s) and run the training loop.
     factories = make_factories(config)
-    environment = VectorEnv(factories) if len(factories) > 1 else factories[0]()
+    workers = config.training.env_workers
+    if len(factories) == 1:
+        environment = factories[0]()
+    elif workers > 1 and visualizer is None:  # The visualizer needs the environments here.
+        environment = AsyncVectorEnv(factories, workers)
+    else:
+        environment = VectorEnv(factories)
     loop = TrainingLoop(
         environment,
         policy,
@@ -206,6 +213,8 @@ def run_training(config: Config | None = None) -> TrainingState:
         )
         state = loop.state
     finally:
+        if isinstance(environment, VectorEnv):
+            environment.close()  # Stops the worker processes.
         if visualizer is not None:
             visualizer.close()
     return state

@@ -67,6 +67,8 @@ The simulation layer is deterministic and independent of rendering. It must not 
   fighter state and scoring config.
 - `src/arena_ai/envs/vector_env.py` — Runs independent headless environments
   synchronously and auto-resets completed instances for batched collection.
+- `src/arena_ai/envs/async_vector_env.py` — `AsyncVectorEnv`: the same interface, with the
+  environments stepped in worker processes (`training.env_workers`).
 - `src/arena_ai/envs/training_envs/` — Contains concrete environments for
   training and scenario testing.
 - `src/arena_ai/envs/training_envs/one_v_many_env.py` — `OneVManyEnv`: one learning

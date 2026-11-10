@@ -24,7 +24,11 @@ training:
   iterations: 5000 # rollout-and-update cycles, not episodes: each collects rollout_steps steps
   rollout_steps: 512 # transitions collected before each policy update
   checkpoint_interval: 100 # iterations between checkpoint saves
-  seed: null # optional seed for the initial environment reset
+  # The one seed for all training randomness, or null for a different run each time. It seeds
+  # the network's initial weights and action sampling, and every environment's generator
+  # (environment i uses seed + i), which draws spawn positions, the scripted opponents'
+  # per-episode options and the dice of the parrier and random opponents.
+  seed: null
   # One environment per entry, in order. Each entry lists the opponents the agent faces at
   # once in that environment (1 to game.yaml observation.max_opponents names from approach,
   # parrier, idle, runner, random). A bare name means one opponent. Opponents are allies:
@@ -53,6 +57,10 @@ training:
       [parrier, random, approach],
       [random, runner, idle],
     ]
+  # Worker processes that step the environments in parallel (1 = in this process). Environments
+  # are dealt out round-robin, so use a divisor of the environment count: with 16, 8 workers
+  # of 2 are as fast as 10 (some would hold 2, others 1), and 16 oversubscribes the cores.
+  env_workers: 8
   num_envs: 16 # the most environments allowed: training refuses to start with more entries
   randomize_spawns: true # random fighter start positions each episode
   # Redraw the scripted opponents' options each episode, so no fixed distance or timing can be

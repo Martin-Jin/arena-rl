@@ -6,8 +6,24 @@ from typing import Any
 from arena_ai.envs.arena_env import ArenaEnv
 
 
+def step_and_reset(env: ArenaEnv, action: int) -> tuple[Any, float, bool, bool, dict[str, Any]]:
+    """Step one environment and, if its episode ended, reset it at once.
+
+    The last observation and info of the ended episode go in ``info["final_observation"]``
+    and ``info["final_info"]``, because PPO needs them to bootstrap, and the reset's info
+    goes in ``info["reset_info"]``. Shared by ``VectorEnv`` and the worker processes of
+    ``AsyncVectorEnv``, so both end episodes the same way.
+    """
+    observation, reward, ended, timed_out, info = env.step(action)
+    if ended or timed_out:
+        info = {**info, "final_observation": observation, "final_info": info.copy()}
+        observation, reset_info = env.reset()
+        info["reset_info"] = reset_info
+    return observation, reward, ended, timed_out, info
+
+
 class VectorEnv:
-    """Run independent environment instances in one synchronous batch."""
+    """Run independent environment instances in one synchronous batch, in this process."""
 
     def __init__(self, env_factories: Sequence[Callable[[], ArenaEnv]]) -> None:
         if not env_factories:
@@ -51,18 +67,13 @@ class VectorEnv:
         truncated: list[bool] = []
         infos: list[dict[str, Any]] = []
         for env, action in zip(self.envs, actions):
-            observation, reward, ended, timed_out, info = env.step(action)
-            if ended or timed_out:
-                info = {
-                    **info,
-                    "final_observation": observation,
-                    "final_info": info.copy(),
-                }
-                observation, reset_info = env.reset()
-                info["reset_info"] = reset_info
+            observation, reward, ended, timed_out, info = step_and_reset(env, action)
             observations.append(observation)
             rewards.append(reward)
             terminated.append(ended)
             truncated.append(timed_out)
             infos.append(info)
         return observations, rewards, terminated, truncated, infos
+
+    def close(self) -> None:
+        """Release resources. Nothing to release in this process."""

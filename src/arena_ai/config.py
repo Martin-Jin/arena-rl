@@ -221,6 +221,8 @@ class TrainingConfig:
     # The most environments training allows; ``opponents`` sets how many run.
     num_envs: int = 1
     randomize_spawns: bool = False
+    # Worker processes stepping the environments in parallel; 1 steps them in this process.
+    env_workers: int = 1
     # Redraw the scripted opponents' swing-start distance and the hunter's attack chance each
     # episode (see agents/scripted/episode.py). Tuples, so a checkpoint saved before these
     # fields existed still reads the defaults.

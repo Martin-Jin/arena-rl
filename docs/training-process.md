@@ -25,6 +25,13 @@ defines:
 - `num_envs` — the most environments allowed. Training refuses to start, with an
   error, if `opponents` lists more entries, or an entry has no names or more than
   `observation.max_opponents`.
+- `seed` — the one seed for all training randomness (`null` for a different run each time).
+  It seeds the network's initial weights and action sampling, and each environment's own
+  generator (environment `i` uses `seed + i`). That generator draws spawn positions, the
+  scripted opponents' per-episode options and the dice of the `parrier` and `random`
+  opponents.
+- `env_workers` — worker processes that step the environments at the same time (`1` steps
+  them one after another in the training process). See "Parallel environments" below.
 - `randomize_spawns` — start each episode with random fighter positions.
 - `randomize_opponents` — redraw the scripted opponents' options at every episode reset,
   from the environment's seeded generator, so a learner cannot memorize one fixed distance
@@ -147,6 +154,47 @@ The scalar boundary is checked before data enters
 actions, rewards, terminal flags, values, and old log-probabilities are stored.
 The rollout is converted to a [`RolloutBatch`](../src/arena_ai/training/rollout.py)
 after collection and is discarded after the update.
+
+## Parallel environments
+
+**Why it exists.** Stepping the simulation is about half of a rollout, and one core does it
+for every environment in turn. **What it does.** With `env_workers` above 1,
+[`AsyncVectorEnv`](../src/arena_ai/envs/async_vector_env.py) splits the environments over
+worker processes. A worker owns its environments for the whole run, because each holds the
+state of a fight, so there is no shared task queue. Each rollout step has three parts:
+
+1. The training process sends every worker its environments' actions.
+2. The workers step their environments at the same time.
+3. The training process waits for all of them, puts the results back in environment order
+   and runs the network on the whole batch.
+
+**What does not change.** The network, the optimizer and the update stay in the training
+process. Observations, rewards and flags arrive in the same order and with the same
+features as with `VectorEnv`, and a run with the same `seed` gives the same data. A test
+checks this step for step, including auto-resets.
+
+**Why processes, and how many.** The simulation is pure Python, so threads would take turns
+on the interpreter lock, and a GPU cannot run it. Environments are dealt out round-robin
+(environment `i` to worker `i % workers`), so the slow ones spread out. Measured on 16
+environments and 12 cores, the time to step all of them was:
+
+| Workers | 1 (no workers) | 4 | 8 | 10 | 16 |
+| --- | --- | --- | --- | --- | --- |
+| Speedup | 1.0x | 2.1x | 3.0x | 3.0x | 2.0x |
+
+Ten is no faster than eight, because 16 environments over 10 workers leaves some workers
+with two and the step waits for them. Sixteen is slower, because it has more processes than
+cores and more messages. Use a divisor of the environment count.
+
+**What it buys overall.** Stepping the environments gets about 3x faster, but a whole
+training iteration only about 1.2x (20 iterations of 512 steps took 107 s, and 88 s with 8
+workers). The rest is the network (three small forward passes per step, one for the actions
+and two for values) and the PPO update, which this does not touch.
+
+**Limits.** The training visualizer needs the environments in the training process, so
+`VISUALIZE_TRAINING` falls back to `VectorEnv`. Environment factories must be picklable
+(module-level functions and `partial`, not lambdas). A failure in a worker is raised in the
+training process with the worker's traceback.
 
 ## Resuming a run
 
