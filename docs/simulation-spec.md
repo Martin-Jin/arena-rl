@@ -48,7 +48,10 @@ attack press made at the same time. The viewer maps `Q` to parry, and `Shift` or
 `F` is `FEATURES_PER_FIGHTER` (27) and `K` is `observation.max_opponents` in
 [`configs/game.yaml`](../configs/game.yaml) (3), so the vector has `F * (1 + K) + K` = 111
 values. `K` is the only place the number of opponents appears: raising it needs only that
-config value (and a retrain).
+config value (and a retrain). The training environments append a few more values after this
+vector, the critic's opponent context (see
+[training-process.md](training-process.md#critic-opponent-context)). They are not part of the
+observation or of `spec_version`, and the policy ignores them.
 
 - Opponents fill the slots in the natural order of their ids (`opponent_2` before
   `opponent_10`), from slot 0.

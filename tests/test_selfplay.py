@@ -93,7 +93,8 @@ class OwnObservationTests(unittest.TestCase):
     def test_the_agents_own_view_is_the_learners_view(self) -> None:
         env = OneVManyEnv(CONFIG, [("idle", make_opponent_policy("idle", CONFIG))])
         observation, _ = env.reset(seed=1)
-        self.assertEqual(own_observation(env.fighters, AGENT_ID, CONFIG), observation)
+        own = own_observation(env.fighters, AGENT_ID, CONFIG)
+        self.assertEqual(own, observation[: len(own)])  # The rest is the critic's context.
 
 
 class SelfPlayPolicyTests(unittest.TestCase):

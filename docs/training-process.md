@@ -255,6 +255,54 @@ rule:
   worker, so an environment with one steps slower than a scripted one. Workers import PyTorch
   only when an entry uses `agent`.
 
+## Critic opponent context
+
+**Why it exists.** The critic (the value network) predicts how well a fight will go, but the
+observation only shows the fighters' state, not who they are. Measured on `best.pt`, its
+explained variance (how much of the return it predicts: 1 is perfect, 0 is no better than the
+average) on the first rollout against one opponent type was 0.8 for `idle`, 0.5 for `approach`
+and `random`, 0.18 against `approach` + `parrier`, and negative against `parrier` alone (-0.33)
+and against the self-play copy (-0.31). After only two or three updates on one matchup it rose
+to about 0.7. So much of the error was a missing per-matchup offset, not a weak network.
+
+**What it does.** The training environment appends `opponent_context` to every observation: how
+many opponents of each type are in the fight (`OPPONENT_TYPES`), then the number of opponents
+and its square (so three opponents can cost more than three times one). The critic adds
+`matchup(context)`, one linear layer, to its value. The policy never sees it: the attention
+block reads exactly the observation's own columns.
+
+**Why this approach.** One critic per opponent type would split the data about 15 ways and
+route each environment's data to a different network. A critic-only input shares what the
+matchups have in common and costs 10 parameters. The critic is only used in training, so it
+can use information the policy lacks. An offset is less expressive than feeding the context
+through the whole critic, but it needs no change to the attention block, and a checkpoint
+without it still loads.
+
+**How it works in code.**
+1. `OneVManyEnv.get_observation` appends the context. It rides in the observation so it stays
+   paired with the right step: the final observation of an episode (used to bootstrap)
+   carries that episode's opponents, and the first observation after an auto-reset carries
+   the newly drawn ones.
+2. `ActorCritic.forward` and `StackedActor` split the batch at `observation_size`: the policy
+   reads the observation, and the critic adds `matchup` of the rest. A batch without the extra
+   columns (the viewer, tests) gets no offset.
+3. `load_checkpoint` accepts a checkpoint without `matchup` and pads the saved optimizer.
+
+**Result so far.** The layer starts at zero, so a resumed `best.pt` gives the same values as
+before (the first explained variance matched the earlier measurement). In a 60-update resume
+on the normal opponent mix, explained variance printed every 10 updates ranged 0.30 to 0.66
+(mean about 0.5), about where it was before (0.51 to 0.54). So 60 updates showed no clear
+gain over that noise. Judge it over a longer run, and compare the per-matchup figures above.
+
+**Limits.**
+- It does not help the critic with what is unknown inside one matchup, such as a random
+  opponent's dice or the time left in the episode (a win pays a time bonus, but the time left
+  is not an input).
+- Adding an opponent to `OPPONENTS` changes `OPPONENT_TYPES` and so the layer's size, which
+  breaks loading older checkpoints.
+- The first rollouts of a new run still train a critic that starts at zero offset, so
+  the benefit builds up over updates.
+
 ## Resuming a run
 
 `scripts/run_training.py` saves `checkpoints/latest.pt` at every checkpoint

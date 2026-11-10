@@ -2,6 +2,7 @@ import unittest
 
 import torch
 
+from arena_ai.agents.scripted.registry import CONTEXT_SIZE
 from arena_ai.agents.policy import ActorCritic, PolicyAdapter
 from arena_ai.config import load_config
 from arena_ai.sim.observation_vector import FEATURES_PER_FIGHTER
@@ -19,6 +20,9 @@ def make_data(device: torch.device) -> tuple[torch.Tensor, ...]:
     generator = torch.Generator().manual_seed(0)
     observations = torch.rand(SAMPLES, OBSERVATION_SIZE, generator=generator)
     observations[:, -OPPONENTS:] = (observations[:, -OPPONENTS:] > 0.5).float()
+    # Training batches carry the critic's opponent context after the observation.
+    context = torch.rand(SAMPLES, CONTEXT_SIZE, generator=generator)
+    observations = torch.cat([observations, context], dim=1)
     actions = torch.randint(0, 24, (SAMPLES,), generator=generator)
     log_probs = -torch.rand(SAMPLES, generator=generator) * 3
     advantages = torch.randn(SAMPLES, generator=generator)

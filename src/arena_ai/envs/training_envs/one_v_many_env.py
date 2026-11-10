@@ -5,7 +5,7 @@ import random
 
 from arena_ai.agents import selfplay
 from arena_ai.agents.action import to_fighter_action
-from arena_ai.agents.scripted.registry import OpponentMixture
+from arena_ai.agents.scripted.registry import OpponentMixture, opponent_context
 from arena_ai.agents.scripted.view import team_observation
 from arena_ai.config import Config
 from arena_ai.envs.arena_env import ArenaEnv
@@ -80,6 +80,15 @@ class OneVManyEnv(ArenaEnv):
             if hasattr(policy, "resample"):
                 policy.resample(self.rng)
         return super().reset(seed)
+
+    def get_observation(self) -> list[float]:
+        """Return the learner's observation followed by the critic context (opponent types).
+
+        The policy reads only the observation part (see ``agents/policy.py``), so the extra
+        values never reach it. They ride along so they stay paired with the right step, also
+        across an auto-reset, where a mixture draws new opponents.
+        """
+        return super().get_observation() + opponent_context(self.opponent_names)
 
     def set_opponent_weights(self, weights) -> None:
         """Give the self-play opponents the learner's weights (see ``agents/selfplay.py``).

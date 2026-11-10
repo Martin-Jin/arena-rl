@@ -82,6 +82,12 @@ class StackedActor:
         hidden_c = [m for m in critic.hidden if isinstance(m, nn.Linear)]
         self.hidden = [_stack(a, c, device) for a, c in zip(hidden_a, hidden_c)]
         self.output = _stack(actor.output_layer, critic.output_layer, device, LOGIT_COUNT)
+        self.matchup_weight = model.matchup.weight.detach().T.contiguous().to(device)  # [T, 1]
+        self.matchup_bias = model.matchup.bias.detach().to(device)
+        self.policy_input_size = f_size = FEATURES_PER_FIGHTER * (self.max_opponents + 1) + (
+            self.max_opponents
+        )
+        del f_size
 
     @staticmethod
     def _get(module: nn.Module, path: str):
@@ -99,7 +105,7 @@ class StackedActor:
         d, h, dk = self.embed_dim, self.num_heads, self.head_dim
         self_row = observation[:, :f]
         opponent_rows = observation[:, f : f * (k + 1)].reshape(batch * k, f)
-        mask = observation[:, f * (k + 1) :] > 0.5  # [B, K]
+        mask = observation[:, f * (k + 1) : f * (k + 1) + k] > 0.5  # [B, K]
         visible = torch.cat([torch.ones_like(mask[:, :1]), mask], dim=1)  # [B, 1 + K]
 
         e_self = self._mlp(self_row.unsqueeze(0).expand(2, -1, -1), self.phi_self)  # [2, B, d]
@@ -121,4 +127,8 @@ class StackedActor:
         for layer in self.hidden:
             x = self.activation(_linear(x, layer))
         out = self.output_activation(_linear(x, self.output))  # [2, B, LOGIT_COUNT]
-        return out[0], out[1, :, 0]
+        value = out[1, :, 0]
+        context = observation[:, self.policy_input_size :]  # The critic-only opponent types.
+        if context.shape[1]:
+            value = value + (context @ self.matchup_weight)[:, 0] + self.matchup_bias
+        return out[0], value

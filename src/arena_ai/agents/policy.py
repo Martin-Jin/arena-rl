@@ -8,7 +8,8 @@ from arena_ai.agents.distribution import sample_with_log_prob
 from arena_ai.agents.stacked_actor import StackedActor
 from arena_ai.config import Config
 from arena_ai.agents.attention import EntityAttention, activation
-from arena_ai.sim.observation_vector import FEATURES_PER_FIGHTER
+from arena_ai.agents.scripted.registry import CONTEXT_SIZE
+from arena_ai.sim.observation_vector import FEATURES_PER_FIGHTER, observation_size
 
 
 class AttentionNetwork(nn.Module):
@@ -59,6 +60,13 @@ class ActorCritic(nn.Module):
         self.value_network = AttentionNetwork(config, 1)
         nn.init.orthogonal_(self.policy_network.output_layer.weight, gain=0.01)
         nn.init.orthogonal_(self.value_network.output_layer.weight)
+        # The critic's offset for the opponent types in a fight (critic-only input that follows
+        # the observation, see ``opponent_context``). It starts at zero, so a checkpoint saved
+        # before it existed gives the same values (see ``training/checkpoints.py``).
+        self.policy_input_size = observation_size(config.game.observation.max_opponents)
+        self.matchup = nn.Linear(CONTEXT_SIZE, 1)
+        nn.init.zeros_(self.matchup.weight)
+        nn.init.zeros_(self.matchup.bias)
         network = config.agent.network
         # What a checkpoint must match to load: the same observation layout and network
         # shape. ``max_opponents`` is not part of it, because the weights do not depend on it.
@@ -73,8 +81,17 @@ class ActorCritic(nn.Module):
         }
 
     def forward(self, observations: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """Return action logits and critic values for a tensor batch."""
-        return self.policy_network(observations), self.value_network(observations)
+        """Return action logits and critic values for a tensor batch.
+
+        A batch may carry the opponent types after the observation (the training environments
+        append them). The policy ignores them, and the critic adds ``matchup`` of them to its
+        value. A batch without them (the viewer, tests) simply gets no offset.
+        """
+        values = self.value_network(observations)
+        context = observations[:, self.policy_input_size :]
+        if context.shape[1]:
+            values = values + self.matchup(context)
+        return self.policy_network(observations), values
 
 
 class PolicyAdapter:

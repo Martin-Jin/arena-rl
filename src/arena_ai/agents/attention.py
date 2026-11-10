@@ -87,7 +87,7 @@ class EntityAttention(nn.Module):
         f, k = FEATURES_PER_FIGHTER, self.max_opponents
         self_row = observation[:, :f]
         opponent_rows = observation[:, f : f * (k + 1)].reshape(batch, k, f)
-        mask = observation[:, f * (k + 1) :] > 0.5  # [B, K]
+        mask = observation[:, f * (k + 1) : f * (k + 1) + k] > 0.5  # [B, K]
 
         e_self = self.phi_self(self_row)  # [B, d]
         e_opp = self.phi_opp(opponent_rows)  # [B, K, d]

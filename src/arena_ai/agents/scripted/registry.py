@@ -29,6 +29,28 @@ OPPONENTS = {
 # names it.
 SELF_PLAY = "agent"
 
+# The opponent types the critic is told about (see ``opponent_context``). Adding an opponent
+# to ``OPPONENTS`` adds one, which changes the critic's shape: old checkpoints then need the
+# shim in ``training/checkpoints.py`` or a new run.
+OPPONENT_TYPES = (*sorted(OPPONENTS), SELF_PLAY)
+
+
+# The size of ``opponent_context``: one count per type, then the opponent number and its square.
+CONTEXT_SIZE = len(OPPONENT_TYPES) + 2
+
+
+def opponent_context(names) -> list[float]:
+    """Return how many opponents of each type (``OPPONENT_TYPES`` order) a fight has, then
+    the number of opponents and its square.
+
+    **Why:** how well a fight is likely to go depends on who the agent faces and how many
+    at once, but the observation only shows the fighters' state. This is extra input for the
+    critic alone, which is only used in training. The policy never sees it. The square lets
+    three opponents cost more than three times one.
+    """
+    counts = [float(sum(name == kind for name in names)) for kind in OPPONENT_TYPES]
+    return [*counts, float(len(names)), float(len(names) ** 2)]
+
 
 @dataclass(frozen=True)
 class OpponentMixture:

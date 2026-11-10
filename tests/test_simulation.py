@@ -7,6 +7,7 @@ from arena_ai.agents.action import (
     from_parts,
     to_fighter_action,
 )
+from arena_ai.agents.scripted import CONTEXT_SIZE
 from arena_ai.config import load_config
 from arena_ai.sim.observation_vector import observation_size
 from arena_ai.envs.training_envs.one_v_one_env import OneVOneEnv
@@ -44,7 +45,8 @@ class SimulationTests(unittest.TestCase):
         first, second = run(), run()
         self.assertEqual(first, second)
         slots = load_config().game.observation.max_opponents
-        self.assertEqual(len(first[0]), observation_size(slots))
+        # The training environment appends the critic's opponent context.
+        self.assertEqual(len(first[0]), observation_size(slots) + CONTEXT_SIZE)
 
 
 if __name__ == "__main__":

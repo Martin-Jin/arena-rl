@@ -9,6 +9,10 @@ from arena_ai.config import Config
 from arena_ai.training.train import TrainingState
 
 
+# The parameters a checkpoint may lack (see ``load_checkpoint``).
+NEW_PARAMETER_PREFIX = "matchup."
+
+
 def save_checkpoint(
     path: str | Path,
     model: torch.nn.Module,
@@ -64,7 +68,20 @@ def load_checkpoint(
     """Restore a checkpoint and return its serialized metadata."""
     checkpoint = torch.load(path, map_location=map_location, weights_only=False)
     _check_compatible(path, checkpoint, model)
-    model.load_state_dict(checkpoint["model"])
+    # Checkpoints saved before the critic's ``matchup`` layer have no weights for it: it keeps
+    # its zero start, so the critic's values are unchanged. Anything else missing is an error.
+    # TODO: remove this and the optimizer padding below once no checkpoint saved before the
+    # ``matchup`` layer is still resumed (best.pt and any run folder from before it).
+    missing, unexpected = model.load_state_dict(checkpoint["model"], strict=False)
+    wrong = [key for key in missing if not key.startswith(NEW_PARAMETER_PREFIX)] + unexpected
+    if wrong:
+        raise ValueError(f"{path} does not match the model: {wrong}")
     if optimizer is not None:
-        optimizer.load_state_dict(checkpoint["optimizer"])
+        saved = checkpoint["optimizer"]
+        group = saved["param_groups"][0]
+        wanted = len(optimizer.param_groups[0]["params"])
+        # The new parameters come last, so pad the saved list with them: they have no
+        # optimizer state yet and start from scratch.
+        group["params"] = group["params"] + list(range(len(group["params"]), wanted))
+        optimizer.load_state_dict(saved)
     return checkpoint

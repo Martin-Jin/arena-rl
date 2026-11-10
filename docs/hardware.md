@@ -2,7 +2,7 @@
 
 Training uses the GPU only for the work that benefits from it. The network is small:
 an attention input block over the fighters (64-wide embeddings, four heads) that feeds two
-hidden layers of 128 units, about 123,000 parameters in total. The hidden layers receive
+hidden layers of 128 units, about 125,000 parameters in total. The hidden layers receive
 `[e_self ; context]`, the acting fighter's own embedding joined to the attention context
 (see [network.md](network.md)). Most of the work is many tiny
 steps, so a GPU is often slower than the CPU. Each GPU operation has a fixed

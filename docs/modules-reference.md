@@ -95,8 +95,8 @@ The simulation layer is deterministic and independent of rendering. It must not 
   hunter: it parries every attack it can see from the front, so mix it with easier
   opponents in training), `dodger.py` (approach-and-attack that rolls through every swing
   it can see, until its stamina runs out), `runner.py` (flees the learner), `simple.py` (idle and uniformly
-  random), `registry.py` (the `OPPONENTS` registry, `SELF_PLAY` and `training_opponents`, which checks a
-  `training.opponents` list), `episode.py` (`EpisodePolicy`, which redraws an opponent's
+  random), `registry.py` (the `OPPONENTS` registry, `SELF_PLAY`, `OPPONENT_TYPES` with `opponent_context`,
+  the critic's extra input, and `training_opponents`, which checks a `training.opponents` list), `episode.py` (`EpisodePolicy`, which redraws an opponent's
   options each training episode), `view.py` (how a policy reads its observation by name, and
   `team_observation`, which builds it: the agent, the opponent, then its allies, from
   `fighter_rows` so each fighter is encoded once per step) and
@@ -120,8 +120,9 @@ The simulation layer is deterministic and independent of rendering. It must not 
 
 ### Training
 
-- `src/arena_ai/training/` — Contains the learner-versus-scripted-opponent
-  workflow. It has no self-play, fine-tuning, curriculum or opponent-pool workflow.
+- `src/arena_ai/training/` — Contains the training workflow: the learner against scripted
+  opponents or a copy of itself (`agent`, see `agents/selfplay.py`). It has no fine-tuning,
+  curriculum or opponent-pool workflow.
 - `src/arena_ai/training/rollout.py` — Stores observations, actions, rewards,
   termination flags, and policy values/log probabilities collected from rollouts.
 - `src/arena_ai/training/ppo.py` — Calculates GAE and bootstrapped critic
@@ -132,7 +133,8 @@ The simulation layer is deterministic and independent of rendering. It must not 
   behaviour statistics for a rollout batch (action shares, reward per step).
 - `src/arena_ai/training/report.py` — Formats the latest statistics for printing.
 - `src/arena_ai/training/checkpoints.py` — Saves and restores the policy,
-  optimizer, configuration, and training progress.
+  optimizer, configuration, and training progress. It also loads checkpoints saved before the
+  critic's `matchup` layer (see `docs/network.md`).
 - `src/arena_ai/training/train.py` — Owns rollout collection across episodes,
   updates, checkpoint callbacks, and training metrics. See
   [`docs/training-process.md`](training-process.md) for the complete current

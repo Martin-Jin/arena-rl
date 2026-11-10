@@ -210,7 +210,14 @@ activations). Loading checks it and names each difference. `max_opponents` is no
 signature, because no weight depends on it: a network trained with 3 opponent slots loads
 with 5.
 
+The critic also has a `matchup` layer (see
+[training-process.md](training-process.md#critic-opponent-context)). It is not in the
+signature either. A checkpoint saved before it existed still loads: the layer keeps its zero
+start, so the values are unchanged, and the saved optimizer state is padded for the new
+parameters. That shim is in `training/checkpoints.py`, with a TODO to remove it once no old
+checkpoint is resumed.
+
 ## Size
 
-With the defaults the network has 112,778 parameters: 56,905 in the policy network and 55,873
-in the value network.
+With the defaults the network has 124,694 parameters: 62,987 in the policy network, 61,697
+in the value network and 10 in the critic's `matchup` layer.
