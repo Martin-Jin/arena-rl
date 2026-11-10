@@ -137,16 +137,29 @@ class ParryingHunterTests(unittest.TestCase):
         self.assertLess(sum(waits) / len(waits), 10)  # About 5 frames on average.
         self.assertLessEqual(max(waits), 40)
 
-    def test_it_does_not_attack_a_learner_that_is_moving(self) -> None:
+    def test_it_does_not_attack_a_learner_that_walks_away(self) -> None:
         fighters = {
-            "agent": FighterState(x=5.0, facing_dir=1, vx=4.0),
+            "agent": FighterState(x=5.0, facing_dir=1, vx=-4.0),
             "opponent": FighterState(x=5.5, facing_dir=-1),
         }
-        # Walking back and forth keeps the learner's velocity non-zero but in reach.
-        for step_index in range(60):
-            direction = 1 if (step_index // 5) % 2 == 0 else -1
-            play(fighters, FighterAction(move_dir=direction), 1)
+        # Only walking away dodges its swing, so it holds back even with the chance at 0.
+        self.chance.return_value = 0.0
+        for _ in range(30):
+            play(fighters, FighterAction(move_dir=-1), 1)
             self.assertEqual(fighters["opponent"].attack_frame, 0)
+
+    def test_it_attacks_a_learner_that_wiggles_left_and_right_in_reach(self) -> None:
+        # Regression: any movement stopped it attacking, so a learner that tapped left and
+        # right never gave it an attack. The learner walks back every other step, which
+        # is the wiggle that exploited it. Fails if the gate goes back to ``vx == 0``.
+        self.chance.return_value = 0.0
+        fighters = {  # Already moving, so the first observation is not a standstill.
+            "agent": FighterState(x=5.0, facing_dir=1, vx=-4.0),
+            "opponent": FighterState(x=5.5, facing_dir=-1),
+        }
+        for step_index in range(120):
+            play(fighters, FighterAction(move_dir=-1 if step_index % 2 == 0 else 1), 1)
+        self.assertLess(fighters["agent"].health, 100)
 
     def test_it_turns_to_parry_a_swing_from_behind(self) -> None:
         fighters = {  # The learner walked past: it is behind the hunter, which faces away.

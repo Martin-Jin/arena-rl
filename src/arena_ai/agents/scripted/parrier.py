@@ -30,12 +30,12 @@ def parrying_hunter(
     A swing that is about to hit it from the front is parried on the exact step the swing turns
     active, so the learner cannot win by attacking from the front. It attacks after a
     parry (the counter) and, now and then (``HUNTER_ATTACK_CHANCE`` per step), when the
-    learner stands on the ground with no movement input, including one that swings
-    away from it, since that swing cannot hit. It never starts a swing against a
-    learner that is moving or whose swing points at it, because a swing leaves it
-    unable to parry. A learner that swings away and turns back while the swing is
-    active can therefore hit it. An attack it starts against a still learner can still trade hits
-    with a swing the learner starts right after. It uses the global ``random`` module,
+    learner is not walking away from it, including one that swings away from it, since
+    that swing cannot hit. It never starts a swing against a learner that is walking
+    away or whose swing points at it, because a swing leaves it unable to parry. A learner
+    that swings away and turns back while the swing is active can therefore hit it. An
+    attack it starts against a still learner can still trade hits with a swing the learner
+    starts right after. It uses the global ``random`` module,
     like ``random_action``, so it is not reproducible.
     It turns to face an attacker that is behind it (for example one that walked past it
     before attacking) and then parries. It only has a chance to beat it while it is busy:
@@ -96,7 +96,12 @@ def parrying_hunter(
     action = approach_and_attack(observation, config)
     # A swing that reached the branch above is no threat (it points away, or this fighter is
     # busy), so only movement, not swinging, stops the fighter from attacking.
-    learner_still = learner["vx"] == 0  # A jumping learner with no walk input is still
+    # Only a learner walking away from this fighter can dodge its swing, so only that
+    # blocks an attack. Walking toward it, or back and forth in place, does not: this
+    # fighter keeps closing in during the swing. Blocking on any movement let a learner
+    # that wiggled left and right stop it from ever attacking.
+    away = 1 if learner_x > self_x else -1
+    learner_still = learner["vx"] * away <= 0
     if action == Action.ATTACK and not (learner_still and random.random() < HUNTER_ATTACK_CHANCE):
         return int(Action.IDLE)
     return action

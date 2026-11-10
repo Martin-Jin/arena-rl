@@ -13,6 +13,7 @@ def approach_and_attack(
 ) -> int:
     """Face the learner, approach, jump when it is above, and attack in reach.
 
+    It keeps walking toward a learner in front of it during its swing.
     Deterministic. The scripted fighter is slot 1 of the learner-perspective observation.
     It never parries.
     """
@@ -42,11 +43,13 @@ def approach_and_attack(
     forward = self_facing * dx
     reach = fighter_width + attack_range
 
-    # Mid-swing: do not turn (turning would also turn the swing), so only chase a learner
-    # that is in front
-    # of us and out of reach. Otherwise let the swing play out.
+    # Mid-swing: do not turn (turning would also turn the swing), so only push toward a
+    # learner that is in front of us. Pushing on past the edge of reach, up to body contact
+    # (bodies block each other), means a learner that steps back a few centimeters on the
+    # active frames is still hit. Standing still at the edge let it dodge that way with one
+    # tap and punish the recovery.
     if self_attacking:
-        if forward > reach:
+        if forward > 0:
             return int(move_toward)
         return int(Action.IDLE)
 
