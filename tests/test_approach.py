@@ -31,6 +31,18 @@ class ApproachTests(unittest.TestCase):
         opponent = FighterState(x=5.8, facing_dir=1, attack_frame=3)
         self.assertEqual(action_for(learner, opponent), Action.IDLE)
 
+    def test_it_jumps_and_swings_together_at_a_jumping_learner_in_reach(self) -> None:
+        # Regression: it stood still while the learner was above reach, so a learner that
+        # kept jumping was never hit.
+        learner = FighterState(x=5.0, y=1.5, facing_dir=1, on_ground=False)
+        opponent = FighterState(x=5.8, facing_dir=-1)
+        self.assertEqual(action_for(learner, opponent), Action.MOVE_LEFT_JUMP_ATTACK)
+
+    def test_it_only_swings_in_the_air_when_the_learner_is_still_above(self) -> None:
+        learner = FighterState(x=5.0, y=1.5, facing_dir=1, on_ground=False)
+        opponent = FighterState(x=5.8, y=1.0, facing_dir=-1, on_ground=False)
+        self.assertEqual(action_for(learner, opponent), Action.MOVE_LEFT_ATTACK)
+
 
 if __name__ == "__main__":
     unittest.main()

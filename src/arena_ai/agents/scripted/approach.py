@@ -12,7 +12,7 @@ def approach_and_attack(
     config: Config | None = None,
     swing_start_offset_m: float = 0.0,
 ) -> int:
-    """Face the learner, approach, jump when it is above, and attack in reach.
+    """Face the learner, approach and attack in reach, jumping too if the learner is airborne.
 
     It keeps walking toward a learner in front of it during its swing, including on the
     step it starts the swing. ``swing_start_offset_m`` moves the distance at which it starts
@@ -64,10 +64,17 @@ def approach_and_attack(
 
     # In horizontal reach of the hitbox (center to front edge + range), moved by the offset.
     if forward <= reach + swing_start_offset_m:
-        if abs(dy) < fighter_height:
+        level = abs(dy) < fighter_height
+        # A learner in the air, or above reach, is met in the air: jump and swing on the same
+        # step, so the rise during the wind-up lifts the hitbox to it. Swinging from the
+        # ground at a jumping learner missed, and waiting for it to land left this fighter
+        # standing still.
+        if self_on_ground and (dy >= fighter_height or learner["on_ground"] != 1.0):
+            if toward > 0:
+                return int(Action.MOVE_RIGHT_JUMP_ATTACK)
+            return int(Action.MOVE_LEFT_JUMP_ATTACK)
+        if level or dy > 0:
             return int(Action.MOVE_RIGHT_ATTACK if toward > 0 else Action.MOVE_LEFT_ATTACK)
-        if dy > 0 and self_on_ground:
-            return int(Action.JUMP)
         return int(Action.IDLE)
 
     return int(move_toward)

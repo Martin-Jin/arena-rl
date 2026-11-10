@@ -20,7 +20,14 @@ from arena_ai.config import Config, load_config
 HUNTER_ATTACK_CHANCE = 0.2
 
 # The actions that start a swing.
-SWING_STARTS = (Action.ATTACK, Action.MOVE_LEFT_ATTACK, Action.MOVE_RIGHT_ATTACK)
+SWING_STARTS = (
+    Action.ATTACK,
+    Action.MOVE_LEFT_ATTACK,
+    Action.MOVE_RIGHT_ATTACK,
+    Action.JUMP_ATTACK,
+    Action.MOVE_LEFT_JUMP_ATTACK,
+    Action.MOVE_RIGHT_JUMP_ATTACK,
+)
 
 
 @jumps_over_allies
