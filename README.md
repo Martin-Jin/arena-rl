@@ -3,17 +3,17 @@
 Arena AI is a Python 2D arena-fighting project with a deterministic fighter
 simulation, reinforcement-learning components, and a pygame viewer.
 
-It includes the simulation, a manual viewer and a headless PPO training workflow.
-It has no Gymnasium/PettingZoo adapters, and training is learner versus scripted
-opponents only: there is no self-play, behavior cloning or fine-tuning.
+It includes the simulation, a manual viewer and a headless PPO training workflow. Training
+is against scripted opponents, a copy of the learner itself (self-play), or a mix. It has
+no Gymnasium/PettingZoo adapters, behavior cloning or fine-tuning.
 
 ## Current features
 
 - Fixed-timestep fighter simulation with movement, jumping, attacks, parrying,
-  counter attacks, health, damage, and hit detection.
+  counter attacks, dodging, health, damage, and hit detection.
 - Configurable game, agent, and scoring values in [`configs/`](configs/).
 - Observation encoding and discrete action definitions used by the learning agent.
-- **Training works today:** hand-written PPO, rollout, checkpoint, and environment
+- **Training:** hand-written PPO, rollout, checkpoint, and environment
   modules, run with `py scripts/run_training.py`. Choose the opponents of each parallel
   environment (one to three at once) with `training.opponents` in
   [`configs/agent.yaml`](configs/agent.yaml). Naming `agent` as an opponent trains the
@@ -125,12 +125,35 @@ Controls:
 
 ## Trained agent
 
-The repository does not include trained weights, so the viewer's trained agent needs a
-checkpoint first: run training (see [Training](#training)). The viewer then loads
-`checkpoints/latest.pt`, or any file you pick under **Checkpoint** in Settings. To keep
-a run's weights, copy the file out of the run folder and rename it (for example to
-`best.pt`). `.gitignore` lets `checkpoints/best.pt` be committed, and every other file in
-`checkpoints/` stays ignored.
+The repository includes the best weights so far, `checkpoints/best.pt`, so the viewer's
+trained opponent works straight after a clone with no training. Every other file in
+`checkpoints/` is gitignored. The viewer uses `latest.pt` when it exists, otherwise the
+newest `.pt` file (so a fresh clone gets `best.pt`), or any file you pick under
+**Checkpoint** in Settings. Replace `best.pt` only when a run is clearly better, and update
+these figures when you do.
+
+These weights are from iteration 3,100 of one run: 25.4 million steps and 44,631 episodes,
+of which the agent won 66%. That run mixed scripted opponents, drawn opponents and a copy of
+the agent itself (self-play), so the whole-run figure includes the hard multi-opponent fights.
+
+**In training**, the last 100 episodes against each opponent were:
+
+| Opponent | Win rate |
+| --- | --- |
+| approach, parrier, dodger, runner (alone) | 100% |
+| random (alone) | 91% |
+| a copy of itself (`agent`) | 50% |
+| approach + parrier | 50% |
+| parrier + parrier | 22% |
+| approach + approach + one drawn opponent | 16% |
+
+Two or three opponents at once are much harder than one, and the agent still loses most of
+those fights. Against itself it wins about half, as it should.
+
+**Measured separately** with `py scripts/evaluate_agent.py best.pt 30` (30 fights per
+opponent from fixed starts, one opponent each), it won all 30 against approach, parrier,
+dodger, runner and random, both with its best move (greedy) and with sampled moves. It
+left the parrier with the least health to spare (66 of 100 left when greedy).
 
 A checkpoint loads only if it was saved with the current observation layout and network
 shape (observation spec version 6, attention input block with four heads), so train a new
