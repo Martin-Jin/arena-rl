@@ -14,6 +14,7 @@ lambdas).
 
 from collections.abc import Callable, Sequence
 import multiprocessing
+import signal
 import traceback
 from typing import Any
 
@@ -25,7 +26,14 @@ CLOSE_TIMEOUT_S = 5.0
 
 
 def _worker(connection, factories: Sequence[Callable[[], ArenaEnv]]) -> None:
-    """Own some environments and answer the main process's commands until told to close."""
+    """Own some environments and answer the main process's commands until told to close.
+
+    It ignores ``Ctrl+C``: on Windows the console sends it to every process in the group, so
+    workers that exited on it closed their pipes under the main process, which then failed
+    with a ``BrokenPipeError`` before it could save a checkpoint. Now only the main process
+    handles it, and it closes the workers itself.
+    """
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
     try:
         envs = [factory() for factory in factories]
         connection.send(("ok", None))

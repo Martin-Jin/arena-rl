@@ -1,10 +1,12 @@
 from functools import partial
+import multiprocessing
 import random
+import signal
 import unittest
 
 from arena_ai.agents.scripted import EpisodePolicy
 from arena_ai.config import load_config
-from arena_ai.envs.async_vector_env import AsyncVectorEnv
+from arena_ai.envs.async_vector_env import AsyncVectorEnv, _worker
 from arena_ai.envs.training_envs.one_v_many_env import OneVManyEnv
 from arena_ai.envs.vector_env import VectorEnv
 
@@ -27,6 +29,16 @@ def broken_factory():
 
 
 class AsyncVectorEnvTests(unittest.TestCase):
+    def test_a_worker_ignores_ctrl_c_so_only_the_main_process_handles_it(self) -> None:
+        # Regression: workers that exited on Ctrl+C broke the main process's pipes, so it
+        # failed with a BrokenPipeError instead of saving a checkpoint.
+        self.addCleanup(signal.signal, signal.SIGINT, signal.getsignal(signal.SIGINT))
+        parent, child = multiprocessing.Pipe()
+        parent.send(("close", None))  # The worker answers "ok", then reads this and exits.
+        _worker(child, [])
+        self.assertEqual(signal.getsignal(signal.SIGINT), signal.SIG_IGN)
+        self.assertEqual(parent.recv(), ("ok", None))
+
     def test_it_matches_the_synchronous_vector_env_step_for_step(self) -> None:
         sync = VectorEnv(factories())
         parallel = AsyncVectorEnv(factories(), num_workers=2)

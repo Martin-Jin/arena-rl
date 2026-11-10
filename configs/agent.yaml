@@ -61,7 +61,7 @@ training:
       [parrier, dodger],
       [approach, null],
       [parrier, null],
-      [parrier, parrier, parrier],
+      [parrier, parrier, random],
       [approach, approach, null],
       [null, null, null],
       null,

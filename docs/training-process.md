@@ -226,7 +226,10 @@ path. The script then:
 `Ctrl+C` is held until the current PPO update finishes, so a checkpoint saved on
 interrupt never holds weights that are partway through an update while its
 iteration count excludes it. A second `Ctrl+C` stops at once and may save such a
-partial update.
+partial update. The environment worker processes ignore `Ctrl+C` (the console sends it to
+them too), so only the training process handles it and closes them. Before, workers that
+exited on it broke the training process with a `BrokenPipeError` during a rollout, so no
+checkpoint was saved.
 
 A resumed run is a valid continuation, not an exact replay. These are not saved:
 the random number generators (a configured seed is offset by the saved iteration
