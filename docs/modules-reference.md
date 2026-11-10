@@ -198,7 +198,9 @@ The viewer layer is the only layer intended to depend on `pygame`.
 
 - `src/arena_ai/viewer/game.py` — Interactive pygame viewer with menus.
 - `scripts/run_training.py` — Runs headless PPO training.
-- Evaluation and play scripts are planned under `scripts/`.
+- `scripts/evaluate_agent.py` — Plays a checkpoint against each scripted opponent and prints
+  win count, remaining health and fight length.
+- Further evaluation and play scripts are planned under `scripts/`.
 
 ## Tests
 

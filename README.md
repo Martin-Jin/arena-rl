@@ -102,7 +102,7 @@ Controls:
   fighter state, rules, observations, and stepping.
 - [`src/arena_ai/viewer/`](src/arena_ai/viewer/) — pygame rendering, input,
   and animation loading.
-- [`scripts/`](scripts/) — runnable entry points (currently training).
+- [`scripts/`](scripts/) — runnable entry points: training, and `evaluate_agent.py` to play a checkpoint against each scripted opponent.
 - [`tests/`](tests/) — automated tests.
 - [`configs/viewer.yaml`](configs/viewer.yaml) — viewer display, animation,
   audio volume, normalization, and fade settings.
