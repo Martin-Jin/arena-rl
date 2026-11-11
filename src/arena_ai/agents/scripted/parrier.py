@@ -1,4 +1,4 @@
-"""The perfect-parry opponent: parries every swing it can see, attacks a still learner."""
+"""A scripted agent that attacks and parries perfectly but does not dodge."""
 
 import random
 
@@ -38,61 +38,42 @@ def parrying_hunter(
     attack_chance: float = HUNTER_ATTACK_CHANCE,
     rng=random,
 ) -> int:
-    """Chase the learner, parry every attack it can, and attack a learner that stands still.
-
-    A swing that is about to hit it from the front is parried on the exact step the swing turns
-    active, so the learner cannot win by attacking from the front. It attacks after a
-    parry (the counter) and, now and then (``HUNTER_ATTACK_CHANCE`` per step), when the
-    learner is not walking away from it, including one that swings away from it, since
-    that swing cannot hit. It never starts a swing against a learner that is walking
-    away or whose swing points at it, because a swing leaves it unable to parry. A learner
-    that swings away and turns back while the swing is active can therefore hit it. An
-    attack it starts against a still learner can still trade hits with a swing the learner
-    starts right after. ``swing_start_offset_m`` is passed to ``approach_and_attack``.
-    ``attack_chance`` replaces ``HUNTER_ATTACK_CHANCE``. ``rng`` (anything with ``random()``)
-    draws the chance: it defaults to the global ``random`` module, so the viewer is not
-    reproducible, and training passes a seeded generator.
-    It turns to face an attacker that is behind it (for example one that walked past it
-    before attacking) and then parries. It only has a chance to beat it while it is busy:
-    - It cannot parry or turn while it is attacking or parrying, so a swing that lands
-      during its own swing or its parry recovery is not parried.
-    - It needs one step to turn, so a swing that is already on its last wind-up step
-      when it ends up behind the opponent still lands.
-    """
+    """Chases and attacks normally. When a swing starts within 4.0 sprite widths, it only turns, jump-parries and counters."""
     learner, me = learner_and_me(observation)
     config = config or load_config()
     combat = config.game.combat
     arena_width = config.game.world.arena_width_m
 
     learner_x = learner["x"] * arena_width
-    learner_swinging = is_attacking(learner)
-    # Wind-up frames left: 1 is the last one, so a parry pressed now is up on the first hit.
     windup_left = round(learner["attack_windup_left"] * combat.longest_windup_frames)
     self_x = me["x"] * arena_width
     self_facing = int(me["facing_dir"])
     self_busy = me["busy_frames_left"] > 0
     counter_ready = me["counter_frames"] > 0
+    learner_airborne = learner["y"] > 0.0
+    learner_in_front = (learner_x - self_x) * self_facing >= 0
 
-    # A swing that points away from this fighter cannot hit it, so it is not a threat: the
-    # fighter carries on and may attack instead of parrying.
-    if learner_swinging and not self_busy and swing_threatens(learner, me, config):
-        learner_in_front = (learner_x - self_x) * self_facing >= 0
-        if not learner_in_front and windup_left > 1:
-            # Moving toward the learner turns this fighter at once, in time to parry.
-            return int(Action.MOVE_RIGHT if learner_x > self_x else Action.MOVE_LEFT)
-        if learner_in_front and windup_left == 1:
-            return int(Action.PARRY)
-        return int(Action.IDLE)  # Waiting to parry, or too late to turn around.
+    sprite_width_m = config.game.fighter.height_m * config.game.fighter.width_to_height_ratio
+    in_focus_zone = abs(learner_x - self_x) <= 4.0 * sprite_width_m
+
+    # Counter after a successful parry.
     if counter_ready and not self_busy:
-        return int(Action.ATTACK)  # The counter after a parry.
-    # Otherwise chase and face the learner, and attack only a learner that stands still.
+        return int(Action.ATTACK)
+
+    # Focus mode: a swing is active within 4.0 sprite widths. No walking, no attacking.
+    if is_attacking(learner) and in_focus_zone:
+        if self_busy:
+            return int(Action.IDLE)
+        if not learner_in_front:
+            return int(Action.MOVE_RIGHT if learner_x > self_x else Action.MOVE_LEFT)  # turn only
+        if windup_left == 1:
+            return int(
+                Action.JUMP_PARRY if learner_airborne else Action.PARRY
+            )  # ASSUMPTION: JUMP_PARRY exists
+        return int(Action.IDLE)
+
+    # Normal mode: chase and attack, same gating as before.
     action = approach_and_attack(observation, config, swing_start_offset_m=swing_start_offset_m)
-    # A swing that reached the branch above is no threat (it points away, or this fighter is
-    # busy), so only movement, not swinging, stops the fighter from attacking.
-    # Only a learner walking away from this fighter can dodge its swing, so only that
-    # blocks an attack. Walking toward it, or back and forth in place, does not: this
-    # fighter keeps closing in during the swing. Blocking on any movement let a learner
-    # that wiggled left and right stop it from ever attacking.
     away = 1 if learner_x > self_x else -1
     learner_still = learner["vx"] * away <= 0
     if action in SWING_STARTS and not (learner_still and rng.random() < attack_chance):
