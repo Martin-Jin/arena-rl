@@ -12,13 +12,13 @@ network:
 
 policy:
   clip_range: 0.2 # clipping range for policy updates
-  learning_rate: 0.0003 # learning rate for the optimizer
+  learning_rate: 0.00015 # learning rate for the optimizer
   discount_factor: 0.99 # discount factor for future rewards
   gae_lambda: 0.95 # lambda parameter for Generalized Advantage Estimation
   num_epochs: 4 # number of epochs for training
   batch_size: 512 # size of each training batch
   value_loss_coef: 0.5 # coefficient for value loss in the total loss function
-  entropy_coef: 0.011 # coefficient for entropy in the total loss function
+  entropy_coef: 0.002 # coefficient for entropy in the total loss function
 
 training:
   iterations: 5000 # rollout-and-update cycles, not episodes: each collects rollout_steps steps
@@ -59,7 +59,7 @@ training:
       [dodger],
       [idle],
       [random],
-      [agent],
+      null,
       [null, null],
       [null, random],
       [parrier, null],
