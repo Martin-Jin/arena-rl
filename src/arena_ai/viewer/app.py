@@ -32,9 +32,7 @@ class App:
         self.theme = Theme(config.viewer.ui)
         self.to_screen = make_to_screen(config)
         self.settings = load_settings(config)
-        self.audio = AudioManager(
-            config.viewer.audio, config.game.observation.max_opponents + 1
-        )
+        self.audio = AudioManager(config.viewer.audio, config.game.observation.max_opponents + 1)
         self.audio.set_music_volume(self.settings.music_volume)
         self.audio.set_effects_volume(self.settings.effects_volume)
         self.audio.start_music()

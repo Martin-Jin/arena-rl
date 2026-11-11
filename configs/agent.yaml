@@ -60,15 +60,15 @@ training:
       [idle],
       [random],
       [agent],
-      [parrier, approach],
       [null, null],
       [null, random],
+      [parrier, null],
       [approach, null],
       [parrier, parrier],
-      [random, null, random],
-      [approach, approach, null],
       [null, null, null],
-      null,
+      [random, null, null],
+      [approach, parrier, null],
+      [approach, parrier, dodger],
     ]
   # What a null slot can be drawn as (an empty list means every opponent in the registry).
   random_opponent_pool: [approach, parrier, dodger, idle, runner, random]
