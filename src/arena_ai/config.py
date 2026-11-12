@@ -309,6 +309,7 @@ class ScoringConfig:
     timeout_win_reward: float = 0.0
     timeout_penalty: float = 0.0
     kill_reward: float = 0.0
+    max_parry_reward: float = 3.0
 
 
 @dataclass(frozen=True)

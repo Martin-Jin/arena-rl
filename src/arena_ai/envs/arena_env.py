@@ -42,6 +42,7 @@ class ArenaEnv(ABC):
         self.edge_steps = 0  # Steps within the edge margin of a wall.
         self.parry_attempts = 0  # Parries the agent started.
         self.parries = 0  # Parries of the agent that stopped an attack.
+        self.parry_reward_paid = 0.0  # Reward paid for parries that stopped an attack.
 
     @property
     def episode_done(self) -> bool:
@@ -82,6 +83,11 @@ class ArenaEnv(ABC):
         self._episode_done = terminated or truncated
 
         reward = self.calculate_reward(previous_health)
+        parry_part = self.config.scoring.parry_reward * self.fighters[AGENT_ID].parried
+        if parry_part > 0:
+            allowed = max(0.0, self.config.scoring.max_parry_reward - self.parry_reward_paid)
+            reward -= parry_part - min(parry_part, allowed)
+            self.parry_reward_paid += min(parry_part, allowed)
         # A time-out is not a kill, so "winner" stays None for it. It still earns a small
         # reward when the agent is ahead on health, and is reported as "timeout_win".
         timeout_win = truncated and winner(self.fighters, timed_out=True) == AGENT_ID

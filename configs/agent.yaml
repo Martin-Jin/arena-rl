@@ -18,7 +18,7 @@ policy:
   num_epochs: 4 # number of epochs for training
   batch_size: 512 # size of each training batch
   value_loss_coef: 0.5 # coefficient for value loss in the total loss function
-  entropy_coef: 0.006 # coefficient for entropy in the total loss function
+  entropy_coef: 0.002 # coefficient for entropy in the total loss function
 
 training:
   iterations: 5000 # rollout-and-update cycles, not episodes: each collects rollout_steps steps
@@ -59,19 +59,19 @@ training:
       [dodger],
       [idle],
       [random],
-      null,
+      [approach, parrier],
+      [parrier, dodger],
+      [idle, null],
+      [runner, null],
       [null, null],
-      [null, random],
-      [parrier, null],
-      [approach, null],
-      [parrier, idle],
+      [approach, parrier, dodger],
+      [idle, null, null],
+      [runner, null, null],
       [null, null, null],
-      [random, null, null],
-      [approach, parrier, null],
-      [parrier, runner],
+      null,
     ]
   # What a null slot can be drawn as (an empty list means every opponent in the registry).
-  random_opponent_pool: [approach, parrier, dodger, idle, runner, random]
+  random_opponent_pool: [approach, parrier, dodger, idle, runner]
   # Worker processes that step the environments in parallel (1 = in this process). Environments
   # are dealt out round-robin, so use a divisor of the environment count: with 16, 8 workers
   # of 2 are as fast as 10 (some would hold 2, others 1), and 16 oversubscribes the cores.

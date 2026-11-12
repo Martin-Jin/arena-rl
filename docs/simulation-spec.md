@@ -330,6 +330,7 @@ reward = damage_reward_scale * (damage dealt - damage taken)
 ```
 
 On a time-out the environment adds `timeout_win_reward` when the agent is ahead on health, and subtracts `timeout_penalty` when it is not. Stalling is therefore worse than fighting on, but still better than losing.
+Note the parry reward is capped, to prevent agent from spamming parries to gain reward.
 
 **Win-only bonuses.** `health_reward` and `victory_time_bonus` are paid only on the step
 that wins the fight. Health pays more for a cleaner win, and the time bonus pays more for a
