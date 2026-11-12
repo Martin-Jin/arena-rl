@@ -87,6 +87,8 @@ class ArenaEnv(ABC):
         timeout_win = truncated and winner(self.fighters, timed_out=True) == AGENT_ID
         if timeout_win:
             reward += self.config.scoring.timeout_win_reward
+        elif truncated:
+            reward -= self.config.scoring.timeout_penalty
         info = {
             "step_count": self.step_count,
             "winner": winner(self.fighters),

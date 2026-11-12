@@ -64,34 +64,34 @@ Every fighter contributes these 27 values, each clamped to `[-1, 1]`. Their orde
 `FEATURE_NAMES` in [`sim/observation_vector.py`](../src/arena_ai/sim/observation_vector.py),
 the single source for this table:
 
-| Offset | Feature        | Scaling                                          |
-| ------ | -------------- | ------------------------------------------------ |
-| 0      | `x`            | divided by `arena_width_m`                       |
-| 1      | `y`            | height above the floor / `max_observed_height_m` |
-| 2      | `vx`           | divided by `move_speed_mps`                      |
-| 3      | `vy`           | divided by `jump_velocity_mps`                   |
-| 4      | `on_ground`    | 1.0 or 0.0                                       |
-| 5      | `facing_dir`   | -1.0 or 1.0                                      |
-| 6      | `health`       | divided by `max_health`                          |
-| 7      | `attack_windup_left` | wind-up frames of the running swing still to run, divided by the longest wind-up of any attack type. 1 frame (not 0) is the last wind-up frame, the one a parry must be pressed on |
-| 8      | `attack_active_left` | damaging frames still to run, divided by the longest active phase. Full length until the phase starts |
-| 9      | `attack_recovery_left` | recovery frames still to run, divided by the longest recovery. Full length until the phase starts |
-| 10     | `parry_window_left` | protected frames of the running parry still to run, divided by `parry_window_frames` |
-| 11     | `parry_recovery_left` | parry recovery frames still to run, divided by `parry_recovery_frames`. Full length until the window ends |
-| 12     | `parry_window` | divided by `parry_window_frames`: the protected frames of the running parry, or of the next one when idle. Below 1.0 means spam is shrinking it |
-| 13     | `counter_frames` | frames left to counter, divided by `counter_window_frames` |
-| 14     | `stagger_frames` | frames left in which a parried fighter cannot attack, divided by `parried_stagger_frames` |
-| 15     | `parry_held` | 1.0 if the fighter's parry input was held on the previous step. Only a new press starts a parry, so a policy that keeps parry on never starts another one, and needs this to know it must release first |
-| 16     | `busy_frames_left` | frames until the fighter can start an attack or a parry again (the larger of the attack and parry countdowns), divided by the longer of `longest_attack_frames` and `parry_total_frames`. A dodge burst counts too, since it blocks both |
-| 17, 18 | `attack_type_<name>` | one-hot of the attack in progress, one value per `AttackType` (`slash` and `counter`), all 0 when not attacking |
-| 19     | `rel_x_ahead` | horizontal distance from the acting fighter, positive in front of it (along its facing), divided by 3 attack reaches (`width_m + attack_range_m`) |
-| 20     | `rel_y` | height above the acting fighter, divided by 2 fighter heights |
-| 21     | `rel_x_aimed` | horizontal distance, positive when this fighter faces the acting fighter (its swing points at it), divided by 3 attack reaches |
-| 22     | `dodge_frames_left` | frames of the running dodge burst still to run, divided by `duration_frames`. The fighter is invincible while it is above 0 and cannot attack or parry |
-| 23     | `dodge_gap_left` | frames left after the burst in which the fighter cannot dodge again (it can be hit), divided by `gap_frames` |
-| 24     | `dodge_held` | 1.0 if the dodge input was held on the previous step. Only a new press starts a dodge, so a policy that keeps dodge on never dodges again, and needs this to know it must release first |
-| 25     | `stamina` | divided by `max_stamina`. A dodge needs at least `cost` |
-| 26     | `dodge_cost` | `cost` divided by `max_stamina`: the same for every fighter and step. It is an input so the network knows how many dodges the stamina buys |
+| Offset | Feature                | Scaling                                                                                                                                                                                                                                  |
+| ------ | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0      | `x`                    | divided by `arena_width_m`                                                                                                                                                                                                               |
+| 1      | `y`                    | height above the floor / `max_observed_height_m`                                                                                                                                                                                         |
+| 2      | `vx`                   | divided by `move_speed_mps`                                                                                                                                                                                                              |
+| 3      | `vy`                   | divided by `jump_velocity_mps`                                                                                                                                                                                                           |
+| 4      | `on_ground`            | 1.0 or 0.0                                                                                                                                                                                                                               |
+| 5      | `facing_dir`           | -1.0 or 1.0                                                                                                                                                                                                                              |
+| 6      | `health`               | divided by `max_health`                                                                                                                                                                                                                  |
+| 7      | `attack_windup_left`   | wind-up frames of the running swing still to run, divided by the longest wind-up of any attack type. 1 frame (not 0) is the last wind-up frame, the one a parry must be pressed on                                                       |
+| 8      | `attack_active_left`   | damaging frames still to run, divided by the longest active phase. Full length until the phase starts                                                                                                                                    |
+| 9      | `attack_recovery_left` | recovery frames still to run, divided by the longest recovery. Full length until the phase starts                                                                                                                                        |
+| 10     | `parry_window_left`    | protected frames of the running parry still to run, divided by `parry_window_frames`                                                                                                                                                     |
+| 11     | `parry_recovery_left`  | parry recovery frames still to run, divided by `parry_recovery_frames`. Full length until the window ends                                                                                                                                |
+| 12     | `parry_window`         | divided by `parry_window_frames`: the protected frames of the running parry, or of the next one when idle. Below 1.0 means spam is shrinking it                                                                                          |
+| 13     | `counter_frames`       | frames left to counter, divided by `counter_window_frames`                                                                                                                                                                               |
+| 14     | `stagger_frames`       | frames left in which a parried fighter cannot attack, divided by `parried_stagger_frames`                                                                                                                                                |
+| 15     | `parry_held`           | 1.0 if the fighter's parry input was held on the previous step. Only a new press starts a parry, so a policy that keeps parry on never starts another one, and needs this to know it must release first                                  |
+| 16     | `busy_frames_left`     | frames until the fighter can start an attack or a parry again (the larger of the attack and parry countdowns), divided by the longer of `longest_attack_frames` and `parry_total_frames`. A dodge burst counts too, since it blocks both |
+| 17, 18 | `attack_type_<name>`   | one-hot of the attack in progress, one value per `AttackType` (`slash` and `counter`), all 0 when not attacking                                                                                                                          |
+| 19     | `rel_x_ahead`          | horizontal distance from the acting fighter, positive in front of it (along its facing), divided by 3 attack reaches (`width_m + attack_range_m`)                                                                                        |
+| 20     | `rel_y`                | height above the acting fighter, divided by 2 fighter heights                                                                                                                                                                            |
+| 21     | `rel_x_aimed`          | horizontal distance, positive when this fighter faces the acting fighter (its swing points at it), divided by 3 attack reaches                                                                                                           |
+| 22     | `dodge_frames_left`    | frames of the running dodge burst still to run, divided by `duration_frames`. The fighter is invincible while it is above 0 and cannot attack or parry                                                                                   |
+| 23     | `dodge_gap_left`       | frames left after the burst in which the fighter cannot dodge again (it can be hit), divided by `gap_frames`                                                                                                                             |
+| 24     | `dodge_held`           | 1.0 if the dodge input was held on the previous step. Only a new press starts a dodge, so a policy that keeps dodge on never dodges again, and needs this to know it must release first                                                  |
+| 25     | `stamina`              | divided by `max_stamina`. A dodge needs at least `cost`                                                                                                                                                                                  |
+| 26     | `dodge_cost`           | `cost` divided by `max_stamina`: the same for every fighter and step. It is an input so the network knows how many dodges the stamina buys                                                                                               |
 
 The three `rel_*` features are measured from the acting fighter, so they are 0 in its own
 row. They exist because each opponent row is encoded on its own: without them the network
@@ -326,11 +326,10 @@ reward = damage_reward_scale * (damage dealt - damage taken)
          + counter_reward      (the learner's counter attack hit)
          - missed_parry_penalty  (a parry ended without stopping an attack)
          - missed_attack_penalty (a swing finished without hitting or being parried)
+         - timeout_penalty     (a time-out where the agent is not ahead on health)
 ```
 
-On a time-out the environment adds `timeout_win_reward` (0.25) when the agent is ahead
-on health. It is positive but well below the victory reward, so ending a fight by
-stalling is better than losing and worse than winning.
+On a time-out the environment adds `timeout_win_reward` when the agent is ahead on health, and subtracts `timeout_penalty` when it is not. Stalling is therefore worse than fighting on, but still better than losing.
 
 **Win-only bonuses.** `health_reward` and `victory_time_bonus` are paid only on the step
 that wins the fight. Health pays more for a cleaner win, and the time bonus pays more for a
