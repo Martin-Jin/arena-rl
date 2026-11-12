@@ -7,7 +7,7 @@ scoring:
   edge_penalty_scale: 0.006
   victory_time_bonus: 1.0 # a win only: this times the share of the time limit left (0 if it lost)
   health_reward: 2.0 # a win only: this times the agent's health share at the end (health / max)
-  parry_reward: 0.25 # a successful parry
+  parry_reward: 0.4 # a successful parry
   counter_reward: 0.25 # a counter attack that hits, on top of the damage reward
   kill_reward: 1.0 # each opponent the agent finishes off; 0 turns it off
   timeout_win_reward: 0.3 # a time-out with more health than the opponents' mean: well below a kill

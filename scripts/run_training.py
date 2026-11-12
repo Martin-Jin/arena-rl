@@ -46,7 +46,7 @@ USE_CUDA_GRAPH = True
 # Opponent behavior is read from the code, not the checkpoint, so a resumed run fights the
 # current scripted opponents.
 # RESUME_FROM: str | None = None
-RESUME_FROM = "checkpoints/latest.pt"
+RESUME_FROM = "checkpoints/best.pt"
 
 
 def select_training_device() -> torch.device:
