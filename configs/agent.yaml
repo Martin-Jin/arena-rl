@@ -51,23 +51,44 @@ training:
   # Here six of sixteen are one-on-one against a single opponent, four have two fixed
   # opponents, two keep one fixed and draw the other, and four are drawn or three-wide.
   # Easy opponents (idle, random, runner) stay in the pool, so there is still a winning signal.
+  # opponents:
+  #   [
+  #     [parrier],
+  #     [runner],
+  #     [approach],
+  #     [dodger],
+  #     [idle],
+  #     [random],
+  #     [approach, parrier],
+  #     [parrier, dodger],
+  #     [idle, null],
+  #     [runner, null],
+  #     [null, null],
+  #     [approach, parrier, dodger],
+  #     [idle, null, null],
+  #     [runner, null, null],
+  #     [null, null, null],
+  #     null,
+  #   ]
+
+  # Another set of opponenets to train on.
   opponents:
     [
-      [parrier],
-      [runner],
-      [approach],
-      [dodger],
-      [idle],
-      [random],
-      [approach, parrier],
-      [parrier, dodger],
-      [idle, null],
-      [runner, null],
-      [null, null],
-      [approach, parrier, dodger],
-      [idle, null, null],
-      [runner, null, null],
-      [null, null, null],
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
       null,
     ]
   # What a null slot can be drawn as (an empty list means every opponent in the registry).
